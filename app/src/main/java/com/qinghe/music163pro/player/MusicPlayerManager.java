@@ -29,6 +29,7 @@ import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.LocalLibraryCache;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.PlaybackStats;
 
@@ -157,6 +158,8 @@ public class MusicPlayerManager {
 
     public void setContext(Context context) {
         this.appContext = context.getApplicationContext();
+        // 本地音乐库缓存：状态恢复时要靠它把「本地歌 → 路径」找回来
+        LocalLibraryCache.init(this.appContext);
     }
 
     public void setCallback(PlayerCallback callback) {
@@ -957,7 +960,17 @@ public class MusicPlayerManager {
             // 按名字反查会找不到文件。
             String localPath = song.getUrl();
             if (TextUtils.isEmpty(localPath) || !new File(localPath).exists()) {
-                localPath = DownloadManager.getDownloadedMp3Path(song);
+                // 手上的路径不可用（状态里没存 / 文件被移走 / SD 卡还没挂载好）：
+                // 先按 id 查本地音乐库缓存，查不到再退回下载目录反查。
+                String cachedPath = LocalLibraryCache.pathFor(song.getId());
+                localPath = cachedPath != null ? cachedPath
+                        : DownloadManager.getDownloadedMp3Path(song);
+            }
+            if (TextUtils.isEmpty(localPath)) {
+                // 最后兜底：不校验存在性再要一次。SD 卡尚未挂载完成时 exists() 会一律
+                // 返回 false，但缓存里那条路径其实是对的 —— 交给播放器去真正打开文件，
+                // 而不是在这里就判成「找不到」。
+                localPath = LocalLibraryCache.pathForUnchecked(song.getId());
             }
             if (!TextUtils.isEmpty(localPath)) {
                 song.setUrl(localPath);
@@ -977,6 +990,15 @@ public class MusicPlayerManager {
         // url 指向本地文件：收藏列表里读出来的本地歌曲只有 url 是本地路径、
         // 没有 forceLocalPlayback 标记，不接住它就会拿负数 id 去问网易云要链接然后失败。
         String existingUrl = song.getUrl();
+        if (TextUtils.isEmpty(existingUrl)
+                || !LocalTracks.isLocalPath(existingUrl)
+                || !new File(existingUrl).exists()) {
+            // 本地歌但手上的路径不可用 → 用缓存补一次（收藏列表里读出来的本地歌常遇到）
+            String repaired = LocalLibraryCache.pathFor(song.getId());
+            if (repaired != null) {
+                existingUrl = repaired;
+            }
+        }
         if (LocalTracks.isLocalPath(existingUrl) && new File(existingUrl).exists()) {
             startLocalPlayback(song, existingUrl);
             return;
@@ -1759,6 +1781,14 @@ public class MusicPlayerManager {
                 String restoredUrl = obj.optString("url", null);
                 if (LocalTracks.isLocalPath(restoredUrl)) {
                     song.setUrl(restoredUrl);
+                } else if (song.isForceLocalPlayback() || LocalTracks.isLocalId(song.getId())) {
+                    // 这份状态里没有路径 —— 老版本写下的就是如此，装上新版后第一次启动
+                    // 照样解析不出。用本地音乐库缓存补救：只要这首本地歌曾被扫到过或被播过，
+                    // 就能按 id 把路径找回来（缓存会自己校验文件是否还在）。
+                    String cachedPath = LocalLibraryCache.pathFor(song.getId());
+                    if (cachedPath != null) {
+                        song.setUrl(cachedPath);
+                    }
                 }
                 restoredList.add(song);
             }
@@ -1803,6 +1833,9 @@ public class MusicPlayerManager {
     private void startLocalPlayback(Song song, String localPath) {
         song.setLocalQuality(DownloadManager.detectLocalQualityFromPath(localPath));
         currentlyPlayingSongId = song.getId();
+        // 起播即入缓存：即使这次的播放状态没能存下 url（老版本写过的那份就没有），
+        // 下次启动也能按 id 把这条路径找回来。这是「重开找不到文件」的补救路径。
+        LocalLibraryCache.put(song);
         playLocalFile(localPath, song);
     }
 

@@ -19,6 +19,7 @@ import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.BatchFavoriteHelper;
+import com.qinghe.music163pro.util.LocalLibraryCache;
 import com.qinghe.music163pro.util.LocalMetadata;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.MultiSelectController;
@@ -91,6 +92,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 本地音乐库缓存：扫描结果落盘，供下次启动解析本地歌路径
+        LocalLibraryCache.init(this);
         setContentView(R.layout.activity_local_music);
 
         tvTitle = findViewById(R.id.tv_local_music_title);
@@ -190,6 +193,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
                 scanning = false;
                 localSongs.clear();
                 localSongs.addAll(found);
+                // 扫描结果写进缓存：下次启动不必等扫描完就能解析本地歌路径
+                LocalLibraryCache.putAll(found);
                 sortAndIndex();
                 if (adapter != null) {
                     adapter.notifyDataSetChanged();
