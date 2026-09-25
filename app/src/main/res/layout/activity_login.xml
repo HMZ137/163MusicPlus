@@ -64,5 +64,47 @@
             android:textAllCaps="false"
             style="@style/Widget.App.Button.Outlined" />
 
+        <!--
+          Cookie 备份：导出到公共外部存储（/sdcard/163Music/cookie.txt），卸载不会被清，
+          重装后点「读取 Cookie」即可恢复登录。
+          两个按钮并排而不是各占一行 —— 320px 表盘竖向空间很紧，并排能省下 42px。
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_export_cookie"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="@string/cookie_export"
+                android:textSize="12sp"
+                android:textAllCaps="false"
+                style="@style/Widget.App.Button.Outlined" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_import_cookie"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="@string/cookie_import"
+                android:textSize="12sp"
+                android:textAllCaps="false"
+                style="@style/Widget.App.Button.Outlined" />
+        </LinearLayout>
+
+        <!-- 备份位置 + 最近一次导出时间，运行时填 -->
+        <TextView
+            android:id="@+id/tv_cookie_backup_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
+
     </LinearLayout>
 </ScrollView>
