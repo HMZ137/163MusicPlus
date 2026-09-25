@@ -25,6 +25,7 @@ import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.WatchUiUtils;
 
 import org.json.JSONObject;
 
@@ -95,7 +96,9 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         tvTitle.setTextColor(0xFFFFFFFF);
         tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
         tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(px(56), 0, px(56), px(4));
+        // 左右各留出可用空间：左边给浮动返回按钮，右边给「删除/收藏」那 44px 按钮
+        // （按钮距右边缘还有一圈圆角安全内缩，所以右侧要比左侧多留一点）
+        tvTitle.setPadding(px(56), 0, px(80), px(4));
         tvTitle.setSingleLine(true);
         tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
@@ -105,32 +108,42 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         tvTitle.setLayoutParams(titleParams);
         titleRow.addView(tvTitle);
 
-        // Delete button - top right
+        // 删除按钮 —— 贴右上，但要留出「圆角安全内缩」，否则会被物理圆角切掉
+        int corner = WatchUiUtils.cornerInset(this);
         btnDelete = new ImageView(this);
         btnDelete.setImageResource(R.drawable.ic_delete);
-        btnDelete.setPadding(px(4), px(4), px(2), px(4));
         btnDelete.setClickable(true);
         btnDelete.setFocusable(true);
         btnDelete.setId(View.generateViewId());
+        // 触控区取 44px（原来 26x28 太小）；图标靠 padding 收到 ~20px 居中
         android.widget.RelativeLayout.LayoutParams delParams = new android.widget.RelativeLayout.LayoutParams(
-                px(26), px(28));
+                px(44), px(44));
         delParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
         delParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        delParams.setMarginEnd(corner);
         btnDelete.setLayoutParams(delParams);
+        btnDelete.setPadding(px(12), px(12), px(12), px(12));
         btnDelete.setVisibility(View.GONE);
         btnDelete.setOnClickListener(v -> onDeletePlaylist());
         titleRow.addView(btnDelete);
 
-        // Heart button - left of delete
+        // 收藏按钮 —— **直接贴父容器右端，不再用 LEFT_OF 删除按钮定位**。
+        //
+        // 原来写的是 LEFT_OF btnDelete，而 updateActionButtons() 里「别人的歌单」那一支
+        // （雷达歌单就属于这种）会把 btnDelete 设为 GONE —— RelativeLayout 中相对一个 GONE
+        // 的视图定位，依赖方会被甩到父容器最左侧。结果收藏按钮跑到左上角，正好压在浮动
+        // 返回按钮底下：位置错、而且点不到。
+        // 两个按钮在任何分支里都不会同时可见，所以各自贴右端即可，不会重叠。
         btnFav = new ImageView(this);
-        btnFav.setPadding(px(2), px(4), px(4), px(4));
         btnFav.setClickable(true);
         btnFav.setFocusable(true);
         android.widget.RelativeLayout.LayoutParams favParams = new android.widget.RelativeLayout.LayoutParams(
-                px(26), px(28));
-        favParams.addRule(android.widget.RelativeLayout.LEFT_OF, btnDelete.getId());
+                px(44), px(44));
+        favParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
         favParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        favParams.setMarginEnd(corner);
         btnFav.setLayoutParams(favParams);
+        btnFav.setPadding(px(12), px(12), px(12), px(12));
         btnFav.setOnClickListener(v -> togglePlaylistFav());
         titleRow.addView(btnFav);
 
