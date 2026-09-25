@@ -25,7 +25,9 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.activity.MainActivity;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.LocalTracks;
 
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -295,6 +297,25 @@ public class MusicPlaybackService extends Service {
         }
     }
 
+    /**
+     * 这个封面地址能否交给**别的进程**去加载。
+     *
+     * <p>刻意不复用 {@link LocalTracks#isLocalPath} —— 那个回答的是「是不是本地文件路径」
+     * （用于播放路由），而这里问的是「别的进程读不读得到」，是两回事：
+     * {@code content://} 不是 http，但恰恰是**可以**跨进程读的。用「非 http 即不可外传」
+     * 会把将来的 FileProvider 方案一并挡掉，所以这里用白名单，未知 scheme 一律不外传
+     * （宁可不显示，也别让对方拿到一个必然失败的地址）。</p>
+     */
+    private static boolean isShareableCoverUrl(String url) {
+        if (TextUtils.isEmpty(url)) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.US);
+        return lower.startsWith("http://")
+                || lower.startsWith("https://")
+                || lower.startsWith("content://");
+    }
+
     private void postXtcCard() {
         notificationManager.notify(XTC_NOTIFICATION_ID,
                 buildXtcCardNotification(currentSongName, currentArtist,
@@ -377,7 +398,12 @@ public class MusicPlaybackService extends Service {
         extras.putInt("PLAY_STATE",    isPlaying ? PLAY_STATE_PLAYING : PLAY_STATE_PAUSED);
         extras.putString("SONG_NAME",   title);
         extras.putString("SINGER_NAME", text);
-        if (!TextUtils.isEmpty(coverUrl)) {
+        // 只在封面是「别的进程读得到」的地址时才外传。
+        // 读这个 extra 的是小天才手表系统 UI —— 另一个进程。而本地音乐的封面落在
+        // 应用私有缓存 /data/data/<包名>/cache/local_cover/ 下，它读不到，
+        // 塞过去只会是一张破图。不传的话本地歌的音乐卡片就不显示封面，
+        // 与引入本地封面读取之前的行为一致。
+        if (isShareableCoverUrl(coverUrl)) {
             extras.putString("ALBUM_COVER_URL", coverUrl);
         }
         extras.putParcelable("PLAY_PAUSE_INTENT", playPausePi);
