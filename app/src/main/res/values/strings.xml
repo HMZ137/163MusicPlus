@@ -55,6 +55,13 @@
     <string name="local_music">本地音乐</string>
     <string name="local_music_entry">本地</string>
     <string name="local_music_shuffle">随机</string>
+    <!-- 打开「字母选择页」的入口按钮。短，因为 320px 标题栏还要留给标题和「随机」 -->
+    <string name="local_music_letters">A-Z</string>
+    <string name="letter_picker_title">选择字母</string>
+    <string name="letter_picker_empty">还没有本地音乐</string>
+    <!-- 字母选择页里格子上的副标题，例如「12 首」 -->
+    <string name="letter_picker_count">%1$d首</string>
+    <string name="letter_picker_none">无</string>
     <string name="playback_stats">播放统计</string>
     <string name="playback_stats_clear">清空统计</string>
     <string name="bilibili_entry">听bilibili</string>

@@ -25,6 +25,53 @@
             android:paddingTop="4dp"
             android:paddingBottom="8dp" />
 
+        <!--
+          本地播放模式：放了设置列表的第一项。它不是一个普通开关 ——
+          打开之后更多页里所有依赖账号/网络的入口都会消失，整个应用变成纯本地播放器，
+          所以要放在最容易找到的位置，也要让人一眼看出这是个「模式」而不是「偏好」。
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="本地播放模式"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="只看本机音乐，隐藏云端功能"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_local_only_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:layout_marginStart="16dp"
+            android:background="@color/divider" />
+
         <!-- Keep screen on: SwitchMaterial row -->
         <LinearLayout
             android:layout_width="match_parent"

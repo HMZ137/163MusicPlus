@@ -1,7 +1,6 @@
 package com.qinghe.music163pro.util;
 
 import android.app.Activity;
-import android.content.SharedPreferences;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -47,11 +46,15 @@ public final class BatchFavoriteHelper {
     private BatchFavoriteHelper() {
     }
 
-    /** 当前是否使用云端收藏。与单曲收藏读取的是同一份设置，保证行为一致。 */
+    /**
+     * 当前是否使用云端收藏。与单曲收藏读取的是同一份设置，保证行为一致。
+     *
+     * <p>判定收在 {@link PlaybackMode#isCloudFavoriteEnabled} 里：本地播放模式下批量收藏
+     * 也必须落本地库，否则会出现「列表页批量收藏写了云端、播放页单曲收藏写了本地」
+     * 这种同一个按钮两种结果的怪事。</p>
+     */
     public static boolean isCloudFavoriteMode(Activity activity) {
-        SharedPreferences prefs =
-                activity.getSharedPreferences("music163_settings", Activity.MODE_PRIVATE);
-        return prefs.getBoolean("fav_mode_cloud", false);
+        return PlaybackMode.isCloudFavoriteEnabled(activity);
     }
 
     /**

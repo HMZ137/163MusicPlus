@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  字母选择格里的一格。深色底 + 极淡填充，靠 ripple 给点按反馈。
+  只做视觉，不做尺寸 —— 尺寸由 GridView 的 columnWidth 决定，这样格子在
+  不同屏宽的手表上都能自动铺满，不需要为每档分辨率调数值。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF">
+
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#1FFFFFFF" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+</ripple>

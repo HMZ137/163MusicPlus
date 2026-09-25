@@ -17,6 +17,7 @@ import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.MoreMenuPreferences;
+import com.qinghe.music163pro.util.PlaybackMode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.List;
  */
 public class MoreActivity extends BaseWatchActivity {
 
+    private View btnLocalMusic;
     private View btnProfile;
     private View btnPersonalFM;
     private View btnMyPlaylists;
@@ -60,6 +62,7 @@ public class MoreActivity extends BaseWatchActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
+        btnLocalMusic = findViewById(R.id.btn_menu_local_music);
         btnFavorites = findViewById(R.id.btn_menu_favorites);
         btnMyPlaylists = findViewById(R.id.btn_menu_my_playlists);
         btnDailyRecommend = findViewById(R.id.btn_menu_daily_recommend);
@@ -76,6 +79,12 @@ public class MoreActivity extends BaseWatchActivity {
         btnPersonalFM = findViewById(R.id.btn_menu_personal_fm);
         btnLogin = findViewById(R.id.btn_menu_login);
         btnSettings = findViewById(R.id.btn_menu_settings);
+
+        // 本机音乐：本地播放模式下的主入口（云音乐模式下这个磁贴不显示）
+        if (btnLocalMusic != null) {
+            btnLocalMusic.setOnClickListener(v ->
+                    startActivity(new Intent(this, LocalMusicActivity.class)));
+        }
 
         btnFavorites.setOnClickListener(v ->
                 startActivity(new Intent(this, FavoritesListActivity.class)));
@@ -171,6 +180,11 @@ public class MoreActivity extends BaseWatchActivity {
     }
 
     private void updateMenuVisibility() {
+        // 本机音乐磁贴的显隐完全由播放模式决定，不参与「编辑更多菜单」的勾选体系
+        if (btnLocalMusic != null) {
+            btnLocalMusic.setVisibility(
+                    PlaybackMode.isLocalOnly(this) ? View.VISIBLE : View.GONE);
+        }
         applyVisibility(btnFavorites, MoreMenuPreferences.KEY_FAVORITES, false);
         applyVisibility(btnMyPlaylists, MoreMenuPreferences.KEY_MY_PLAYLISTS, true);
         applyVisibility(btnDailyRecommend, MoreMenuPreferences.KEY_DAILY_RECOMMEND, true);
@@ -215,6 +229,13 @@ public class MoreActivity extends BaseWatchActivity {
         java.util.List<String> order = MoreMenuPreferences.getOrder(prefs);
         parent.removeAllViews();
         parent.addView(titleView);
+        // 本地播放模式下把「本机音乐」钉在最前 —— 纯本地播放器最常用的入口就是它。
+        // 注意这里必须显式补回：removeAllViews() 之后只会按 order 重建，不在 order 里的
+        // 视图会永久消失（这正是「漏注册 ≠ 排到后面，而是整块不见了」的那个坑）。
+        if (btnLocalMusic != null
+                && btnLocalMusic.getVisibility() == View.VISIBLE) {
+            parent.addView(btnLocalMusic);
+        }
         for (String key : order) {
             View view = viewByKey.get(key);
             if (view != null) parent.addView(view);
@@ -223,9 +244,14 @@ public class MoreActivity extends BaseWatchActivity {
     }
 
     private void applyVisibility(View target, String key, boolean requireLogin) {
+        if (target == null) return;
         boolean enabled = MoreMenuPreferences.isEnabled(prefs, key);
         boolean loggedIn = !requireLogin || Boolean.TRUE.equals(target.getTag());
-        target.setVisibility(enabled && loggedIn ? View.VISIBLE : View.GONE);
+        // 本地播放模式下，依赖账号/网络的云端入口一律隐藏。这里只做「藏起来」，
+        // 不动任何播放链路 —— 云音乐模式下所有判定都与改动前完全一致。
+        boolean cloudAllowed = !PlaybackMode.isLocalOnly(this)
+                || !PlaybackMode.isCloudFeature(key);
+        target.setVisibility(enabled && loggedIn && cloudAllowed ? View.VISIBLE : View.GONE);
     }
 
     private void startPersonalFM() {

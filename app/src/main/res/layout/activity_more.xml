@@ -24,6 +24,37 @@
             android:paddingTop="4dp"
             android:paddingBottom="8dp" />
 
+        <!--
+          本机音乐：只在「本地播放模式」下出现，并且被 applyMenuOrder() 提到列表最前。
+          它不是 MoreMenuPreferences 里的可排序磁贴 —— 它的显隐由播放模式决定，
+          而不是由用户在「编辑更多菜单」里勾选。默认 gone，云音乐模式下完全不可见。
+        -->
+        <LinearLayout
+            android:id="@+id/btn_menu_local_music"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"
+            android:visibility="gone">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_phone_android"
+                android:alpha="0.7" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="本机音乐"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/btn_menu_favorites"
             android:layout_width="match_parent"

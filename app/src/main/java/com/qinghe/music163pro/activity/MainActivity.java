@@ -54,6 +54,7 @@ import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.util.BackgroundUtil;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.LyricSettings;
+import com.qinghe.music163pro.util.PlaybackMode;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONObject;
@@ -653,6 +654,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // 评论、歌单，下载与设铃声也没有意义。所以按 localOnly 把不可用的项去掉，
         // 并把「收藏」换成只写本地库、带本地标签的「收藏本地音乐」。
         final boolean localOnly = LocalTracks.isLocalOnly(song);
+        // 本地播放模式下整机都不该再出现云端动作 —— 即使当前这首是云歌
+        // （比如切模式之前就排在队列里的），下载 / 评论 / 歌单 / 音质 也一样点不通。
+        // 两者合并成 cloudBlocked 之后，下面原有的 if (!localOnly) 分支全部复用，
+        // 不必为「模式」再写一套平行的菜单逻辑。
+        final boolean localMode = PlaybackMode.isLocalOnly(this);
+        final boolean cloudBlocked = localOnly || localMode;
         final long localFavId = LocalTracks.idForPath(song.getUrl());
 
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
@@ -667,16 +674,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         } else {
             isFav = favoritesManager.isFavorite(song.getId());
         }
-        row1.addView(createFuncItem(isFav ? R.drawable.ic_favorite : R.drawable.ic_favorite_border,
-                localOnly ? (isFav ? "取消收藏" : "收藏本地音乐") : (isFav ? "取消收藏" : "收藏"),
-                v -> {
-                    if (localOnly) {
-                        onFuncFavoriteLocal(song);
-                    } else {
-                        onFuncFavorite(song);
-                    }
-                }));
-        if (!localOnly) {
+        // 本地播放模式下，云歌没有「能收藏进去的地方」—— 本地收藏库是按文件路径存键的，
+        // 云歌的流地址会过期，存进去就是一条查不回来的死记录。所以这种情况直接不显示收藏，
+        // 而不是让它去写一个没有意义的负数 id。
+        if (localOnly || !localMode) {
+            row1.addView(createFuncItem(isFav ? R.drawable.ic_favorite : R.drawable.ic_favorite_border,
+                    localOnly ? (isFav ? "取消收藏" : "收藏本地音乐") : (isFav ? "取消收藏" : "收藏"),
+                    v -> {
+                        if (localOnly) {
+                            onFuncFavoriteLocal(song);
+                        } else {
+                            onFuncFavorite(song);
+                        }
+                    }));
+        }
+        if (!cloudBlocked) {
             row1.addView(createFuncItem(R.drawable.ic_get_app, "下载",
                     v -> onFuncDownload(song)));
         }
@@ -690,7 +702,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row2.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        if (!localOnly) {
+        if (!cloudBlocked) {
             row2.addView(createFuncItem(R.drawable.ic_notifications, "设为铃声",
                     v -> onFuncSetRingtone(song)));
         }
@@ -766,7 +778,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        if (!localOnly) {
+        if (!cloudBlocked) {
             row4.addView(createFuncItem(R.drawable.ic_info, "音乐信息",
                     v -> onFuncSongInfo(song)));
             row4.addView(createFuncItem(R.drawable.ic_comment, "评论",
@@ -784,7 +796,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         row5.addView(createFuncItem(R.drawable.ic_queue_music, "播放列表",
                 v -> onFuncShowPlaylist()));
-        if (!localOnly) {
+        if (!cloudBlocked) {
             row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
                     v -> onFuncAddToPlaylist(song)));
         }
@@ -802,7 +814,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String curQuality = getCurrentQualityLabel(song,
                 qualityPrefs.getString("preferred_quality", "exhigh"));
         String qualityLabel = "音质: " + getQualityShortName(curQuality);
-        if (!localOnly) {
+        if (!cloudBlocked) {
             row6.addView(createFuncItem(R.drawable.ic_audio_quality, qualityLabel,
                     v -> onFuncSelectQuality()));
         }

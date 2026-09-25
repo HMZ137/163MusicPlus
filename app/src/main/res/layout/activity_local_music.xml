@@ -6,19 +6,25 @@
     android:orientation="vertical"
     android:padding="6dp">
 
-    <!-- 标题栏：标题 weight=1 + 右侧「随机」；与下载列表同一套做法，结构上不会重叠 -->
-    <LinearLayout
+    <!--
+      标题栏：右侧放「A-Z」和「随机」两个动作。
+      改成 RelativeLayout + layout_toStartOf 链式避让是必须的 —— 之前用的是
+      LinearLayout（标题 weight=1），再加一个按钮会让标题被挤到左半边、看着像没居中。
+      下载列表页早就踩过这个坑，这里直接对齐它的做法。
+    -->
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
         android:paddingBottom="6dp">
 
+        <!-- 标题止于「A-Z」按钮之前，否则居中后会伸到按钮底下 -->
         <TextView
             android:id="@+id/tv_local_music_title"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@id/btn_local_letters"
+            android:layout_centerVertical="true"
             android:text="@string/local_music"
             android:textColor="@color/text_primary"
             android:textSize="14sp"
@@ -26,10 +32,29 @@
             android:letterSpacing="0.05"
             android:gravity="center" />
 
+        <!-- 打开独立的字母选择页。原来那条贴边的窄索引条已经去掉，列表因此拿回全宽 -->
+        <TextView
+            android:id="@+id/btn_local_letters"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toStartOf="@id/btn_local_shuffle"
+            android:layout_centerVertical="true"
+            android:text="@string/local_music_letters"
+            android:textColor="@color/colorPrimary"
+            android:textSize="12sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:clickable="true"
+            android:focusable="true" />
+
         <TextView
             android:id="@+id/btn_local_shuffle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
             android:text="@string/local_music_shuffle"
             android:textColor="@color/colorPrimary"
             android:textSize="12sp"
@@ -39,32 +64,15 @@
             android:paddingBottom="4dp"
             android:clickable="true"
             android:focusable="true" />
-    </LinearLayout>
+    </RelativeLayout>
 
-    <!-- 列表 + 右侧字母索引 -->
-    <LinearLayout
+    <ListView
+        android:id="@+id/lv_local_music"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="horizontal">
-
-        <ListView
-            android:id="@+id/lv_local_music"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:divider="@color/divider"
-            android:dividerHeight="0.5dp" />
-
-        <LinearLayout
-            android:id="@+id/layout_letter_index"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_vertical"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp" />
-    </LinearLayout>
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp" />
 
     <TextView
         android:id="@+id/tv_local_music_empty"

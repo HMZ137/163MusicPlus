@@ -15,6 +15,7 @@ import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.LyricSettings;
+import com.qinghe.music163pro.util.PlaybackMode;
 import com.qinghe.music163pro.util.UiScale;
 
 /**
@@ -51,6 +52,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
     private SwitchMaterial switchKeepScreenOn;
     private SwitchMaterial switchSleepTimerExitApp;
+    private SwitchMaterial switchLocalOnlyMode;
     private TextView tvFavModeValue;
     private TextView tvSleepTimerModeValue;
     private TextView tvSpeedModeValue;
@@ -78,6 +80,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
         switchKeepScreenOn = findViewById(R.id.switch_keep_screen_on);
         switchSleepTimerExitApp = findViewById(R.id.switch_sleep_timer_exit_app);
+        switchLocalOnlyMode = findViewById(R.id.switch_local_only_mode);
         tvFavModeValue = findViewById(R.id.tv_fav_mode_value);
         tvSleepTimerModeValue = findViewById(R.id.tv_sleep_timer_mode_value);
         tvSpeedModeValue = findViewById(R.id.tv_speed_mode_value);
@@ -116,6 +119,22 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             }
         });
+
+        // 本地播放模式 / 云音乐模式
+        if (switchLocalOnlyMode != null) {
+            switchLocalOnlyMode.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                // 必须走 PlaybackMode.setLocalOnly —— 它同时会关掉/还原「收藏走云端」，
+                // 直接写 pref 会漏掉那一步
+                PlaybackMode.setLocalOnly(this, isChecked);
+                // 收藏模式的值在本地模式下是「锁定」的，切完模式要重新回显一次
+                updateFavModeValue();
+                Toast.makeText(this, isChecked
+                                ? "已切换到本地播放模式，云端功能已隐藏"
+                                : "已切换到云音乐模式",
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
 
         switchSleepTimerExitApp.setOnCheckedChangeListener((btn, isChecked) -> {
             if (updatingSwitch) return;
@@ -312,6 +331,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         updatingSwitch = true;
         switchKeepScreenOn.setChecked(prefs.getBoolean("keep_screen_on", false));
         switchSleepTimerExitApp.setChecked(prefs.getBoolean(PREF_SLEEP_TIMER_EXIT_APP, false));
+        if (switchLocalOnlyMode != null) {
+            switchLocalOnlyMode.setChecked(PlaybackMode.isLocalOnly(this));
+        }
         updatingSwitch = false;
         updateFavModeValue();
         updateSleepTimerModeValue();
@@ -322,6 +344,11 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     private void cycleFavMode() {
+        // 本地播放模式下这里没有可切的东西：收藏被强制走本地库
+        if (PlaybackMode.isLocalOnly(this)) {
+            Toast.makeText(this, "本地播放模式下收藏固定在本地", Toast.LENGTH_SHORT).show();
+            return;
+        }
         boolean isCloud = prefs.getBoolean(PREF_FAV_MODE_CLOUD, false);
         boolean newCloud = !isCloud;
         prefs.edit().putBoolean(PREF_FAV_MODE_CLOUD, newCloud).apply();
@@ -331,6 +358,11 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
     private void updateFavModeValue() {
         if (tvFavModeValue == null) return;
+        if (PlaybackMode.isLocalOnly(this)) {
+            // 显示「锁定」而不是偷偷沿用上次的值 —— 否则用户会以为云端收藏还有效
+            tvFavModeValue.setText("本地（锁定）");
+            return;
+        }
         boolean isCloud = prefs.getBoolean(PREF_FAV_MODE_CLOUD, false);
         tvFavModeValue.setText(isCloud ? "云端" : "本地");
     }

@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -9,7 +10,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,6 +19,7 @@ import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.BatchFavoriteHelper;
+import com.qinghe.music163pro.util.LocalMetadata;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.MultiSelectController;
 import com.qinghe.music163pro.util.NetworkImageLoader;
@@ -43,6 +44,14 @@ import java.util.Map;
  * <p>扫描范围刻意限定，不做全盘遍历（手表上又慢又费电）：
  * {@code 163Music/}（跳过 Download 子树，那是下载列表的地盘）、{@code Music/}、
  * {@code Download/}，且递归深度限制在 {@link #MAX_DEPTH} 层。</p>
+ *
+ * <p><b>曲名 / 歌手 / 封面来自哪儿：</b>优先读音频文件自己的元信息标签
+ * （见 {@link LocalMetadata}），标签缺失才回落到「文件名里的『曲名 - 曲师』」，
+ * 再回落不到就用所在目录名当歌手。此前只做了后两级，于是自己拷进来的歌在列表里
+ * 一律显示文件名、封面全空 —— 即使文件里本来就带着标签和封面。</p>
+ *
+ * <p><b>两个阶段显示：</b>扫描（列文件，快）先出列表；读元信息（每首要解一次音频，慢）
+ * 在后台补上并逐批刷新。这样进页面立刻能看到歌单，而不是黑屏等十几秒。</p>
  */
 public class LocalMusicActivity extends BaseWatchActivity {
 
@@ -50,17 +59,31 @@ public class LocalMusicActivity extends BaseWatchActivity {
     private static final int MAX_DEPTH = 4;
     /** 单次扫描最多收集多少首，防止内存被撑爆。 */
     private static final int MAX_TRACKS = 500;
+    /** 打开字母选择页的请求码。 */
+    private static final int REQUEST_LETTER_PICKER = 0x51;
+    /** 元信息补齐过程中，每处理这么多首就刷新一次列表。 */
+    private static final int METADATA_NOTIFY_EVERY = 8;
 
     private final List<Song> localSongs = new ArrayList<>();
-    /** 首字母 -> 该字母第一首歌在 localSongs 里的下标（用于索引跳转）。 */
-    private final Map<Character, Integer> letterIndex = new LinkedHashMap<>();
+    /**
+     * 分组标题（一个字符一组）与每组的首曲下标 / 曲目数，三份等长。
+     * 直接以「并行数组」形式持有，是因为要原样塞进 Intent 传给字母选择页；
+     * 换成 List&lt;对象&gt; 还得再序列化一次。
+     */
+    private final List<Character> groupLetters = new ArrayList<>();
+    private int[] groupStarts = new int[0];
+    private int[] groupCounts = new int[0];
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /**
+     * 扫描批次号。重新扫描时自增，用来丢弃上一批还没跑完的元信息补齐 ——
+     * 否则旧批次的回调会往新列表里写数据，出现「歌名对不上歌」。
+     */
+    private int scanGeneration;
 
     private ArrayAdapter<Song> adapter;
     private ListView lvSongs;
     private TextView tvEmpty;
     private TextView tvTitle;
-    private LinearLayout letterIndexLayout;
     private MultiSelectController multiSelect;
     private boolean scanning;
 
@@ -72,7 +95,11 @@ public class LocalMusicActivity extends BaseWatchActivity {
         tvTitle = findViewById(R.id.tv_local_music_title);
         lvSongs = findViewById(R.id.lv_local_music);
         tvEmpty = findViewById(R.id.tv_local_music_empty);
-        letterIndexLayout = findViewById(R.id.layout_letter_index);
+
+        View btnLetters = findViewById(R.id.btn_local_letters);
+        if (btnLetters != null) {
+            btnLetters.setOnClickListener(v -> openLetterPicker());
+        }
 
         View btnShuffle = findViewById(R.id.btn_local_shuffle);
         if (btnShuffle != null) {
@@ -89,8 +116,10 @@ public class LocalMusicActivity extends BaseWatchActivity {
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
                     tvName.setText(song.getName());
-                    tvArtist.setText(song.getArtist());
+                    // 元信息里可能根本没有歌手 —— 兜底会给出空串，这里再防一次 null
+                    tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());
                     if (ivCover != null) {
+                        // 本地封面走 file:// ，NetworkImageLoader 已经支持这条分支
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
                     }
                 }
@@ -147,10 +176,14 @@ public class LocalMusicActivity extends BaseWatchActivity {
             return;
         }
         scanning = true;
+        final int generation = ++scanGeneration;
         setTitleText("扫描中…");
         new Thread(() -> {
             final List<Song> found = scanLocalAudio();
             mainHandler.post(() -> {
+                if (generation != scanGeneration) {
+                    return;
+                }
                 scanning = false;
                 localSongs.clear();
                 localSongs.addAll(found);
@@ -160,6 +193,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
                 }
                 updateEmptyState();
             });
+            // 列表已经显示出来之后，再慢慢补元信息（不阻塞「先看到歌单」）
+            readMetadata(found, generation);
         }).start();
     }
 
@@ -219,10 +254,24 @@ public class LocalMusicActivity extends BaseWatchActivity {
         }
     }
 
+    /** 从文件名猜出来的「曲名 / 曲师」。元信息读不到时用它兜底。 */
+    private static final class NameGuess {
+        final String name;
+        final String artist;
+
+        NameGuess(String name, String artist) {
+            this.name = name;
+            this.artist = artist;
+        }
+    }
+
     /**
-     * 按「曲名 - 曲师」把文件名还原成歌曲；解析不出曲师时用所在目录名兜底。
+     * 按「曲名 - 曲师」把文件名拆开；拆不出曲师时用所在目录名兜底。
+     *
+     * <p>这个猜测在两处用到：扫描时先给出一个能看的标题，以及元信息补齐时作为
+     * 缺失字段的回落值。所以抽成一个函数，保证两处口径完全一致。</p>
      */
-    private Song fileToSong(File file) {
+    private static NameGuess guessFromFileName(File file) {
         String base = DownloadManager.stripAudioExtension(file.getName());
         String name = base;
         String artist = "";
@@ -236,20 +285,96 @@ public class LocalMusicActivity extends BaseWatchActivity {
                 artist = parent.getName();
             }
         }
+        return new NameGuess(name, artist);
+    }
+
+    /**
+     * 先用文件名猜出来的信息建一个 Song，保证扫描一结束列表就能显示。
+     * 元信息标签稍后由 {@link #readMetadata} 补上。
+     */
+    private Song fileToSong(File file) {
+        NameGuess guess = guessFromFileName(file);
         String path = file.getAbsolutePath();
         // 本地文件没有网易云 id，用路径哈希造一个稳定的负数 id
         // （负数本身就是「本地」标签，见 LocalTracks）
         Song song = new Song(LocalTracks.idForPath(path),
-                LocalTracks.safeName(name), artist, "");
+                LocalTracks.safeName(guess.name), guess.artist, "");
         song.setUrl(path);
         song.setForceLocalPlayback(true);
         return song;
     }
 
+    /**
+     * 逐首读元信息，把标题 / 歌手 / 内嵌封面补进 Song。
+     *
+     * <p><b>不能放主线程</b>：每首要开一次 {@link android.media.MediaMetadataRetriever}，
+     * 几百首就是十几秒。这里在扫描线程上跑，边跑边分批发通知刷新界面。</p>
+     *
+     * <p>排序只在全部补完之后重做一次 —— 中途重排会让用户正在看的列表不断跳动。</p>
+     *
+     * <p>两个提前退出的条件：换了一轮扫描（{@code generation} 变了），或者页面已经关了。
+     * 后者是必要的 —— 这几百次音频解析很贵，用户点一下就退出的话不该继续烧电。</p>
+     */
+    private void readMetadata(List<Song> songs, int generation) {
+        boolean changed = false;
+        int processed = 0;
+        for (Song song : songs) {
+            if (generation != scanGeneration || isFinishing() || isDestroyed()) {
+                // 已经重新扫描过一轮，或者页面已经关掉，这批结果作废，别再往下白跑
+                return;
+            }
+            processed++;
+            File audio = new File(song.getUrl());
+            LocalMetadata.Info info = LocalMetadata.read(this, audio);
+            NameGuess guess = guessFromFileName(audio);
+
+            String name = info.hasTitle() ? info.title : guess.name;
+            String artist = info.hasArtist() ? info.artist : guess.artist;
+            String newName = LocalTracks.safeName(name);
+            String newArtist = artist == null ? "" : artist;
+            if (!newName.equals(song.getName())) {
+                song.setName(newName);
+                changed = true;
+            }
+            if (!newArtist.equals(song.getArtist())) {
+                song.setArtist(newArtist);
+                changed = true;
+            }
+            if (info.cover != null && !info.cover.getAbsolutePath().isEmpty()) {
+                String coverUrl = "file://" + info.cover.getAbsolutePath();
+                if (!coverUrl.equals(song.getCoverUrl())) {
+                    song.setCoverUrl(coverUrl);
+                    changed = true;
+                }
+            }
+            // 边补边刷新：让用户看到名字一个个变正确，而不是一次性跳变
+            if (processed % METADATA_NOTIFY_EVERY == 0) {
+                mainHandler.post(() -> {
+                    if (generation == scanGeneration && adapter != null) {
+                        adapter.notifyDataSetChanged();
+                    }
+                });
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        mainHandler.post(() -> {
+            if (generation != scanGeneration) {
+                return;
+            }
+            // 曲名换成元信息里的之后，字母归属可能变了，重排一次
+            sortAndIndex();
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
+        });
+    }
+
     // ==================== 排序与首字母索引 ====================
 
     /**
-     * 按拼音首字母排序，并建立「首字母 → 第一首下标」的索引。
+     * 按拼音首字母排序，并建立「首字母 → 第一首下标」的分组。
      *
      * <p>先比首字母（{@link PinyinUtils}），同字母内再按中文排序规则比曲名，
      * 这样「张/周/赵」之间也是稳定的字典序，而不是随扫描顺序乱跳。</p>
@@ -272,43 +397,70 @@ public class LocalMusicActivity extends BaseWatchActivity {
             }
             return 0;
         });
-
-        letterIndex.clear();
-        for (int i = 0; i < localSongs.size(); i++) {
-            char initial = PinyinUtils.initialOfWord(localSongs.get(i).getName());
-            if (!letterIndex.containsKey(initial)) {
-                letterIndex.put(initial, i);
-            }
-        }
-        buildLetterIndexBar();
+        buildLetterGroups();
     }
 
-    /** 右侧的字母索引条：只列出实际存在的字母，点一下跳到该字母的第一首。 */
-    private void buildLetterIndexBar() {
-        if (letterIndexLayout == null) {
+    /** 按排好序的列表生成分组信息，供字母选择页使用。 */
+    private void buildLetterGroups() {
+        Map<Character, Integer> firstIndex = new LinkedHashMap<>();
+        Map<Character, Integer> counts = new LinkedHashMap<>();
+        for (int i = 0; i < localSongs.size(); i++) {
+            char initial = PinyinUtils.initialOfWord(localSongs.get(i).getName());
+            if (!firstIndex.containsKey(initial)) {
+                firstIndex.put(initial, i);
+            }
+            Integer count = counts.get(initial);
+            counts.put(initial, count == null ? 1 : count + 1);
+        }
+        groupLetters.clear();
+        groupStarts = new int[firstIndex.size()];
+        groupCounts = new int[firstIndex.size()];
+        int index = 0;
+        for (Map.Entry<Character, Integer> entry : firstIndex.entrySet()) {
+            groupLetters.add(entry.getKey());
+            groupStarts[index] = entry.getValue();
+            Integer count = counts.get(entry.getKey());
+            groupCounts[index] = count == null ? 0 : count;
+            index++;
+        }
+    }
+
+    /**
+     * 打开独立的字母选择页。
+     *
+     * <p>原来这里维护的是列表右侧那条竖排窄索引条。它在 320px 的表盘上最窄只能塞
+     * 9sp 的字，点不准 —— 换成独立一屏的大格子后触控面积翻了 5 倍以上。</p>
+     */
+    private void openLetterPicker() {
+        if (groupLetters.isEmpty()) {
+            Toast.makeText(this, "还没有可跳转的字母", Toast.LENGTH_SHORT).show();
             return;
         }
-        letterIndexLayout.removeAllViews();
-        if (letterIndex.isEmpty()) {
+        StringBuilder letters = new StringBuilder(groupLetters.size());
+        for (Character letter : groupLetters) {
+            letters.append(letter.charValue());
+        }
+        Intent intent = new Intent(this, LetterPickerActivity.class);
+        intent.putExtra(LetterPickerActivity.EXTRA_LETTERS, letters.toString());
+        intent.putExtra(LetterPickerActivity.EXTRA_STARTS, groupStarts);
+        intent.putExtra(LetterPickerActivity.EXTRA_COUNTS, groupCounts);
+        // 把当前停留位置传过去，让选择页把所在字母高亮出来
+        intent.putExtra(LetterPickerActivity.EXTRA_CURRENT, lvSongs.getFirstVisiblePosition());
+        startActivityForResult(intent, REQUEST_LETTER_PICKER);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_LETTER_PICKER || resultCode != RESULT_OK || data == null) {
             return;
         }
-        boolean compact = letterIndex.size() > 16;
-        for (Map.Entry<Character, Integer> entry : letterIndex.entrySet()) {
-            final int targetIndex = entry.getValue();
-            TextView letterView = new TextView(this);
-            letterView.setText(PinyinUtils.labelOf(entry.getKey()));
-            letterView.setTextColor(getResources().getColor(R.color.colorPrimary));
-            letterView.setTextSize(compact ? 9 : 11);
-            letterView.setGravity(Gravity.CENTER);
-            letterView.setPadding(dpToPx(3), dpToPx(1), dpToPx(3), dpToPx(1));
-            letterView.setClickable(true);
-            letterView.setFocusable(true);
-            letterView.setOnClickListener(v -> {
-                // setSelection 会把该行滚到顶部，正好是「跳到这个字母的位置」
-                lvSongs.setSelection(Math.max(0, targetIndex));
-            });
-            letterIndexLayout.addView(letterView);
+        int target = data.getIntExtra(LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
+        if (target < 0) {
+            return;
         }
+        // setSelection 会把该行滚到顶部，正好是「跳到这个字母的位置」
+        lvSongs.setSelection(Math.max(0, Math.min(target, localSongs.size() - 1)));
     }
 
     /** 随机播放全部本地音乐。 */

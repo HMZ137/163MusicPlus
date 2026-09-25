@@ -26,14 +26,24 @@ public final class WatchBackButton {
 
     private static final String VIEW_TAG = "watch_floating_back_button";
 
-    /** 设计基准尺寸（320px 宽屏幕下为 36px，与全局按钮高度规范一致）。 */
-    private static final int BASE_SIZE = 36;
-    private static final int BASE_MARGIN = 4;
+    /**
+     * 设计基准尺寸（320px 宽屏幕下为 48px）。
+     *
+     * <p>早期取 36px（与全局按钮高度一致），但实机反馈「太小、容易点不中而误触到别处」——
+     * 表盘上手指落点本来就不精确，36px 直径只有屏幕宽度的 11%，偏小。现按
+     * 触控目标通行下限放大到 48px（屏幕宽度的 15%）。</p>
+     */
+    private static final int BASE_SIZE = 48;
+    private static final int BASE_MARGIN = 5;
     /** 触控目标下限，避免小屏设备上按钮过小。 */
-    private static final int MIN_SIZE_DP = 32;
-    private static final int MIN_MARGIN_DP = 3;
-    /** 图标占按钮边长的比例。 */
-    private static final float GLYPH_RATIO = 0.56f;
+    private static final int MIN_SIZE_DP = 40;
+    private static final int MIN_MARGIN_DP = 4;
+    /**
+     * 图标占按钮边长的比例。
+     *
+     * <p>按钮变大后比例要从 0.56 降到 0.5 —— 否则图标会跟着一起变粗，看起来像个实心圆。</p>
+     */
+    private static final float GLYPH_RATIO = 0.5f;
 
     private WatchBackButton() {
     }
