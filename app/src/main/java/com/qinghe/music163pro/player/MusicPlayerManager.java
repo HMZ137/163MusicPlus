@@ -1495,12 +1495,18 @@ public class MusicPlayerManager {
                 }
                 if (current.isForceLocalPlayback()) {
                     songJson.put(KEY_FORCE_LOCAL_PLAYBACK, true);
-                    // 持久化本地文件绝对路径：重开后才能直接拿真实路径播放，
-                    // 否则 forceLocalPlayback=true 而 url 为空，手动拷入的本地歌
-                    // 经 getDownloadedMp3Path 反查会失败 -> 提示「找不到文件」。
-                    if (!TextUtils.isEmpty(current.getUrl())) {
-                        songJson.put("url", current.getUrl());
-                    }
+                }
+                // 持久化本地文件绝对路径：重开后才能直接拿真实路径播放，
+                // 否则 forceLocalPlayback=true 而 url 为空，手动拷入的本地歌
+                // 经 getDownloadedMp3Path 反查会失败 -> 提示「找不到文件」。
+                //
+                // 判据用「url 是不是本地路径」而不是只看 forceLocalPlayback ——
+                // 收藏列表里读出来的本地歌只有本地路径、没有该标记（见 playCurrent 的注释），
+                // 漏掉它们重开后同样播不了。
+                // 云歌的 url 是限时直链（会过期，见 playCurrent「Always fetch a fresh URL」），
+                // 存了反而是坏地址，所以只存本地路径。
+                if (LocalTracks.isLocalPath(current.getUrl())) {
+                    songJson.put("url", current.getUrl());
                 }
                 editor.putString(KEY_CURRENT_SONG_JSON, songJson.toString());
             } else {
@@ -1526,9 +1532,12 @@ public class MusicPlayerManager {
                 }
                 if (s.isForceLocalPlayback()) {
                     obj.put(KEY_FORCE_LOCAL_PLAYBACK, true);
-                    if (!TextUtils.isEmpty(s.getUrl())) {
-                        obj.put("url", s.getUrl());
-                    }
+                }
+                // 同 current：只存本地路径，云歌限时直链不存（恢复后也是过期地址）。
+                // 整条 playlist 每一项都要存 —— 恢复后「当前歌」= playlist[currentIndex]，
+                // 只补当前歌的话，列表里其它本地歌重开依旧找不到文件。
+                if (LocalTracks.isLocalPath(s.getUrl())) {
+                    obj.put("url", s.getUrl());
                 }
                 playlistArr.put(obj);
             }
@@ -1599,10 +1608,13 @@ public class MusicPlayerManager {
                     song.setAlbumId(albumId);
                 }
                 song.setForceLocalPlayback(obj.optBoolean(KEY_FORCE_LOCAL_PLAYBACK, false));
-                // 恢复本地文件的绝对路径，让 playCurrent 的 forceLocalPlayback 分支
-                // 能直接拿到真实路径，避免重开后「找不到文件」。
+                // 恢复本地文件的绝对路径，让 playCurrent 能直接拿到真实路径
+                // （forceLocalPlayback 分支与「本地路径 url」分支都吃这个 url），
+                // 避免重开后「找不到文件」。
+                // 只接受本地路径：云歌的 url 是限时直链，恢复了也是过期地址，
+                // 必须让它回落到按 id 重新取链接。
                 String restoredUrl = obj.optString("url", null);
-                if (restoredUrl != null && !restoredUrl.isEmpty()) {
+                if (LocalTracks.isLocalPath(restoredUrl)) {
                     song.setUrl(restoredUrl);
                 }
                 restoredList.add(song);
