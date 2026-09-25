@@ -43,12 +43,19 @@ public final class BackgroundUtil {
     private static final String FILE_NAME = "custom_background.jpg";
     private static final int DEFAULT_BG_COLOR = 0xFF121212;
     private static final int SCRIM_ALPHA = 150; // 0..255
+    /** 本地文件地址前缀。本地音乐的内嵌封面用它（见 LocalMetadata）。 */
+    private static final String LOCAL_FILE_PREFIX = "file://";
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     // Album-cover background, kept in memory only.
     private static Bitmap sCoverBg;
     private static String sCoverBgUrl;
+    /**
+     * 封面加载的请求序号。异步解码乱序返回时，用它判断「这次结果是不是已经过期」——
+     * 见 {@link #loadCoverBackground}。
+     */
+    private static int sCoverRequestSeq;
 
     private BackgroundUtil() {
     }
@@ -100,7 +107,14 @@ public final class BackgroundUtil {
         return url != null && !url.isEmpty() && url.equals(sCoverBgUrl) && sCoverBg != null;
     }
 
+    /**
+     * 清空封面背景，并让**在途的加载作废**。
+     *
+     * <p>只置空字段是不够的：清空意味着「当前不该显示任何封面」，此时若有一个更早发起的
+     * 加载晚点返回，会把封面又贴回来。递增请求序号就能丢弃它。</p>
+     */
     public static void clearCoverBackground() {
+        sCoverRequestSeq++;
         sCoverBg = null;
         sCoverBgUrl = null;
     }
@@ -108,6 +122,15 @@ public final class BackgroundUtil {
     /**
      * Download the cover and keep a darkened copy in memory (no disk write).
      * onReady runs on the main thread whether it succeeded or failed.
+     *
+     * <p><b>为什么要带请求序号：</b>每次调用都新起一个线程解码，而解码耗时取决于图片大小。
+     * 快速连续切歌时，先发起的（大图，慢）可能晚于后发起的（小图，快）返回 ——
+     * 若成功后无条件写缓存，就会把新封面顶掉，界面显示成<b>上一首的封面</b>，
+     * 而且要等到下一次 {@code updateCoverBackground()} 才会被纠正。</p>
+     *
+     * <p>所以只认「最后一次请求」的结果。被作废的那次不写缓存、也不回调 ——
+     * 回调的语义是「缓存已更新，可以重画背景了」，而它并没有更新什么；
+     * 那次更新的请求会自己回调。</p>
      */
     public static void loadCoverBackground(final Context context, final String url,
                                            final Runnable onReady) {
@@ -122,22 +145,46 @@ public final class BackgroundUtil {
         }
         final String targetUrl = url;
         final Context appContext = context.getApplicationContext();
+        final int requestSeq = ++sCoverRequestSeq;
         new Thread(() -> {
             Bitmap raw = downloadBitmap(appContext, targetUrl);
             final Bitmap dimmed = raw != null ? dimBitmap(raw, appContext) : null;
             MAIN.post(() -> {
+                if (requestSeq != sCoverRequestSeq) {
+                    // 已被更新的请求（或一次 clear）作废，丢弃结果
+                    return;
+                }
                 if (dimmed != null) {
                     sCoverBg = dimmed;
                     sCoverBgUrl = targetUrl;
                 } else {
-                    clearCoverBackground();
+                    // 直接置空，不要调 clearCoverBackground() —— 那会把序号再推进一格
+                    sCoverBg = null;
+                    sCoverBgUrl = null;
                 }
                 if (onReady != null) onReady.run();
             });
         }).start();
     }
 
+    /**
+     * 取封面的位图。支持 {@code http(s)://} 和 {@code file://} 两种地址。
+     *
+     * <p><b>为什么必须先判 file://：</b>本地音乐的内嵌封面是 {@code file://} 地址
+     * （见 {@link LocalMetadata}），而 {@code file://} 的
+     * {@code openConnection()} 返回的是 {@code FileURLConnection}，
+     * 强转成 {@link HttpURLConnection} 会抛 {@code ClassCastException} ——
+     * 它会被下面那个 {@code catch (Exception ignored)} 吞掉、方法返回 null，
+     * 表现为「播本地歌时封面背景永远是默认深色」，而且一点报错都看不到。</p>
+     *
+     * <p>列表缩略图走的是 {@link NetworkImageLoader}，它早就分了两条路，
+     * 所以只有播放页背景受影响 —— 这也是为什么这个 bug 一直没被察觉。</p>
+     */
     private static Bitmap downloadBitmap(Context context, String urlStr) {
+        String localPath = localPathOf(urlStr);
+        if (localPath != null) {
+            return decodeLocalImage(context, localPath);
+        }
         HttpURLConnection conn = null;
         InputStream is = null;
         try {
@@ -165,6 +212,49 @@ public final class BackgroundUtil {
             } catch (Exception ignored) {
             }
             if (conn != null) conn.disconnect();
+        }
+    }
+
+    /**
+     * 把 {@code file://} 地址换成可直接读的文件路径；不是本地地址时返回 {@code null}。
+     *
+     * <p>刻意写成不碰任何 Android 类型的静态方法 —— 这样它能被独立跑起来验证
+     * （见 {@code .workbuddy/background-util-probe/}）。这里最容易错的是前缀长度：
+     * Linux 风格绝对路径拼出来是 {@code file:///data/...}（三个斜杠），
+     * 去掉 {@code file://} 正好剩 {@code /data/...}。
+     *
+     * @param url 形如 {@code file:///data/data/<包名>/cache/local_cover/<md5>.img}
+     */
+    static String localPathOf(String url) {
+        if (url == null || !url.startsWith(LOCAL_FILE_PREFIX)) {
+            return null;
+        }
+        String path = url.substring(LOCAL_FILE_PREFIX.length());
+        return path.isEmpty() ? null : path;
+    }
+
+    /**
+     * 解码本地图片文件，按屏幕尺寸采样。
+     *
+     * <p>采样不能省：内嵌封面是 {@code MediaMetadataRetriever} 抽出来的原始尺寸图，
+     * 常见几百 KB 到几 MB，直接整张进内存做背景没必要。</p>
+     */
+    private static Bitmap decodeLocalImage(Context context, String path) {
+        try {
+            File file = new File(path);
+            if (!file.isFile()) {
+                return null;
+            }
+            int reqW = context.getResources().getDisplayMetrics().widthPixels;
+            int reqH = context.getResources().getDisplayMetrics().heightPixels;
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(path, bounds);
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = calculateSampleSize(bounds, reqW, reqH);
+            return BitmapFactory.decodeFile(path, opts);
+        } catch (Exception ignored) {
+            return null;
         }
     }
 

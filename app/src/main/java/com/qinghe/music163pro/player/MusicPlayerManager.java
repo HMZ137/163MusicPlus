@@ -233,10 +233,19 @@ public class MusicPlayerManager {
      * Best song to derive the background cover from: the current song if it has
      * a cover, otherwise the first playlist song with a cover (so the background
      * still loads when nothing is playing yet).
+     *
+     * <p><b>本地歌不走「退而取队列里别的封面」那条路。</b>云歌的封面是异步从接口取的，
+     * 当前这首暂时为空时随便拿一张顶上，比空白背景好；但本地歌的封面在扫描时就已确定
+     * （文件里有没有内嵌封面，{@link LocalTracks} 一路同步可知），没有就是没有。
+     * 若照样兜底，播一首没内嵌封面的本地歌会显示成<b>队列里另一首歌的封面</b> ——
+     * 那不是「缺失」，而是「错误」，比空背景更容易误导。</p>
      */
     public Song getBackgroundSong() {
         Song current = getCurrentSong();
         if (current != null && current.getCoverUrl() != null && !current.getCoverUrl().isEmpty()) {
+            return current;
+        }
+        if (current != null && LocalTracks.isLocalOnly(current)) {
             return current;
         }
         for (Song song : playlist) {
