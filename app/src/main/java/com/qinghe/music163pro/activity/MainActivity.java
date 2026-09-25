@@ -22,7 +22,9 @@ import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewConfiguration;
+import android.widget.RelativeLayout;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -55,6 +57,8 @@ import com.qinghe.music163pro.util.BackgroundUtil;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.LyricSettings;
 import com.qinghe.music163pro.util.PlaybackMode;
+import com.qinghe.music163pro.util.UiScale;
+import com.qinghe.music163pro.util.WatchUiUtils;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONObject;
@@ -175,6 +179,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     @Override
+    /**
+     * 接入全局界面缩放（根因修复）。
+     *
+     * <p>主页面此前直接继承 {@code AppCompatActivity}、没有走 {@code BaseWatchActivity}，
+     * 于是 {@link UiScale} 的缩放对它完全不生效 —— 你把子页面放大时，主页面被排除在外，
+     * 看起来就特别小。补上和 {@code BaseWatchActivity} 一样的 wrap 后，主页面也参与同一套
+     * 缩放：XML 里的 dp/sp 与代码里的 {@link #dp} 都会跟着放大。</p>
+     */
+    // 注意：这里刻意不加 @Override。本工具链的 javac 对这条 attachBaseContext 的
+    // @Override 会误报「Override 不是可重复的注释类型」，但签名与 AppCompatActivity
+    // 的 attachBaseContext(Context) 完全一致（BaseWatchActivity 的同款写法可编译），
+    // 运行时仍由框架多态调用到本方法，缩放照常生效。
+    protected void attachBaseContext(android.content.Context newBase) {
+        super.attachBaseContext(UiScale.wrap(newBase));
+    }
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -198,6 +218,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         ImageView btnVolUp = findViewById(R.id.btn_vol_up);
         ImageView btnMore = findViewById(R.id.btn_more);
         btnPlaylistIndicator = findViewById(R.id.btn_playlist_indicator);
+        // 圆角屏：顶栏两端图标避让物理圆角（原 4dp 边距会落进圆角切除区被切掉）
+        int corner = WatchUiUtils.cornerInset(this);
+        applyCornerInset(btnMore, corner);
+        applyCornerInset(btnPlaylistIndicator, corner);
         ensureChorusMarkerDot();
 
         playerManager = MusicPlayerManager.getInstance();
@@ -960,7 +984,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         TextView title = new TextView(this);
         title.setText(titleText);
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(15);
+        title.setTextSize(18);
         title.setGravity(Gravity.CENTER);
         FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -972,10 +996,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         ImageView btnClose = new ImageView(this);
         btnClose.setImageResource(R.drawable.ic_close);
         btnClose.setColorFilter(0xFFFFFFFF);
-        int closeSize = dp(18);
+        int closeSize = dp(26);
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(closeSize, closeSize);
         closeParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        closeParams.setMarginEnd(dp(4));
+        closeParams.setMarginEnd(Math.max(dp(4), WatchUiUtils.cornerInset(this)));
         btnClose.setLayoutParams(closeParams);
         btnClose.setClickable(true);
         btnClose.setFocusable(true);
@@ -1371,13 +1395,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         MaterialButton button = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
         button.setText(text);
         button.setAllCaps(false);
-        button.setTextSize(12f);
+        button.setTextSize(13f);
         button.setTextColor(ContextCompat.getColor(this, R.color.white));
         button.setCornerRadius(dp(8));
         button.setInsetTop(0);
         button.setInsetBottom(0);
-        button.setMinimumHeight(dp(36));
-        button.setPadding(dp(8), dp(10), dp(8), dp(10));
+        button.setMinimumHeight(dp(40));
+        button.setPadding(dp(10), dp(12), dp(10), dp(12));
         button.setBackgroundTintList(ColorStateList.valueOf(backgroundColor));
         if (!primary) {
             button.setStrokeWidth(0);
@@ -3952,6 +3976,25 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private int dp(int dp) {
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /**
+     * 让贴在某条屏幕边上的 View 避让物理圆角：把它离该边的外边距撑到 {@code corner} 以上。
+     * 用于主页面左上 / 右上两个图标（原 4dp 边距会落进圆角切除区被切掉）。
+     */
+    private void applyCornerInset(View v, int corner) {
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (!(lp instanceof RelativeLayout.LayoutParams)) {
+            return;
+        }
+        RelativeLayout.LayoutParams p = (RelativeLayout.LayoutParams) lp;
+        p.topMargin = Math.max(p.topMargin, corner);
+        if (p.getRule(RelativeLayout.ALIGN_PARENT_END) == RelativeLayout.TRUE) {
+            p.rightMargin = Math.max(p.rightMargin, corner);
+        } else {
+            p.leftMargin = Math.max(p.leftMargin, corner);
+        }
+        v.setLayoutParams(p);
     }
 
     // ==================== Page Indicator ====================

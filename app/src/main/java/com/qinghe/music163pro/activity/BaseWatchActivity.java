@@ -151,4 +151,34 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
         button.setMinimumHeight(minHeightPx);
         return button;
     }
+
+    /**
+     * 给「贴顶栏」的横向条（B 站系列等的自建标题栏）做圆角内缩。
+     *
+     * <p>这些页面自带左上返回控件、不走浮动返回按钮，也没有调用
+     * {@link WatchBackButton#applyTitleBarInset}，所以单独用这个 helper 统一处理：
+     * 把左 / 上 / 右外边距撑到 {@link WatchUiUtils#cornerInset} 以上，让左上返回、
+     * 右端按钮不进物理圆角的切除区。</p>
+     *
+     * <p><b>用 margin 而非 padding：</b>这些标题栏是固定高度（约 {@code px(38)}），
+     * 若用 padding 会把内部按钮竖向挤扁；用 margin 只是把整条下移 + 内缩，不动内容。</p>
+     *
+     * <p>调用点只需在 {@code bar.setLayoutParams(...)} 之后加一行
+     * {@code insetTitleBar(bar);}。</p>
+     */
+    protected final void insetTitleBar(ViewGroup bar) {
+        if (bar == null) {
+            return;
+        }
+        ViewGroup.LayoutParams lp = bar.getLayoutParams();
+        if (!(lp instanceof ViewGroup.MarginLayoutParams)) {
+            return;
+        }
+        ViewGroup.MarginLayoutParams m = (ViewGroup.MarginLayoutParams) lp;
+        int c = WatchUiUtils.cornerInset(this);
+        m.leftMargin = Math.max(m.leftMargin, c);
+        m.topMargin = Math.max(m.topMargin, c);
+        m.rightMargin = Math.max(m.rightMargin, c);
+        bar.setLayoutParams(m);
+    }
 }

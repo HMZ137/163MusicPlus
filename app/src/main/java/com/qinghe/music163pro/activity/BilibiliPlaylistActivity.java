@@ -103,6 +103,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
+        insetTitleBar(bar);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);

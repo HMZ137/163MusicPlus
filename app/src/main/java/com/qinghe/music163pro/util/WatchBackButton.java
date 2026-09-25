@@ -109,6 +109,21 @@ public final class WatchBackButton {
             params.height = reserved;
             titleBar.setLayoutParams(params);
         }
+
+        // 圆角屏：顶栏贴左右边缘，补横向内缩避让物理圆角。
+        // 让标题文字 / 右端按钮不进切除区；只对小于基准值的内边距生效，不缩小已有留白。
+        // 这是把「圆角内缩」从单页（PlaylistDetailActivity）推广到全部子页面顶栏的统一切点：
+        // 17 个 XML 页都调用了本方法，一次改动即全员受益。
+        int inset = WatchUiUtils.cornerInset(activity);
+        int padStart = titleBar.getPaddingStart();
+        int padEnd = titleBar.getPaddingEnd();
+        if (padStart < inset || padEnd < inset) {
+            titleBar.setPaddingRelative(
+                    Math.max(padStart, inset),
+                    titleBar.getPaddingTop(),
+                    Math.max(padEnd, inset),
+                    titleBar.getPaddingBottom());
+        }
     }
 
     /**

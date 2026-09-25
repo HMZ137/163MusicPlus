@@ -194,6 +194,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
+        insetTitleBar(bar);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
