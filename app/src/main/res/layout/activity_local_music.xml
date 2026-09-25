@@ -67,6 +67,23 @@
             android:focusable="true" />
     </RelativeLayout>
 
+    <!--
+      局域网传歌入口。放在这里而不是「更多」菜单：MoreActivity.applyMenuOrder() 会
+      removeAllViews() 后只按 key 重新加回，没在 viewByKey 里注册的磁贴会整块消失。
+      而「把歌传进来」本来就是本机音乐该有的入口。
+    -->
+    <TextView
+        android:id="@+id/btn_local_lan_transfer"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:gravity="center"
+        android:text="局域网传歌"
+        android:textColor="@color/colorPrimary"
+        android:textSize="12sp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true" />
+
     <ListView
         android:id="@+id/lv_local_music"
         android:layout_width="match_parent"

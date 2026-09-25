@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -36,6 +37,7 @@
         <activity android:name=".activity.FavoritesListActivity" android:exported="false" />
         <activity android:name=".activity.DownloadListActivity" android:exported="false" />
         <activity android:name=".activity.LocalMusicActivity" android:exported="false" />
+        <activity android:name=".activity.LanTransferActivity" android:exported="false" />
         <activity android:name=".activity.LetterPickerActivity" android:exported="false" />
         <activity android:name=".activity.PlaybackStatsActivity" android:exported="false" />
         <activity android:name=".activity.SettingsActivity" android:exported="false" />
@@ -94,6 +96,10 @@
 
         <service
             android:name=".service.MusicPlaybackService"
+            android:exported="false" />
+
+        <service
+            android:name=".service.LanTransferService"
             android:exported="false" />
 
         <receiver

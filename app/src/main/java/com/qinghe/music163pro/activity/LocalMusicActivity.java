@@ -112,6 +112,12 @@ public class LocalMusicActivity extends BaseWatchActivity {
             btnShuffle.setOnClickListener(v -> playShuffled());
         }
 
+        View btnLanTransfer = findViewById(R.id.btn_local_lan_transfer);
+        if (btnLanTransfer != null) {
+            btnLanTransfer.setOnClickListener(v ->
+                    startActivity(new Intent(this, LanTransferActivity.class)));
+        }
+
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, localSongs) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
