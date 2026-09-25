@@ -80,6 +80,18 @@ public class SearchActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_search);
 
+        // 搜索栏左边的留白原本在布局里写死 40dp，是按 36px 的返回按钮估的。
+        // 按钮放大到 48px 之后实际占位是 58px，写死的值就不够了（输入框左边缘会被压住），
+        // 所以改成运行时按真实占位设置 —— 这样以后调整按钮尺寸也不用再改布局。
+        View searchBar = findViewById(R.id.layout_search_bar);
+        if (searchBar != null) {
+            searchBar.setPadding(
+                    com.qinghe.music163pro.util.WatchBackButton.getReservedStartPadding(this),
+                    searchBar.getPaddingTop(),
+                    searchBar.getPaddingEnd(),
+                    searchBar.getPaddingBottom());
+        }
+
         etSearch = findViewById(R.id.et_search);
         lvSongs = findViewById(R.id.lv_songs);
         lvPlaylists = findViewById(R.id.lv_playlists);

@@ -33,6 +33,10 @@ public class DailyRecommendActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_daily_recommend);
 
+        // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_title));
+
         tvStatus = findViewById(R.id.tv_status);
         listView = findViewById(R.id.lv_daily_songs);
 

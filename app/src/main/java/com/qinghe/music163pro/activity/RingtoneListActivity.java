@@ -41,6 +41,10 @@ public class RingtoneListActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ringtone_list);
 
+        // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_ringtone_title));
+
         lvRingtones = findViewById(R.id.lv_ringtones);
         tvEmpty = findViewById(R.id.tv_empty);
 

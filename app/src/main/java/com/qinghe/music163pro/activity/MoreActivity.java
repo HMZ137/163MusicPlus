@@ -56,6 +56,11 @@ public class MoreActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_more);
 
+        // 标题栏撑到返回按钮的占位高度：否则按钮会压住第一个磁贴的图标，
+        // 而「本机音乐」在本地模式下正好排在最前，会被压得最狠
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_more_title));
+
         // Apply keep screen on setting
         prefs = getSharedPreferences(MoreMenuPreferences.PREFS_NAME, MODE_PRIVATE);
         if (prefs.getBoolean("keep_screen_on", false)) {

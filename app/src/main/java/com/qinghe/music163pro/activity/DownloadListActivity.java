@@ -69,6 +69,10 @@ public class DownloadListActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_download_list);
 
+        // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.layout_downloads_title_bar));
+
         // Apply keep screen on setting
 
         lvDownloads = findViewById(R.id.lv_downloads);

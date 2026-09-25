@@ -8,6 +8,7 @@
 
     <!-- 标题栏：标题居中，右侧放「整理」动作，与历史记录页保持同一套样式 -->
     <RelativeLayout
+        android:id="@+id/layout_downloads_title_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingBottom="6dp">

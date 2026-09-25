@@ -57,6 +57,9 @@ public class FavoritesListActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_favorites_list);
+        // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_favorites_title));
 
         lvFavorites = findViewById(R.id.lv_favorites);
         lvFavPlaylists = findViewById(R.id.lv_fav_playlists);

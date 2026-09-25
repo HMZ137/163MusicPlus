@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -71,6 +72,43 @@ public final class WatchBackButton {
         }
         // 按钮自身占位 + 两侧外边距，留出一点间隙避免紧贴
         return buttonSize(activity) + buttonMargin(activity) * 2;
+    }
+
+    /**
+     * 把自绘标题栏撑到能容纳浮动返回按钮的高度。
+     *
+     * <p><b>为什么需要：</b>返回按钮是浮在内容之上的，页面自己的标题栏并不会自动让它。
+     * 标题栏多为 {@code wrap_content}（常见高度只有 30 出头），而按钮现在的占位是
+     * {@code buttonSize + 2*margin}（320px 屏上 58px）—— 于是按钮会往下探进第一行内容。
+     * 列表里第一行左侧正好是封面，结果是封面被盖住一角、而且那块区域点不到（按钮抢走了事件）。</p>
+     *
+     * <p><b>这是把按钮从 36px 放大到 48px 之后才暴露出来的：</b>36px 时按钮只越界约 2px，
+     * 看不出来；48px 时越界 20 多像素，第一行封面的上半截就被压住了。所以放大按钮必须
+     * 连带把标题栏的竖直占位补上。</p>
+     *
+     * <p>标题文字本身居中，所以把行高撑大不会让它看起来跑偏，只是上下各多了一点留白。</p>
+     *
+     * @param titleBar 页面自绘的标题行。null 或拿不到 LayoutParams 时静默返回。
+     */
+    public static void applyTitleBarInset(Activity activity, View titleBar) {
+        if (activity == null || titleBar == null) {
+            return;
+        }
+        ViewGroup.LayoutParams params = titleBar.getLayoutParams();
+        if (params == null) {
+            return;
+        }
+        int reserved = getReservedStartPadding(activity);
+        int current = params.height;
+        // wrap_content 是 -2、match_parent 是 -1，都不是「实际高度」。
+        // wrap_content 可以安全撑大；match_parent 说明这一行本来就是占满父容器的，
+        // 不要去动它。已经比占位高的固定高度也不压小。
+        boolean growable = current == ViewGroup.LayoutParams.WRAP_CONTENT
+                || (current > 0 && current < reserved);
+        if (growable) {
+            params.height = reserved;
+            titleBar.setLayoutParams(params);
+        }
     }
 
     /**

@@ -24,6 +24,7 @@ import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.MultiSelectController;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.PinyinUtils;
+import com.qinghe.music163pro.util.WatchBackButton;
 
 import java.io.File;
 import java.text.Collator;
@@ -95,6 +96,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
         tvTitle = findViewById(R.id.tv_local_music_title);
         lvSongs = findViewById(R.id.lv_local_music);
         tvEmpty = findViewById(R.id.tv_local_music_empty);
+        // 标题栏撑到返回按钮的占位高度：否则按钮会压住第一行的封面（详见该方法注释）
+        WatchBackButton.applyTitleBarInset(this, findViewById(R.id.layout_local_music_title_bar));
 
         View btnLetters = findViewById(R.id.btn_local_letters);
         if (btnLetters != null) {

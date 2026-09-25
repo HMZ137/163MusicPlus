@@ -84,14 +84,13 @@ public class LetterPickerActivity extends BaseWatchActivity {
         if (tvTitle != null) {
             tvTitle.setText(getString(R.string.letter_picker_title)
                     + " · " + groups.size() + "组");
+            // 标题行的高度直接对齐浮动返回按钮的占位：标题落在按钮右侧、竖直居中，
+            // 网格也就自然从按钮下方开始，不必再给网格加一段 padding。
+            // （一开始是给网格加 paddingTop，但取的是 getReservedStartPadding() —— 那是
+            // **水平**占位 58px，而网格本来就在标题下方，实际只需 27px，白浪费 31px。）
+            WatchBackButton.applyTitleBarInset(this, tvTitle);
         }
 
-        // GridView 是整宽铺开的，左上角会被浮动返回按钮压住第一格，所以整块下移。
-        // 返回按钮的尺寸随屏宽缩放，这里必须问它要实际占位，不能写死。
-        grid.setPadding(grid.getPaddingStart(),
-                WatchBackButton.getReservedStartPadding(this),
-                grid.getPaddingEnd(),
-                grid.getPaddingBottom());
         grid.setNumColumns(COLUMNS);
         grid.setAdapter(new LetterAdapter());
         grid.setOnItemClickListener((parent, view, position, id) -> {

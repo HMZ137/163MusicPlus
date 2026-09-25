@@ -7,6 +7,7 @@
     android:padding="6dp">
 
     <TextView
+        android:id="@+id/tv_ringtone_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/ringtone_manager"

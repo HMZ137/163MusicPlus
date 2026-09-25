@@ -28,6 +28,10 @@ public class SongRecognitionResultActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_song_recognition_result);
 
+        // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_result_title));
+
         TextView tvSubtitle = findViewById(R.id.tv_result_subtitle);
         TextView tvEmpty = findViewById(R.id.tv_result_empty);
         ListView lvResults = findViewById(R.id.lv_result_songs);

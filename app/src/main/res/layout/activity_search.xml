@@ -7,8 +7,14 @@
     android:padding="6dp">
 
     <!-- Search bar -->
-    <!-- paddingStart 给左上角浮动返回按钮让位 -->
+    <!--
+      paddingStart 给左上角浮动返回按钮让位。这里保留 40dp 只作兜底，
+      实际值由 SearchActivity 在运行时按 WatchBackButton 的真实占位覆盖 ——
+      返回按钮的占位随屏宽缩放，而且从 36px 放大到 48px 之后已经超过 40dp，
+      写死在这里就不够用了。
+    -->
     <LinearLayout
+        android:id="@+id/layout_search_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
