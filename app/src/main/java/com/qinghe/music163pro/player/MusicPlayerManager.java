@@ -29,12 +29,15 @@ import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.LocalTracks;
+import com.qinghe.music163pro.util.PlaybackStats;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -70,6 +73,12 @@ public class MusicPlayerManager {
         void onPlayStateChanged(boolean isPlaying);
         void onError(String message);
         default void onSleepTimerTriggered(boolean exitApp) {}
+
+        /**
+         * 定时关闭到点了，但模式是「放完当前曲再停」，所以此刻还没真正停止。
+         * 默认空实现，不影响既有回调方。
+         */
+        default void onSleepTimerPendingStop() {}
     }
 
     private static MusicPlayerManager instance;
@@ -89,7 +98,17 @@ public class MusicPlayerManager {
      */
     private int speedMode = 0;
     private final Random random = new Random();
+    /**
+     * 随机播放的洗牌顺序，元素是 {@link #playlist} 的下标。
+     * 用它而不是每次「随机抽一首」，是为了让「下一首 / 上一首」在随机模式下
+     * 也有一致的次序，并且不会刚听完又立刻抽到同一首。
+     */
+    private final List<Integer> shuffleOrder = new ArrayList<>();
+    /** playlist 结构变动后置位，下一次随机播放前重建洗牌顺序。 */
+    private boolean shuffleOrderDirty = true;
     private long currentlyPlayingSongId = -1;
+    /** 防重入：同一次「播放结束」只处理一次，详见 {@link #onSongCompleted()}。 */
+    private boolean handlingSongCompleted = false;
     private Context appContext;
     private long bilibiliRetrySongId = -1;
     private int bilibiliRetryCount = 0;
@@ -139,6 +158,7 @@ public class MusicPlayerManager {
         clearSourcePlaylistInfo();
         personalFmMode = false;
         personalFmLoading = false;
+        invalidateShuffleOrder();
         savePlaybackState();
     }
 
@@ -160,6 +180,7 @@ public class MusicPlayerManager {
         sourcePlaylistIsLiked = isLiked;
         personalFmMode = false;
         personalFmLoading = false;
+        invalidateShuffleOrder();
         savePlaybackState();
     }
 
@@ -176,6 +197,7 @@ public class MusicPlayerManager {
         personalFmLoading = false;
         personalFmModeStr = (mode != null && !mode.isEmpty()) ? mode : "DEFAULT";
         personalFmSubModeStr = (subMode != null) ? subMode : "";
+        invalidateShuffleOrder();
         savePlaybackState();
     }
 
@@ -332,6 +354,10 @@ public class MusicPlayerManager {
                             .build());
             mediaPlayer.setDataSource(url);
             mediaPlayer.setOnPreparedListener(mp -> {
+                // 已经被替换掉的旧播放器的迟到回调，直接忽略。
+                // 少了这个判断会出现：新歌已经起播，旧实例的 onPrepared 才回来，
+                // 于是又去 start() 一次已 release 的 MediaPlayer → IllegalStateException 崩溃。
+                if (mp != mediaPlayer) return;
                 if (resumePositionMs > 0) {
                     try {
                         mp.seekTo(resumePositionMs);
@@ -349,8 +375,18 @@ public class MusicPlayerManager {
                     notifyPlayStateChanged(false);
                 }
             });
-            mediaPlayer.setOnCompletionListener(mp -> onSongCompleted());
+            mediaPlayer.setOnCompletionListener(mp -> {
+                // 同上：只有当前播放器的完成事件才算数。
+                // 否则「把进度条拖到结尾」时，旧实例的完成回调会再切一次歌，
+                // 表现为连跳两首、或新歌刚起播就被下一轮切歌打断（听感像自动暂停）。
+                if (mp != mediaPlayer) return;
+                onSongCompleted();
+            });
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                // 旧播放器的迟到错误必须忽略：它内部用的是 getCurrentSong()，
+                // 而此时当前歌已经是下一首了 —— 会把新歌的 URL 清掉并重新拉流，
+                // 于是刚起播的新歌被打断，看起来就是「下一首自动暂停」。
+                if (mp != mediaPlayer) return true;
                 // what==-38 is ENOSYS ("function not implemented") fired asynchronously
                 // by setPlaybackParams() on watch devices (Android 7-8.1) that lack
                 // time-stretch support.  Playback is unaffected; silently ignore it.
@@ -423,6 +459,10 @@ public class MusicPlayerManager {
                             .build());
             mediaPlayer.setDataSource(localPath);
             mediaPlayer.setOnPreparedListener(mp -> {
+                // 已经被替换掉的旧播放器的迟到回调，直接忽略。
+                // 少了这个判断会出现：新歌已经起播，旧实例的 onPrepared 才回来，
+                // 于是又去 start() 一次已 release 的 MediaPlayer → IllegalStateException 崩溃。
+                if (mp != mediaPlayer) return;
                 if (resumePositionMs > 0) {
                     try {
                         mp.seekTo(resumePositionMs);
@@ -440,8 +480,18 @@ public class MusicPlayerManager {
                     notifyPlayStateChanged(false);
                 }
             });
-            mediaPlayer.setOnCompletionListener(mp -> onSongCompleted());
+            mediaPlayer.setOnCompletionListener(mp -> {
+                // 同上：只有当前播放器的完成事件才算数。
+                // 否则「把进度条拖到结尾」时，旧实例的完成回调会再切一次歌，
+                // 表现为连跳两首、或新歌刚起播就被下一轮切歌打断（听感像自动暂停）。
+                if (mp != mediaPlayer) return;
+                onSongCompleted();
+            });
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                // 旧播放器的迟到错误必须忽略：它内部用的是 getCurrentSong()，
+                // 而此时当前歌已经是下一首了 —— 会把新歌的 URL 清掉并重新拉流，
+                // 于是刚起播的新歌被打断，看起来就是「下一首自动暂停」。
+                if (mp != mediaPlayer) return true;
                 // what==-38 is ENOSYS ("function not implemented") fired asynchronously
                 // by setPlaybackParams() on watch devices (Android 7-8.1) that lack
                 // time-stretch support.  Playback is unaffected; silently ignore it.
@@ -488,23 +538,31 @@ public class MusicPlayerManager {
     public void stop() {
         cancelBilibiliRefreshTimer();
         if (exoPlayer != null) {
+            ExoPlayer player = exoPlayer;
+            // 先清字段再 release：release 过程中若还有回调进来，
+            // 监听器里的身份判断（player != exoPlayer）会直接把它挡掉。
+            exoPlayer = null;
             try {
-                exoPlayer.release();
+                player.release();
             } catch (Exception e) {
                 Log.w(TAG, "Error stopping ExoPlayer", e);
             }
-            exoPlayer = null;
         }
         if (mediaPlayer != null) {
+            MediaPlayer player = mediaPlayer;
+            mediaPlayer = null;
             try {
-                if (mediaPlayer.isPlaying()) {
-                    mediaPlayer.stop();
+                // 主动摘掉监听器，避免 release 之后再收到迟到回调
+                player.setOnPreparedListener(null);
+                player.setOnCompletionListener(null);
+                player.setOnErrorListener(null);
+                if (player.isPlaying()) {
+                    player.stop();
                 }
-                mediaPlayer.release();
+                player.release();
             } catch (Exception e) {
                 Log.w(TAG, "Error stopping player", e);
             }
-            mediaPlayer = null;
         }
         isPlaying = false;
         currentlyPlayingSongId = -1;
@@ -549,15 +607,22 @@ public class MusicPlayerManager {
     }
 
     public void seekTo(int positionMs) {
+        int target = Math.max(0, positionMs);
+        // 进度条拖到最右端时，上层算出来的就是 duration。这里夹到 duration-1，
+        // 避免把播放器停在「位置 == 总长」的边界状态上（不同 ROM 对这个边界的处理不一致）。
+        int duration = getDuration();
+        if (duration > 0 && target >= duration) {
+            target = duration - 1;
+        }
         if (usingExoPlayer && exoPlayer != null) {
             try {
-                exoPlayer.seekTo(positionMs);
+                exoPlayer.seekTo(target);
             } catch (Exception e) {
                 Log.w(TAG, "Error seeking ExoPlayer", e);
             }
         } else if (mediaPlayer != null) {
             try {
-                mediaPlayer.seekTo(positionMs);
+                mediaPlayer.seekTo(target);
             } catch (Exception e) {
                 Log.w(TAG, "Error seeking", e);
             }
@@ -568,9 +633,45 @@ public class MusicPlayerManager {
      * Called when current song finishes playing.
      * Behavior depends on play mode.
      */
+    /**
+     * 播放结束的统一入口。
+     *
+     * <p>加了防重入：把进度条直接拖到结尾时，MediaPlayer 的 onCompletion 与
+     * ExoPlayer 的 STATE_ENDED 有可能在同一个调用栈里都被送到（其中一条来自
+     * stop()/release() 引发的同步回调），那样一次结束会连着切两首歌，
+     * 听感上就是「新歌刚起播就被打断」。</p>
+     */
     private void onSongCompleted() {
+        if (handlingSongCompleted) {
+            return;
+        }
+        handlingSongCompleted = true;
+        try {
+            handleSongCompleted();
+        } finally {
+            handlingSongCompleted = false;
+        }
+    }
+
+    private void handleSongCompleted() {
         isPlaying = false;
         notifyPlayStateChanged(false);
+
+        // 「放完当前曲再停」：定时已到点，这一首就是最后一首，不再往下切
+        if (sleepTimerStopAfterCurrent) {
+            sleepTimerStopAfterCurrent = false;
+            boolean exitApp = shouldExitAfterSleepTimer();
+            if (exitApp) {
+                stop();
+            } else {
+                pause();
+            }
+            if (callback != null) {
+                mainHandler.post(() -> callback.onSleepTimerTriggered(exitApp));
+            }
+            return;
+        }
+
         if (playlist.isEmpty()) return;
         switch (playMode) {
             case SINGLE_REPEAT:
@@ -578,15 +679,13 @@ public class MusicPlayerManager {
                 playCurrent();
                 break;
             case RANDOM:
-                // Pick a random song
-                if (playlist.size() > 1) {
-                    int newIndex;
-                    do {
-                        newIndex = random.nextInt(playlist.size());
-                    } while (newIndex == currentIndex);
-                    currentIndex = newIndex;
+                // 沿洗牌顺序播放，与手动「下一首」共用同一套次序，
+                // 避免自动播完和手动切歌在随机模式下走成两条不同的随机序列。
+                if (personalFmMode) {
+                    playNextSequential();
+                } else {
+                    playShuffle(true);
                 }
-                playCurrent();
                 break;
             case LIST_LOOP:
             default:
@@ -595,21 +694,102 @@ public class MusicPlayerManager {
         }
     }
 
+    /**
+     * 手动切到下一首。
+     *
+     * <p>随机模式下沿洗牌顺序前进；私人漫游是一路追加的无限流，仍走顺序逻辑以保留
+     * 「到底自动加载更多」的行为。单曲循环只作用于「自动播完」，手动点下一首照常切歌，
+     * 与主流播放器一致。</p>
+     */
     public void next() {
         if (playlist.isEmpty()) return;
-        playNextSequential();
+        if (playMode == PlayMode.RANDOM && !personalFmMode) {
+            playShuffle(true);
+        } else {
+            playNextSequential();
+        }
     }
 
+    /**
+     * 手动切到上一首。随机模式下沿洗牌顺序后退，因此能真正回到刚才那首，
+     * 而不是又随机抽一首。
+     */
     public void previous() {
         if (playlist.isEmpty()) return;
-        currentIndex = (currentIndex - 1 + playlist.size()) % playlist.size();
-        playCurrent();
+        if (playMode == PlayMode.RANDOM && !personalFmMode) {
+            playShuffle(false);
+        } else {
+            currentIndex = (currentIndex - 1 + playlist.size()) % playlist.size();
+            playCurrent();
+        }
     }
 
     public void playFromCurrentPlaylist(int index) {
         if (index < 0 || index >= playlist.size()) return;
         currentIndex = index;
         playCurrent();
+    }
+
+    /**
+     * 从播放队列里移除一首。
+     *
+     * <p>移除后会自动修正 {@link #currentIndex}：移除的是当前曲目之前的项，
+     * 或移除后下标越界，都会跟着调整。若移除的正是当前播放的那首，则接着播新的当前曲；
+     * 队列被清空则停止播放。</p>
+     *
+     * <p>⚠️ 队列结构变了，必须 {@link #invalidateShuffleOrder()}，
+     * 否则随机模式下原来缓存的洗牌下标会错位。</p>
+     *
+     * @return true 表示确实移除了
+     */
+    public boolean removeFromPlaylist(int index) {
+        if (index < 0 || index >= playlist.size()) {
+            return false;
+        }
+        boolean removedCurrent = (index == currentIndex);
+        playlist.remove(index);
+
+        if (playlist.isEmpty()) {
+            currentIndex = -1;
+            invalidateShuffleOrder();
+            stop();
+            return true;
+        }
+
+        if (currentIndex >= playlist.size()) {
+            currentIndex = playlist.size() - 1;
+        } else if (index < currentIndex) {
+            currentIndex--;
+        }
+        invalidateShuffleOrder();
+
+        if (removedCurrent) {
+            playCurrent();
+        } else {
+            savePlaybackState();
+        }
+        return true;
+    }
+
+    /**
+     * 把队列里的某一首挪到「下一首播放」的位置，当前播放的曲目不受影响。
+     *
+     * @return true 表示确实移动了（点当前曲目本身时返回 false）
+     */
+    public boolean moveToNextInPlaylist(int index) {
+        if (index < 0 || index >= playlist.size() || index == currentIndex) {
+            return false;
+        }
+        Song song = playlist.remove(index);
+        // 抽走的是当前曲目之前的项时，当前下标要跟着前移一位
+        if (index < currentIndex) {
+            currentIndex--;
+        }
+        int insertAt = Math.min(currentIndex + 1, playlist.size());
+        playlist.add(insertAt, song);
+        invalidateShuffleOrder();
+        savePlaybackState();
+        return true;
     }
 
     public void playCurrent() {
@@ -620,7 +800,13 @@ public class MusicPlayerManager {
         savePlaybackState();
 
         if (song.isForceLocalPlayback()) {
-            String localPath = DownloadManager.getDownloadedMp3Path(song);
+            // 下载列表给出的 url 就是音频文件的绝对路径，优先直接用它：
+            // 当目录名与「曲名 - 曲师」对不上时（手动拷进来的音乐、缺 info.json 的下载），
+            // 按名字反查会找不到文件。
+            String localPath = song.getUrl();
+            if (TextUtils.isEmpty(localPath) || !new File(localPath).exists()) {
+                localPath = DownloadManager.getDownloadedMp3Path(song);
+            }
             if (!TextUtils.isEmpty(localPath)) {
                 song.setUrl(localPath);
                 startLocalPlayback(song, localPath);
@@ -633,6 +819,14 @@ public class MusicPlayerManager {
         // Handle Bilibili songs (stream from network)
         if (song.isBilibili()) {
             playBilibiliSong(song);
+            return;
+        }
+
+        // url 指向本地文件：收藏列表里读出来的本地歌曲只有 url 是本地路径、
+        // 没有 forceLocalPlayback 标记，不接住它就会拿负数 id 去问网易云要链接然后失败。
+        String existingUrl = song.getUrl();
+        if (LocalTracks.isLocalPath(existingUrl) && new File(existingUrl).exists()) {
+            startLocalPlayback(song, existingUrl);
             return;
         }
 
@@ -750,10 +944,11 @@ public class MusicPlayerManager {
             DefaultDataSource.Factory dataSourceFactory =
                     new DefaultDataSource.Factory(appContext, httpFactory);
 
-            exoPlayer = new ExoPlayer.Builder(appContext)
+            final ExoPlayer player = new ExoPlayer.Builder(appContext)
                     .setLoadControl(loadControl)
                     .setMediaSourceFactory(new DefaultMediaSourceFactory(dataSourceFactory))
                     .build();
+            exoPlayer = player;
 
             exoPlayer.setWakeMode(C.WAKE_MODE_NETWORK);
             exoPlayer.setAudioAttributes(
@@ -770,6 +965,9 @@ public class MusicPlayerManager {
 
                 @Override
                 public void onPlaybackStateChanged(int state) {
+                    // 已被替换（release 过）的旧 ExoPlayer 的迟到回调，一律忽略。
+                    // 否则它的 STATE_ENDED 会让刚起播的新歌被当成「播完了」而再切一次。
+                    if (player != exoPlayer) return;
                     if (state == Player.STATE_READY && !prepared) {
                         prepared = true;
                         applyPlaybackSpeed();
@@ -788,6 +986,7 @@ public class MusicPlayerManager {
 
                 @Override
                 public void onPlayerError(PlaybackException error) {
+                    if (player != exoPlayer) return;
                     isPlaying = false;
                     notifyPlayStateChanged(false);
                     cancelBilibiliRefreshTimer();
@@ -1056,18 +1255,29 @@ public class MusicPlayerManager {
     }
 
     private void notifySongChanged(Song song) {
+        // 播放统计挂在这里：这是「歌曲变了」的唯一出口，不会漏事件
+        PlaybackStats.onSongStarted(appContext, song);
         if (callback != null) {
             mainHandler.post(() -> callback.onSongChanged(song));
         }
     }
 
     private void notifyPlayStateChanged(boolean playing) {
+        // 同理，「播放状态变了」也只从这里出去，统计的起表 / 结算挂在这一处即可
+        PlaybackStats.onPlayStateChanged(appContext, playing);
         if (callback != null) {
             mainHandler.post(() -> callback.onPlayStateChanged(playing));
         }
     }
 
     // ==================== Sleep Timer ====================
+
+    /** 定时关闭模式（settings: sleep_timer_mode）：按总时长倒计时。 */
+    public static final int SLEEP_TIMER_MODE_TOTAL = 0;
+    /** 定时关闭模式：只累计实际播放时间。 */
+    public static final int SLEEP_TIMER_MODE_NET = 1;
+    /** 定时关闭模式：到点后不立刻停，等当前这首放完再停。 */
+    public static final int SLEEP_TIMER_MODE_FINISH_TRACK = 2;
 
     private long sleepTimerEndMs = 0;
     private Runnable sleepTimerRunnable;
@@ -1078,6 +1288,14 @@ public class MusicPlayerManager {
     private Runnable sleepTimerNetRunnable;
 
     /**
+     * 「等这首放完再停」已经武装待命。
+     *
+     * <p>对应 {@link #SLEEP_TIMER_MODE_FINISH_TRACK}：倒计时到点时只置这个标志，
+     * 真正的停止发生在 {@link #onSongCompleted()}，这样不会把歌掐在中间。</p>
+     */
+    private boolean sleepTimerStopAfterCurrent = false;
+
+    /**
      * Start sleep timer. Stops playback after the specified number of minutes.
      * @param minutes number of minutes until auto-stop
      */
@@ -1086,40 +1304,51 @@ public class MusicPlayerManager {
     }
 
     /**
-     * Start sleep timer using the current mode from settings (total or net playback).
+     * Start sleep timer using the current mode from settings.
+     *
      * @param seconds total seconds for the timer
      */
     public void startSleepTimerSeconds(int seconds) {
-        // Check current timer mode preference
-        boolean netMode = false;
+        int mode = SLEEP_TIMER_MODE_TOTAL;
         if (appContext != null) {
             SharedPreferences prefs = appContext.getSharedPreferences("music163_settings",
                     Context.MODE_PRIVATE);
-            netMode = prefs.getInt("sleep_timer_mode", 0) == 1;
+            mode = prefs.getInt("sleep_timer_mode", SLEEP_TIMER_MODE_TOTAL);
         }
-        if (netMode) {
+        if (mode == SLEEP_TIMER_MODE_NET) {
             startSleepTimerNetSeconds(seconds);
         } else {
-            startSleepTimerTotalSeconds(seconds);
+            // 总时长与「放完当前曲」共用同一套倒计时，区别只在于到点后的动作
+            startSleepTimerTotalSeconds(seconds, mode == SLEEP_TIMER_MODE_FINISH_TRACK);
         }
     }
 
     /**
      * Start total-duration sleep timer (normal countdown regardless of playback state).
+     *
+     * @param finishCurrentTrack 到点后是否等当前这首放完再停
      */
-    private void startSleepTimerTotalSeconds(int seconds) {
+    private void startSleepTimerTotalSeconds(int seconds, boolean finishCurrentTrack) {
         cancelSleepTimer();
         long delayMs = (long) seconds * 1000;
         sleepTimerEndMs = System.currentTimeMillis() + delayMs;
         sleepTimerNetMode = false;
         sleepTimerRunnable = () -> {
+            sleepTimerEndMs = 0;
+            if (finishCurrentTrack) {
+                // 只武装标志，等这首自然放完；期间定时器算「仍然生效」
+                sleepTimerStopAfterCurrent = true;
+                if (callback != null) {
+                    mainHandler.post(() -> callback.onSleepTimerPendingStop());
+                }
+                return;
+            }
             boolean exitApp = shouldExitAfterSleepTimer();
             if (exitApp) {
                 stop();
             } else {
                 pause();
             }
-            sleepTimerEndMs = 0;
             if (callback != null) {
                 mainHandler.post(() -> callback.onSleepTimerTriggered(exitApp));
             }
@@ -1182,16 +1411,26 @@ public class MusicPlayerManager {
         sleepTimerEndMs = 0;
         sleepTimerNetRemainingMs = 0;
         sleepTimerNetMode = false;
+        sleepTimerStopAfterCurrent = false;
     }
 
     /**
      * Check if a sleep timer is active.
      */
     public boolean isSleepTimerActive() {
+        if (sleepTimerStopAfterCurrent) {
+            // 「放完当前曲再停」已到点、正在等这首结束，仍然算生效
+            return true;
+        }
         if (sleepTimerNetMode) {
             return sleepTimerNetRemainingMs > 0;
         }
         return sleepTimerEndMs > 0 && System.currentTimeMillis() < sleepTimerEndMs;
+    }
+
+    /** 定时是否已到点、正在等当前这首放完。 */
+    public boolean isSleepTimerWaitingForTrackEnd() {
+        return sleepTimerStopAfterCurrent;
     }
 
     /**
@@ -1350,6 +1589,7 @@ public class MusicPlayerManager {
             } else {
                 currentIndex = 0;
             }
+            invalidateShuffleOrder();
 
             // Restore source playlist info
             sourcePlaylistId = prefs.getLong(KEY_SOURCE_PLAYLIST_ID, -1);
@@ -1392,6 +1632,74 @@ public class MusicPlayerManager {
         String songName = song != null && !TextUtils.isEmpty(song.getName()) ? song.getName() : "当前歌曲";
         mainHandler.post(() -> callback.onError(
                 songName + " 仅支持本地播放，但本地文件未找到。请在下载列表中重新下载"));
+    }
+
+    // ==================== 随机播放 ====================
+
+    /**
+     * 沿洗牌顺序前进 / 后退一首。
+     *
+     * <p>原实现里 {@code next()} 直接调 {@link #playNextSequential()}，随机模式只在
+     * 「一首自动播完」时生效，所以点「下一首」仍然是列表顺序 —— 这就是随机播放
+     * 看起来没生效的原因。现在手动切歌与自动播完都走同一条路径。</p>
+     *
+     * @param forward true = 下一首，false = 上一首
+     */
+    private void playShuffle(boolean forward) {
+        if (playlist.isEmpty()) return;
+        if (playlist.size() == 1) {
+            playCurrent();
+            return;
+        }
+        ensureShuffleOrder();
+
+        int position = shuffleOrder.indexOf(currentIndex);
+        if (position < 0) {
+            // 当前歌曲不在洗牌表里（列表刚被整体换过），重建后再定位
+            rebuildShuffleOrder();
+            position = shuffleOrder.indexOf(currentIndex);
+            if (position < 0) position = 0;
+        }
+
+        int target = position + (forward ? 1 : -1);
+        if (target < 0) {
+            target = shuffleOrder.size() - 1;
+        } else if (target >= shuffleOrder.size()) {
+            // 一轮放完：重新洗牌。刚播完的歌会被留在队首，于是下一首从新的第 2 位开始，
+            // 保证「随机」不会退化成每一轮都固定的顺序，也不会立刻重复同一首。
+            rebuildShuffleOrder();
+            target = shuffleOrder.size() > 1 ? 1 : 0;
+        }
+
+        currentIndex = shuffleOrder.get(target);
+        playCurrent();
+    }
+
+    /** 洗牌顺序失效、或长度与 playlist 对不上时重建。 */
+    private void ensureShuffleOrder() {
+        if (shuffleOrderDirty || shuffleOrder.size() != playlist.size()) {
+            rebuildShuffleOrder();
+        }
+    }
+
+    /** 重建洗牌顺序，并把当前歌曲挪到队首，保证「下一首」不会立刻又抽到它。 */
+    private void rebuildShuffleOrder() {
+        shuffleOrder.clear();
+        for (int i = 0; i < playlist.size(); i++) {
+            shuffleOrder.add(i);
+        }
+        Collections.shuffle(shuffleOrder, random);
+        int position = shuffleOrder.indexOf(currentIndex);
+        if (position > 0) {
+            shuffleOrder.remove(position);
+            shuffleOrder.add(0, currentIndex);
+        }
+        shuffleOrderDirty = false;
+    }
+
+    /** playlist 结构变动后调用，让下一次随机播放重新洗牌。 */
+    private void invalidateShuffleOrder() {
+        shuffleOrderDirty = true;
     }
 
     private void playNextSequential() {
@@ -1446,6 +1754,10 @@ public class MusicPlayerManager {
             existingIds.add(song.getId());
             playlist.add(song);
             appended++;
+        }
+        if (appended > 0) {
+            // 列表变长后原来的洗牌下标会错位
+            invalidateShuffleOrder();
         }
         return appended;
     }

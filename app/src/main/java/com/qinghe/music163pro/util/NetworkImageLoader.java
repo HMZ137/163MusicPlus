@@ -82,6 +82,16 @@ public final class NetworkImageLoader {
         }
     }
 
+    /**
+     * 清空内存里的封面缓存（配合设置页的「清理缓存」使用）。
+     *
+     * <p>磁盘缓存清掉之后如果不动这里，已经画出来的封面还会继续显示旧图，
+     * 看起来像「清了个寂寞」。</p>
+     */
+    public static void clearMemoryCache() {
+        MEMORY_CACHE.evictAll();
+    }
+
     public static void load(ImageView imageView, String imageUrl) {
         if (imageView == null) {
             return;

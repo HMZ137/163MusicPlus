@@ -6,16 +6,63 @@
     android:orientation="vertical"
     android:padding="6dp">
 
-    <TextView
+    <!-- 标题栏：标题居中，右侧放「整理」动作，与历史记录页保持同一套样式 -->
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/downloads"
-        android:textColor="@color/text_primary"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.05"
-        android:gravity="center"
-        android:paddingBottom="6dp" />
+        android:paddingBottom="6dp">
+
+        <!--
+            标题必须止于最左侧那个动作按钮之前。
+            之前用 match_parent + centerInParent，标题会铺满整行 —— 在 320px 手表上
+            「下载列表」四个字居中后会伸到右侧按钮底下，把「本地」压得看不清。
+        -->
+        <TextView
+            android:id="@+id/tv_downloads_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@id/btn_local_music"
+            android:layout_centerVertical="true"
+            android:text="@string/downloads"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/btn_local_music"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toStartOf="@id/btn_tidy_downloads"
+            android:layout_centerVertical="true"
+            android:text="@string/local_music_entry"
+            android:textColor="@color/colorPrimary"
+            android:textSize="12sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/btn_tidy_downloads"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:text="@string/download_tidy"
+            android:textColor="@color/colorPrimary"
+            android:textSize="12sp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:clickable="true"
+            android:focusable="true" />
+    </RelativeLayout>
 
     <ListView
         android:id="@+id/lv_downloads"

@@ -15,7 +15,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -42,7 +41,7 @@ import java.util.Locale;
  *
  * Adapted for watch screen (320x360 DPI).
  */
-public class SongInfoActivity extends AppCompatActivity {
+public class SongInfoActivity extends BaseWatchActivity {
 
     private static final String TAG = "SongInfoActivity";
     private static final String PREFS_NAME = "music163_settings";
@@ -1098,10 +1097,5 @@ public class SongInfoActivity extends AppCompatActivity {
         divider.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, px(1)));
         return divider;
-    }
-
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 }

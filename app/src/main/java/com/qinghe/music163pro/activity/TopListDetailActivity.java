@@ -14,8 +14,6 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
@@ -29,7 +27,7 @@ import java.util.List;
  * Top List Detail activity - shows songs in a specific chart.
  * Designed for watch screen (320x360 dpi).
  */
-public class TopListDetailActivity extends AppCompatActivity {
+public class TopListDetailActivity extends BaseWatchActivity {
 
     private ListView lvSongs;
     private final List<Song> displayList = new ArrayList<>();
@@ -133,11 +131,6 @@ public class TopListDetailActivity extends AppCompatActivity {
                 Toast.makeText(TopListDetailActivity.this, "加载失败: " + message, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 
     @Override

@@ -13,7 +13,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
@@ -21,6 +20,7 @@ import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.BackgroundUtil;
+import com.qinghe.music163pro.util.LyricSettings;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  *  - 阻塞 (LYRIC_MODE_BLOCK=1): pauses auto-scroll when user scrolls;
  *    resumes after configured interval seconds; double-tap to seek to that line
  */
-public class LyricsActivity extends AppCompatActivity {
+public class LyricsActivity extends BaseWatchActivity {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final Pattern LRC_PATTERN = Pattern.compile("\\[(\\d{1,3}):(\\d{2})\\.?(\\d{0,3})\\](.*)");
@@ -143,7 +143,8 @@ public class LyricsActivity extends AppCompatActivity {
                         if (idx < 0 || idx >= lyricLines.size()) {
                             return false;
                         }
-                        int seekMs = (int) lyricLines.get(idx).timeMs;
+                        int seekMs = LyricSettings.seekPositionForLine(LyricsActivity.this,
+                                lyricLines.get(idx).timeMs);
                         playerManager.seekTo(seekMs);
                         userScrolled = false;
                         lastUserScrollTime = 0L;
@@ -390,18 +391,40 @@ public class LyricsActivity extends AppCompatActivity {
             return;
         }
 
+        // 可选的文字底衬：在浅色或花哨的自定义背景上，白字经常会看不清
+        final boolean backdropEnabled = LyricSettings.isBackdropEnabled(this);
+        final int backdropPadding = backdropEnabled ? dp(8) : 0;
+
         for (LyricLine line : lyricLines) {
             TextView tv = new TextView(this);
             tv.setText(line.text);
             tv.setTextColor(0xB3FFFFFF);
             tv.setTextSize(13);
             tv.setGravity(android.view.Gravity.CENTER);
-            tv.setPadding(0, dp(6), 0, dp(6));
+            // 底衬打开时左右留出内边距，否则文字会贴着色块边缘
+            tv.setPadding(backdropPadding, dp(6), backdropPadding, dp(6));
+            if (backdropEnabled) {
+                tv.setBackground(buildLyricBackdrop());
+            }
             // No per-TextView touch listeners: double-tap and scroll detection
             // are handled at the ScrollView level in setupBlockingModeDetection().
             llContainer.addView(tv);
             lyricViews.add(tv);
         }
+    }
+
+    /**
+     * 歌词文字的底衬：半透明黑色圆角块。
+     *
+     * <p>这个页面每行就是一个独立的 TextView（不像播放页那样有外层容器），
+     * 所以底衬直接打在 TextView 上。</p>
+     */
+    private android.graphics.drawable.Drawable buildLyricBackdrop() {
+        android.graphics.drawable.GradientDrawable background =
+                new android.graphics.drawable.GradientDrawable();
+        background.setColor(LyricSettings.getBackdropColor());
+        background.setCornerRadius(dp(6));
+        return background;
     }
 
     private void showNoLyrics() {
@@ -458,10 +481,17 @@ public class LyricsActivity extends AppCompatActivity {
         scrollHandler.post(scrollRunnable);
     }
 
+    /**
+     * 找出当前该高亮的歌词下标。
+     *
+     * <p>歌词偏移在这里生效：传入的是原始播放进度，内部换算成参考点再比较。
+     * 时间戳本身保持原样，这样与音译 / 翻译歌词按时间戳对齐的映射不会被破坏。</p>
+     */
     private int findCurrentLyricIndex(int positionMs) {
         int index = -1;
+        int referencePos = LyricSettings.referencePosition(this, positionMs);
         for (int i = 0; i < lyricLines.size(); i++) {
-            if (lyricLines.get(i).timeMs <= positionMs) {
+            if (lyricLines.get(i).timeMs <= referencePos) {
                 index = i;
             } else {
                 break;

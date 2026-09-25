@@ -14,7 +14,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.util.MusicLog;
 
@@ -26,7 +25,7 @@ import com.qinghe.music163pro.util.MusicLog;
  * Extras (input):  EXTRA_URL = the verifyUrl from the -462 response
  * Result (output): EXTRA_COOKIE = cookie string for music.163.com (may be empty)
  */
-public class WebVerifyActivity extends AppCompatActivity {
+public class WebVerifyActivity extends BaseWatchActivity {
 
     public static final String EXTRA_URL    = "verify_url";
     public static final String EXTRA_COOKIE = "verify_cookie";

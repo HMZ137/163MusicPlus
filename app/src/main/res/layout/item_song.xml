@@ -41,5 +41,26 @@
             android:singleLine="true"
             android:textColor="@color/text_secondary"
             android:textSize="11sp" />
+
+        <!-- 下载进度，仅下载列表会用到；默认 GONE，对其他列表无影响 -->
+        <TextView
+            android:id="@+id/tv_item_progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/colorPrimary"
+            android:textSize="11sp"
+            android:visibility="gone" />
     </LinearLayout>
+
+    <!-- 多选模式的勾选状态指示，非多选模式下由代码置为 GONE -->
+    <ImageView
+        android:id="@+id/iv_item_check"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="6dp"
+        android:contentDescription="@string/multi_select_selected"
+        android:src="@drawable/ic_check_circle_outline"
+        android:visibility="gone" />
 </LinearLayout>

@@ -16,7 +16,9 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class FavoritesManager {
 
@@ -141,6 +143,11 @@ public class FavoritesManager {
         }
         list.add(0, song);
         saveFavorites(list);
+        // 本地收藏用的是「路径派生的负数 id」，不属于网易云的曲目体系，
+        // 写进 ids 文件会污染云同步与快速查重，所以跳过。
+        if (song.getId() <= 0) {
+            return;
+        }
         // Also add ID to ids file
         try {
             JSONArray arr = loadIdArray();
@@ -176,6 +183,61 @@ public class FavoritesManager {
         } catch (Exception e) {
             Log.w(TAG, "Error removing favorite ID", e);
         }
+    }
+
+    /**
+     * 批量加入本地收藏。
+     *
+     * <p>与逐首调用 {@link #addFavorite(Song)} 的区别是只读写一次 prefs / favorites.json /
+     * favorite-ids.json，避免在手表上对一个几十首的列表反复做整表序列化。</p>
+     *
+     * <p>已收藏的歌曲、以及没有有效歌曲 ID 的条目（例如老版本遗留的纯本地 mp3，
+     * id 为 0）会被自动跳过。</p>
+     *
+     * @param songs 待收藏歌曲，允许为 null / 空
+     * @return 实际新增到收藏的数量
+     */
+    public int addFavorites(List<Song> songs) {
+        if (songs == null || songs.isEmpty()) return 0;
+
+        // 先把现有的收藏 id 收进一个集合，避免逐首查重时的重复读取。
+        List<Song> list = getFavorites();
+        Set<Long> existing = new HashSet<>();
+        for (Song s : list) existing.add(s.getId());
+        for (Long id : getFavoriteIds()) existing.add(id);
+
+        List<Song> added = new ArrayList<>();
+        for (Song song : songs) {
+            if (song == null || song.getId() <= 0) continue;
+            if (existing.add(song.getId())) added.add(song);
+        }
+        if (added.isEmpty()) return 0;
+
+        // 新增项放到列表头部，保持「最近收藏在最前」的相对顺序。
+        list.addAll(0, added);
+        saveFavorites(list);
+
+        // 同步 id 索引文件，同样一次性写完。
+        try {
+            JSONArray arr = loadIdArray();
+            JSONArray newArr = new JSONArray();
+            for (Song s : added) newArr.put(s.getId());
+            for (int i = 0; i < arr.length(); i++) {
+                long id = arr.getLong(i);
+                boolean duplicated = false;
+                for (Song s : added) {
+                    if (s.getId() == id) {
+                        duplicated = true;
+                        break;
+                    }
+                }
+                if (!duplicated) newArr.put(id);
+            }
+            saveIdFile(newArr);
+        } catch (Exception e) {
+            Log.w(TAG, "Error batch adding favorite IDs", e);
+        }
+        return added.size();
     }
 
     public boolean isFavorite(long songId) {

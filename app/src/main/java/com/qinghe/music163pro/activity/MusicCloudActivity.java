@@ -257,6 +257,6 @@ public class MusicCloudActivity extends BaseWatchActivity {
 
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         WatchConfirmDialog.show(this, title, message, onConfirm,
-                new WatchConfirmDialog.Options(0xFF424242, 0xFFBB86FC, true));
+                WatchConfirmDialog.Options.defaultOptions());
     }
 }

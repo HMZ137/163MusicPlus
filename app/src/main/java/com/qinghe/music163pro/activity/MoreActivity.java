@@ -10,7 +10,6 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -29,7 +28,7 @@ import java.util.List;
  *
  * Supports right-swipe gesture to go back to the player screen.
  */
-public class MoreActivity extends AppCompatActivity {
+public class MoreActivity extends BaseWatchActivity {
 
     private View btnProfile;
     private View btnPersonalFM;
@@ -41,6 +40,7 @@ public class MoreActivity extends AppCompatActivity {
     private View btnSearch;
     private View btnSongRecognition;
     private View btnDownloads;
+    private View btnBilibili;
     private View btnRingtones;
     private View btnTopList;
     private View btnHistory;
@@ -68,6 +68,7 @@ public class MoreActivity extends AppCompatActivity {
         btnSearch = findViewById(R.id.btn_menu_search);
         btnSongRecognition = findViewById(R.id.btn_menu_song_recognition);
         btnDownloads = findViewById(R.id.btn_menu_downloads);
+        btnBilibili = findViewById(R.id.btn_menu_bilibili);
         btnRingtones = findViewById(R.id.btn_menu_ringtones);
         btnTopList = findViewById(R.id.btn_menu_toplist);
         btnHistory = findViewById(R.id.btn_menu_history);
@@ -98,6 +99,13 @@ public class MoreActivity extends AppCompatActivity {
 
         btnDownloads.setOnClickListener(v ->
                 startActivity(new Intent(this, DownloadListActivity.class)));
+
+        // 听bilibili：只保留「从BV号打开」与「本机收藏」两条不依赖账号的链路
+        // 听bilibili：只保留「从BV号打开」与「本机收藏」两条不依赖账号的链路
+        if (btnBilibili != null) {
+            btnBilibili.setOnClickListener(v ->
+                    startActivity(new Intent(this, BilibiliActivity.class)));
+        }
 
         btnRingtones.setOnClickListener(v ->
                 startActivity(new Intent(this, RingtoneListActivity.class)));
@@ -171,6 +179,8 @@ public class MoreActivity extends AppCompatActivity {
         applyVisibility(btnSearch, MoreMenuPreferences.KEY_SEARCH, false);
         applyVisibility(btnSongRecognition, MoreMenuPreferences.KEY_SONG_RECOGNITION, false);
         applyVisibility(btnDownloads, MoreMenuPreferences.KEY_DOWNLOADS, false);
+        // 不需要登录，所以 requireLogin = false
+        applyVisibility(btnBilibili, MoreMenuPreferences.KEY_BILIBILI, false);
         applyVisibility(btnRingtones, MoreMenuPreferences.KEY_RINGTONES, false);
         applyVisibility(btnTopList, MoreMenuPreferences.KEY_TOPLIST, false);
         applyVisibility(btnHistory, MoreMenuPreferences.KEY_HISTORY, false);
@@ -194,6 +204,7 @@ public class MoreActivity extends AppCompatActivity {
         viewByKey.put(MoreMenuPreferences.KEY_SEARCH, btnSearch);
         viewByKey.put(MoreMenuPreferences.KEY_SONG_RECOGNITION, btnSongRecognition);
         viewByKey.put(MoreMenuPreferences.KEY_DOWNLOADS, btnDownloads);
+        viewByKey.put(MoreMenuPreferences.KEY_BILIBILI, btnBilibili);
         viewByKey.put(MoreMenuPreferences.KEY_RINGTONES, btnRingtones);
         viewByKey.put(MoreMenuPreferences.KEY_TOPLIST, btnTopList);
         viewByKey.put(MoreMenuPreferences.KEY_HISTORY, btnHistory);

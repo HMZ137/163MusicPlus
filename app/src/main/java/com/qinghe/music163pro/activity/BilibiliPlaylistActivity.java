@@ -39,6 +39,14 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
     private final List<BilibiliApiHelper.BilibiliPage> fetchedPages = new ArrayList<>();
     private BilibiliFavoritesManager favoritesManager;
 
+    /**
+     * 页面标题栏里已经有返回控件，不再叠加左上角浮动返回按钮，避免出现两个返回入口。
+     */
+    @Override
+    protected boolean shouldShowBackButton() {
+        return false;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -98,7 +106,8 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(30), px(30)));
+        back.setPadding(px(5), px(5), px(5), px(5));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
         back.setOnClickListener(v -> finish());
@@ -118,7 +127,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         bar.addView(title);
 
         btnFavorite = new ImageView(this);
-        btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
+        btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(px(30), px(30)));
         btnFavorite.setOnClickListener(v -> toggleFavorite());
         bar.addView(btnFavorite);
         return bar;

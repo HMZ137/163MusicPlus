@@ -11,7 +11,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.text.util.Linkify;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.qinghe.music163pro.R;
@@ -25,7 +24,7 @@ import java.util.List;
  * About page - shows app name, version, developer, description, update summary.
  * Adapted for watch DPI with scrollable content.
  */
-public class AboutActivity extends AppCompatActivity {
+public class AboutActivity extends BaseWatchActivity {
 
     private static final String DEFAULT_OVERVIEW =
             "加载中...";
@@ -265,8 +264,4 @@ public class AboutActivity extends AppCompatActivity {
     /**
      * Convert a value scaled for a 320px-wide watch screen to actual pixels.
      */
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
-    }
 }

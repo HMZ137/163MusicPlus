@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,6 +27,10 @@ import java.net.URL;
  *   (re)loaded when the screen is shown, so it never stays blank.
  * - MODE_CUSTOM: a user-picked static image saved to internal storage.
  * - MODE_DEFAULT: plain dark background.
+ *
+ * 显示方式统一为「填充」：等比放大到盖满整块区域、超出的部分居中裁掉
+ * （{@link CenterCropDrawable}）。早期版本直接用 BitmapDrawable，其默认 gravity 为
+ * Gravity.FILL，会把图片按 view 宽高非等比拉伸，在手表这种窄屏上变形很明显。
  */
 public final class BackgroundUtil {
 
@@ -196,7 +199,7 @@ public final class BackgroundUtil {
         }
         if (MODE_COVER.equals(mode)) {
             if (sCoverBg != null) {
-                root.setBackground(new BitmapDrawable(context.getResources(), sCoverBg));
+                root.setBackground(new CenterCropDrawable(sCoverBg));
             } else {
                 root.setBackgroundColor(DEFAULT_BG_COLOR);
             }
@@ -221,7 +224,7 @@ public final class BackgroundUtil {
                 return;
             }
             Bitmap dimmed = dimBitmap(src, context);
-            root.setBackground(new BitmapDrawable(context.getResources(), dimmed));
+            root.setBackground(new CenterCropDrawable(dimmed));
         } catch (Exception ignored) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
         }

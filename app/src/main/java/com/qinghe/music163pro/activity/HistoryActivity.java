@@ -15,10 +15,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.MultiSelectController;
+import com.qinghe.music163pro.util.BatchFavoriteHelper;
 import com.qinghe.music163pro.manager.HistoryManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -29,6 +29,7 @@ import java.util.List;
 
 /**
  * History activity - shows play history sorted by time (newest first).
+ * 长按进入多选，可批量收藏 / 批量删除播放记录。
  * Designed for watch screen (320x360 dpi).
  */
 public class HistoryActivity extends BaseWatchActivity {
@@ -38,6 +39,7 @@ public class HistoryActivity extends BaseWatchActivity {
     private ArrayAdapter<Song> adapter;
     private MusicPlayerManager playerManager;
     private TextView tvEmpty;
+    private MultiSelectController multiSelect;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,15 +139,29 @@ public class HistoryActivity extends BaseWatchActivity {
             finish();
         });
 
-        lvHistory.setOnItemLongClickListener((parent, view, position, id) -> {
-            Song song = displayList.get(position);
-            showConfirmDialog("确认删除", "确定删除「" + song.getName() + "」的播放记录？", () -> {
-                HistoryManager.getInstance().removeFromHistory(song.getId());
-                loadHistory();
-                Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
-            });
-            return true;
-        });
+        // 长按进入多选模式，多选后可通过动作栏批量收藏或删除播放记录
+        multiSelect = MultiSelectController.attach(this, lvHistory,
+                new MultiSelectController.Callback() {
+                    @Override
+                    public List<MultiSelectController.Action> getActions() {
+                        List<MultiSelectController.Action> actions = new ArrayList<>();
+                        actions.add(MultiSelectController.Action.favorite(HistoryActivity.this));
+                        actions.add(MultiSelectController.Action.delete(HistoryActivity.this));
+                        return actions;
+                    }
+
+                    @Override
+                    public void onAction(MultiSelectController.Action action, List<Integer> positions) {
+                        if (MultiSelectController.Action.ID_FAVORITE.equals(action.id)) {
+                            favoriteSelected(positions);
+                        } else if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
+                            confirmDeleteSelected(positions);
+                        }
+                    }
+                });
+        if (multiSelect != null) {
+            addBackInterceptor(multiSelect::handleBackPressed);
+        }
 
         loadHistory();
     }
@@ -153,7 +169,74 @@ public class HistoryActivity extends BaseWatchActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // 列表数据在 onResume 会重新加载，选中下标可能失效，先退出多选。
+        if (multiSelect != null) {
+            multiSelect.exitSelectionMode();
+        }
         loadHistory();
+    }
+
+    /**
+     * 删除选中的播放记录。
+     */
+    private void confirmDeleteSelected(List<Integer> positions) {
+        final List<Long> songIds = new ArrayList<>();
+        for (int position : positions) {
+            if (position >= 0 && position < displayList.size()) {
+                songIds.add(displayList.get(position).getId());
+            }
+        }
+        if (songIds.isEmpty()) {
+            return;
+        }
+        showConfirmDialog("确认删除",
+                "确定删除选中的 " + songIds.size() + " 条播放记录？", () -> {
+                    for (Long songId : songIds) {
+                        HistoryManager.getInstance().removeFromHistory(songId);
+                    }
+                    if (multiSelect != null) {
+                        multiSelect.exitSelectionMode();
+                    }
+                    loadHistory();
+                    Toast.makeText(HistoryActivity.this, "已删除", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    /**
+     * 批量收藏选中的播放记录里的歌曲。
+     *
+     * <p>收藏口径与单曲收藏保持一致：设置里切到「云端收藏」时走网易云接口（需要登录），
+     * 否则写入本地收藏。详见 {@link BatchFavoriteHelper}。</p>
+     */
+    private void favoriteSelected(List<Integer> positions) {
+        final List<Song> targets = new ArrayList<>();
+        for (int position : positions) {
+            if (position >= 0 && position < displayList.size()) {
+                targets.add(displayList.get(position));
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        Toast.makeText(this, getString(R.string.multi_select_favoriting, targets.size()),
+                Toast.LENGTH_SHORT).show();
+        BatchFavoriteHelper.favoriteAll(this, targets, new BatchFavoriteHelper.Callback() {
+            @Override
+            public void onFinished(int added, int skipped, int failed, int total) {
+                if (multiSelect != null) {
+                    multiSelect.exitSelectionMode();
+                }
+                Toast.makeText(HistoryActivity.this,
+                        BatchFavoriteHelper.buildResultMessage(HistoryActivity.this, added, failed),
+                        Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNeedLogin() {
+                Toast.makeText(HistoryActivity.this,
+                        R.string.multi_select_favorite_need_login, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void loadHistory() {
@@ -213,7 +296,7 @@ public class HistoryActivity extends BaseWatchActivity {
      */
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         WatchConfirmDialog.show(this, title, message, onConfirm,
-                new WatchConfirmDialog.Options(0xFF424242, 0xFFBB86FC, true));
+                WatchConfirmDialog.Options.defaultOptions());
     }
 
     @Override

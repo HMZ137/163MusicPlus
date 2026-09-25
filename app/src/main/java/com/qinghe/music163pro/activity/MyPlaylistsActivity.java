@@ -16,8 +16,6 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.PlaylistInfo;
@@ -33,7 +31,7 @@ import java.util.List;
  * Clicking a playlist opens PlaylistDetailActivity with full ownership info.
  * Designed for watch screen (320x360 dpi).
  */
-public class MyPlaylistsActivity extends AppCompatActivity {
+public class MyPlaylistsActivity extends BaseWatchActivity {
 
     private ListView lvPlaylists;
     private final List<PlaylistInfo> displayList = new ArrayList<>();
@@ -406,11 +404,6 @@ public class MyPlaylistsActivity extends AppCompatActivity {
                         "创建失败: " + message, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 
     @Override

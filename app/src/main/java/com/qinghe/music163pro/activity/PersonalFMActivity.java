@@ -10,7 +10,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -22,7 +21,7 @@ import java.util.List;
  * Personal FM mode selection activity.
  * Shows available roaming modes before starting FM playback.
  */
-public class PersonalFMActivity extends AppCompatActivity {
+public class PersonalFMActivity extends BaseWatchActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

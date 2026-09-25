@@ -52,6 +52,8 @@ import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.UpdateChecker;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.util.BackgroundUtil;
+import com.qinghe.music163pro.util.LocalTracks;
+import com.qinghe.music163pro.util.LyricSettings;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONObject;
@@ -149,6 +151,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private boolean translationEnabled; // Whether translation is currently showing
     private TextView btnTranslationToggle; // Toggle button in lyrics overlay
     private final java.util.Map<Long, String> translationMap = new java.util.HashMap<>(); // timeMs -> translated text
+    // Romanized (音译 / 音) lyrics
+    private String currentRomalrcText; // Raw romanized LRC text for current song
+    private boolean romanizationEnabled; // Whether romanization is currently showing
+    private TextView btnRomanizationToggle; // 「音」toggle button in lyrics overlay
+    private final java.util.Map<Long, String> romanizationMap = new java.util.HashMap<>(); // timeMs -> romanized text
     private long currentChorusSongId = -1L;
     private long currentChorusStartMs = -1L;
     private long currentChorusEndMs = -1L;
@@ -159,6 +166,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         long timeMs;
         String text;
         String translation; // Optional translated text
+        String romanization; // Optional romanized (音译) text
         LyricLine(long timeMs, String text) {
             this.timeMs = timeMs;
             this.text = text;
@@ -270,7 +278,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                                 volumeSafeConfirmed = true;
                                 adjustVolumeUp();
                             },
-                            new WatchConfirmDialog.Options(0xFF1E1E1E, 0xFFBB86FC, true));
+                            WatchConfirmDialog.Options.defaultOptions());
                 } else {
                     adjustVolumeUp();
                 }
@@ -522,7 +530,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             @Override
             public void onResult(UpdateChecker.VersionInfo versionInfo) {
                 if (!versionInfo.isLatest()) {
-                    openUpdateActivity(versionInfo.getVersionName());
+                    // 只提示，不再自动跳到更新页、更不下载安装 ——
+                    // 装官方新版会覆盖掉本修改版累积的所有改动。
+                    Toast.makeText(MainActivity.this,
+                            "发现新版本 " + versionInfo.getVersionName()
+                                    + "（当前为修改版，不自动更新）",
+                            Toast.LENGTH_LONG).show();
                 }
             }
 
@@ -533,6 +546,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         });
     }
 
+    /**
+     * 打开更新页查看版本信息。
+     *
+     * <p>自动检查已经不再调用它（改成只 Toast 提示），保留是为了以后需要
+     * 恢复「跳转更新页」时有个现成的入口。</p>
+     */
     private void openUpdateActivity(String targetVersionName) {
         Intent intent = new Intent(this, UpdateActivity.class);
         if (targetVersionName != null && !targetVersionName.trim().isEmpty()) {
@@ -629,20 +648,38 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         // Row 1: 收藏 + 下载
+        //
+        // 本地音乐（下载来的 / 自己拷进来的）用不了云端那一套：没有网易云 id 就查不到音质、
+        // 评论、歌单，下载与设铃声也没有意义。所以按 localOnly 把不可用的项去掉，
+        // 并把「收藏」换成只写本地库、带本地标签的「收藏本地音乐」。
+        final boolean localOnly = LocalTracks.isLocalOnly(song);
+        final long localFavId = LocalTracks.idForPath(song.getUrl());
+
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         boolean isCloudMode = prefs.getBoolean("fav_mode_cloud", false);
         boolean isFav;
-        if (isCloudMode) {
+        if (localOnly) {
+            // 本地收藏用负数 id 当键，和云端收藏互不干扰
+            isFav = localFavId != 0 && favoritesManager.isFavorite(localFavId);
+        } else if (isCloudMode) {
             // In cloud mode, check cached cloud liked IDs
             isFav = isCloudLiked(song.getId());
         } else {
             isFav = favoritesManager.isFavorite(song.getId());
         }
         row1.addView(createFuncItem(isFav ? R.drawable.ic_favorite : R.drawable.ic_favorite_border,
-                isFav ? "取消收藏" : "收藏",
-                v -> onFuncFavorite(song)));
-        row1.addView(createFuncItem(R.drawable.ic_get_app, "下载",
-                v -> onFuncDownload(song)));
+                localOnly ? (isFav ? "取消收藏" : "收藏本地音乐") : (isFav ? "取消收藏" : "收藏"),
+                v -> {
+                    if (localOnly) {
+                        onFuncFavoriteLocal(song);
+                    } else {
+                        onFuncFavorite(song);
+                    }
+                }));
+        if (!localOnly) {
+            row1.addView(createFuncItem(R.drawable.ic_get_app, "下载",
+                    v -> onFuncDownload(song)));
+        }
         contentLayout.addView(row1);
 
         // Row 2: 设为铃声 + 定时关闭
@@ -653,8 +690,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row2.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        row2.addView(createFuncItem(R.drawable.ic_notifications, "设为铃声",
-                v -> onFuncSetRingtone(song)));
+        if (!localOnly) {
+            row2.addView(createFuncItem(R.drawable.ic_notifications, "设为铃声",
+                    v -> onFuncSetRingtone(song)));
+        }
 
         // Sleep timer - show remaining time if active, with live updates
         LinearLayout timerItem = createFuncItem(R.drawable.ic_timer,
@@ -727,11 +766,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        row4.addView(createFuncItem(R.drawable.ic_info, "音乐信息",
-                v -> onFuncSongInfo(song)));
-        row4.addView(createFuncItem(R.drawable.ic_comment, "评论",
-                v -> onFuncComments(song)));
-        contentLayout.addView(row4);
+        if (!localOnly) {
+            row4.addView(createFuncItem(R.drawable.ic_info, "音乐信息",
+                    v -> onFuncSongInfo(song)));
+            row4.addView(createFuncItem(R.drawable.ic_comment, "评论",
+                    v -> onFuncComments(song)));
+            contentLayout.addView(row4);
+        }
 
         // Row 5: 播放列表 + 添加到歌单
         LinearLayout row5 = new LinearLayout(this);
@@ -743,8 +784,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         row5.addView(createFuncItem(R.drawable.ic_queue_music, "播放列表",
                 v -> onFuncShowPlaylist()));
-        row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
-                v -> onFuncAddToPlaylist(song)));
+        if (!localOnly) {
+            row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
+                    v -> onFuncAddToPlaylist(song)));
+        }
         contentLayout.addView(row5);
 
         // Row 6: 音质
@@ -759,8 +802,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String curQuality = getCurrentQualityLabel(song,
                 qualityPrefs.getString("preferred_quality", "exhigh"));
         String qualityLabel = "音质: " + getQualityShortName(curQuality);
-        row6.addView(createFuncItem(R.drawable.ic_audio_quality, qualityLabel,
-                v -> onFuncSelectQuality()));
+        if (!localOnly) {
+            row6.addView(createFuncItem(R.drawable.ic_audio_quality, qualityLabel,
+                    v -> onFuncSelectQuality()));
+        }
         row6.addView(createFuncItem(R.drawable.ic_info, "播放器信息",
                 v -> onFuncPlayerInfo()));
         contentLayout.addView(row6);
@@ -1328,6 +1373,38 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         return button;
     }
 
+    /**
+     * 收藏 / 取消收藏一首本地音乐。
+     *
+     * <p>本地文件没有网易云 id，云端收藏无从谈起，所以这里**强制只写本地收藏库**，
+     * 并且用「文件路径派生的负数 id」当键 —— 负数 id 本身就是「这是本地收藏」的标签，
+     * 后续在收藏列表里能据此打标，也能据此挡掉「添加到歌单」这类需要网易云 id 的操作。</p>
+     */
+    private void onFuncFavoriteLocal(Song song) {
+        String path = song.getUrl();
+        long localId = LocalTracks.idForPath(path);
+        if (localId == 0) {
+            Toast.makeText(this, "无法收藏：拿不到文件路径", Toast.LENGTH_SHORT).show();
+            dismissOverlay();
+            return;
+        }
+
+        // 保存的条目跟原曲同名同姓，但 id 换成负数、url 指向本地文件，
+        // 这样播放时直接走本地播放，不会再去找网易云要链接。
+        Song entry = new Song(localId, song.getName(), song.getArtist(), song.getAlbum());
+        entry.setUrl(path);
+        entry.setForceLocalPlayback(true);
+
+        if (favoritesManager.isFavorite(localId)) {
+            favoritesManager.removeFavorite(entry);
+            Toast.makeText(this, "已取消本地收藏", Toast.LENGTH_SHORT).show();
+        } else {
+            favoritesManager.addFavorite(entry);
+            Toast.makeText(this, "已加入本地收藏", Toast.LENGTH_SHORT).show();
+        }
+        dismissOverlay();
+    }
+
     private void onFuncFavorite(Song song) {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
@@ -1690,7 +1767,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 if (index < 0 || index >= lyricLines.size()) {
                     return false;
                 }
-                int seekMs = (int) lyricLines.get(index).timeMs;
+                int seekMs = LyricSettings.seekPositionForLine(MainActivity.this,
+                        lyricLines.get(index).timeMs);
                 playerManager.seekTo(seekMs);
                 lyricsUserScrolled = false;
                 lyricsLastUserScrollTime = 0L;
@@ -1720,8 +1798,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         mainLayout.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Top bar: Song name + translation toggle button
-        FrameLayout topBar = new FrameLayout(this);
+        // Top bar: 曲名 + 「音 / 译」开关。
+        //
+        // 用横向 LinearLayout 而不是 FrameLayout：曲名是跑马灯，在 FrameLayout 里它会
+        // 铺满整行、从按钮下面滚过去（看起来就是被曲名糊住、点不准）。
+        // 给曲名 weight=1 之后它的边界就止于按钮左侧，结构上不可能重叠。
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -1731,18 +1815,37 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvLyricsSongLabel.setTextColor(0xFFFFFFFF);
         tvLyricsSongLabel.setTextSize(13);
         tvLyricsSongLabel.setGravity(Gravity.CENTER);
-        tvLyricsSongLabel.setPadding(dp(30), dp(6), dp(30), dp(4));
+        tvLyricsSongLabel.setPadding(dp(10), dp(6), dp(6), dp(4));
         tvLyricsSongLabel.setSingleLine(true);
         tvLyricsSongLabel.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
         tvLyricsSongLabel.setSelected(true);
-        FrameLayout.LayoutParams songLabelParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        // weight=1：曲名只占「按钮左侧」的空间，跑马灯也只在自身范围内滚动
+        LinearLayout.LayoutParams songLabelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         tvLyricsSongLabel.setLayoutParams(songLabelParams);
         topBar.addView(tvLyricsSongLabel);
 
-        // Translation toggle button (top-right), hidden by default until we know translation exists
-        SharedPreferences transPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        translationEnabled = transPrefs.getBoolean("lyrics_translation", false);
+        // 右上角的歌词开关：「音」（音译 / 罗马音）与「译」（翻译）。
+        // 两个按钮默认都隐藏，只有确实拿到了对应的歌词才显示。
+        translationEnabled = LyricSettings.isTranslationEnabled(this);
+        romanizationEnabled = LyricSettings.isRomanizationEnabled(this);
+
+        LinearLayout lyricToggleRow = new LinearLayout(this);
+        lyricToggleRow.setOrientation(LinearLayout.HORIZONTAL);
+        lyricToggleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        btnRomanizationToggle = new TextView(this);
+        btnRomanizationToggle.setText(romanizationEnabled ? "音✓" : "音");
+        btnRomanizationToggle.setTextColor(romanizationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
+        btnRomanizationToggle.setTextSize(12);
+        btnRomanizationToggle.setGravity(Gravity.CENTER);
+        btnRomanizationToggle.setPadding(dp(6), dp(4), dp(6), dp(4));
+        btnRomanizationToggle.setClickable(true);
+        btnRomanizationToggle.setFocusable(true);
+        btnRomanizationToggle.setVisibility(View.GONE); // 拿到音译歌词前不显示
+        btnRomanizationToggle.setOnClickListener(v -> toggleLyricsRomanization());
+        lyricToggleRow.addView(btnRomanizationToggle);
+
         btnTranslationToggle = new TextView(this);
         btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
         btnTranslationToggle.setTextColor(translationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
@@ -1752,13 +1855,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnTranslationToggle.setClickable(true);
         btnTranslationToggle.setFocusable(true);
         btnTranslationToggle.setVisibility(View.GONE); // Hidden until translation is available
-        FrameLayout.LayoutParams toggleParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        toggleParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        toggleParams.setMarginEnd(dp(2));
-        btnTranslationToggle.setLayoutParams(toggleParams);
         btnTranslationToggle.setOnClickListener(v -> toggleLyricsTranslation());
-        topBar.addView(btnTranslationToggle);
+        lyricToggleRow.addView(btnTranslationToggle);
+
+        // 按钮按自身宽度排列在曲名右侧，不参与拉伸
+        LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        toggleParams.setMarginEnd(dp(2));
+        lyricToggleRow.setLayoutParams(toggleParams);
+        topBar.addView(lyricToggleRow);
 
         mainLayout.addView(topBar);
 
@@ -1810,19 +1915,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Try local .lrc file first
         String localLrc = loadLocalLrc(song);
         if (localLrc != null && !localLrc.isEmpty()) {
-            // Also try to load local translated lyrics
-            String localTlyric = loadLocalTlyric(song);
-            currentTlyricText = localTlyric;
-            parseLrc(localLrc);
-            if (localTlyric != null && !localTlyric.isEmpty()) {
-                parseTranslationLrc(localTlyric);
-                applyTranslationsToLyrics();
-                if (btnTranslationToggle != null) {
-                    btnTranslationToggle.setVisibility(View.VISIBLE);
-                }
-            }
-            displayLyricsInOverlay();
-            startLyricsScrollSync(tvLyricsTime);
+            // 本地下载时会把翻译 / 音译一起存下来，这里一并用上
+            applyLoadedLyrics(localLrc, loadLocalTlyric(song), loadLocalRomalrc(song), tvLyricsTime);
             return;
         }
 
@@ -1844,26 +1938,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String cookie = playerManager.getCookie();
         MusicApiHelper.getLyricsWithTranslation(song.getId(), cookie, new MusicApiHelper.LyricsFullCallback() {
             @Override
-            public void onResult(String lrcText, String tlyricText) {
+            public void onResult(String lrcText, String tlyricText, String romalrcText) {
                 if (lrcText == null || lrcText.isEmpty()) {
                     showNoLyricsInOverlay();
                     return;
                 }
-                currentTlyricText = tlyricText;
-                parseLrc(lrcText);
-                if (tlyricText != null && !tlyricText.isEmpty()) {
-                    parseTranslationLrc(tlyricText);
-                    applyTranslationsToLyrics();
-                    if (btnTranslationToggle != null) {
-                        btnTranslationToggle.setVisibility(View.VISIBLE);
-                    }
-                } else {
-                    if (btnTranslationToggle != null) {
-                        btnTranslationToggle.setVisibility(View.GONE);
-                    }
-                }
-                displayLyricsInOverlay();
-                startLyricsScrollSync(tvLyricsTime);
+                applyLoadedLyrics(lrcText, tlyricText, romalrcText, tvLyricsTime);
             }
 
             @Override
@@ -1871,6 +1951,45 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 showNoLyricsInOverlay();
             }
         });
+    }
+
+    /**
+     * 歌词装载的统一收尾：解析原文 / 翻译 / 音译，决定两个开关的显隐，然后渲染并开始同步。
+     *
+     * <p>本地 .lrc 与接口返回都走这里。之前两条路径各写一份，结果本地分支漏了
+     * 「没有翻译时隐藏『译』按钮」这一步，导致没翻译的歌也会显示一个点了没反应的按钮。</p>
+     */
+    private void applyLoadedLyrics(String lrcText, String tlyricText, String romalrcText,
+                                   TextView tvLyricsTime) {
+        currentTlyricText = tlyricText;
+        currentRomalrcText = romalrcText;
+        parseLrc(lrcText);
+
+        boolean hasTranslation = tlyricText != null && !tlyricText.isEmpty();
+        if (hasTranslation) {
+            parseTranslationLrc(tlyricText);
+        } else {
+            translationMap.clear();
+        }
+
+        boolean hasRomanization = romalrcText != null && !romalrcText.isEmpty();
+        if (hasRomanization) {
+            parseRomanizationLrc(romalrcText);
+        } else {
+            romanizationMap.clear();
+        }
+
+        applyTranslationsToLyrics();
+
+        if (btnTranslationToggle != null) {
+            btnTranslationToggle.setVisibility(hasTranslation ? View.VISIBLE : View.GONE);
+        }
+        if (btnRomanizationToggle != null) {
+            btnRomanizationToggle.setVisibility(hasRomanization ? View.VISIBLE : View.GONE);
+        }
+
+        displayLyricsInOverlay();
+        startLyricsScrollSync(tvLyricsTime);
     }
 
     private String loadLocalLrc(Song song) {
@@ -1903,17 +2022,29 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * Load translated lyrics from local download folder (tlyrics.lrc).
      */
     private String loadLocalTlyric(Song song) {
+        return readLocalLyricFile(song, "tlyrics.lrc");
+    }
+
+    /** 本地音译歌词（下载时一并保存，见 DownloadManager.downloadLyrics）。 */
+    private String loadLocalRomalrc(Song song) {
+        return readLocalLyricFile(song, "romalrc.lrc");
+    }
+
+    /**
+     * 读取下载目录里的某个歌词文件（lyrics.lrc / tlyrics.lrc / romalrc.lrc）。
+     */
+    private String readLocalLyricFile(Song song, String fileName) {
         try {
             String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
             String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
             String folderName = safeName + " - " + safeArtist;
-            java.io.File tlyricFile = new java.io.File(
+            java.io.File lyricFile = new java.io.File(
                     android.os.Environment.getExternalStorageDirectory(),
-                    "163Music/Download/" + folderName + "/tlyrics.lrc"
+                    "163Music/Download/" + folderName + "/" + fileName
             );
-            if (!tlyricFile.exists()) return null;
+            if (!lyricFile.exists()) return null;
 
-            try (java.io.FileInputStream fis = new java.io.FileInputStream(tlyricFile);
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(lyricFile);
                  java.io.InputStreamReader reader = new java.io.InputStreamReader(fis, "UTF-8")) {
                 StringBuilder sb = new StringBuilder();
                 char[] buf = new char[1024];
@@ -1961,9 +2092,24 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * Parse translated lyrics LRC into the translationMap (timeMs -> translated text).
      */
     private void parseTranslationLrc(String tlyricText) {
-        translationMap.clear();
-        if (tlyricText == null || tlyricText.isEmpty()) return;
-        String[] lines = tlyricText.split("\n");
+        parseTimedLrcInto(tlyricText, translationMap);
+    }
+
+    /**
+     * Parse romanized (音译) lyrics LRC into the romanizationMap (timeMs -> romanized text).
+     */
+    private void parseRomanizationLrc(String romalrcText) {
+        parseTimedLrcInto(romalrcText, romanizationMap);
+    }
+
+    /**
+     * 把「时间戳 -> 文本」形态的 LRC（翻译 / 音译）解析进给定 map。
+     * 两类歌词共用这一份解析，避免两套逻辑慢慢走岔。
+     */
+    private void parseTimedLrcInto(String lrcText, java.util.Map<Long, String> target) {
+        target.clear();
+        if (lrcText == null || lrcText.isEmpty()) return;
+        String[] lines = lrcText.split("\n");
         for (String line : lines) {
             java.util.regex.Matcher matcher = LRC_PATTERN.matcher(line.trim());
             if (matcher.matches()) {
@@ -1980,19 +2126,20 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 long timeMs = (long) min * 60 * 1000 + (long) sec * 1000 + ms;
                 String text = matcher.group(4).trim();
                 if (!text.isEmpty()) {
-                    translationMap.put(timeMs, text);
+                    target.put(timeMs, text);
                 }
             }
         }
     }
 
     /**
-     * Apply translations from translationMap to each lyricLine's translation field.
+     * Apply translations / romanizations from the maps onto each lyricLine.
      */
     private void applyTranslationsToLyrics() {
         for (LyricLine line : lyricLines) {
             String trans = translationMap.get(line.timeMs);
             line.translation = trans; // may be null if no translation for this line
+            line.romanization = romanizationMap.get(line.timeMs);
         }
     }
 
@@ -2002,22 +2149,50 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      */
     private void toggleLyricsTranslation() {
         translationEnabled = !translationEnabled;
-        // Save preference
-        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        prefs.edit().putBoolean("lyrics_translation", translationEnabled).apply();
-        // Update button appearance
+        LyricSettings.setTranslationEnabled(this, translationEnabled);
         if (btnTranslationToggle != null) {
             btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
             btnTranslationToggle.setTextColor(translationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
         }
-        // Re-display lyrics with or without translation
+        refreshLyricsAfterToggle();
+    }
+
+    /**
+     * 切换「音」（音译 / 罗马音）歌词显示。
+     * 与「译」互相独立，可以同时打开 —— 日文歌会同时显示 原文 / 发音 / 翻译 三行。
+     */
+    private void toggleLyricsRomanization() {
+        romanizationEnabled = !romanizationEnabled;
+        LyricSettings.setRomanizationEnabled(this, romanizationEnabled);
+        if (btnRomanizationToggle != null) {
+            btnRomanizationToggle.setText(romanizationEnabled ? "音✓" : "音");
+            btnRomanizationToggle.setTextColor(romanizationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
+        }
+        refreshLyricsAfterToggle();
+    }
+
+    /** 开关切换后重绘歌词，并重新开始高亮同步。 */
+    private void refreshLyricsAfterToggle() {
         displayLyricsInOverlay();
-        // Restart sync to update highlighting
         if (tvLyricsTimeRef != null) {
             lyricsScrollHandler.removeCallbacksAndMessages(null);
             currentHighlightIndex = -1;
             startLyricsScrollSync(tvLyricsTimeRef);
         }
+    }
+
+    /**
+     * 歌词文字的底衬：半透明黑色圆角块。
+     *
+     * <p>底衬打在**整行容器**上而不是每个 TextView 上，这样原文 / 音译 / 翻译三行
+     * 是同一个色块，不会切成三条；也避免逐行嵌套背景导致的额外层级。</p>
+     */
+    private android.graphics.drawable.Drawable buildLyricBackdrop() {
+        android.graphics.drawable.GradientDrawable background =
+                new android.graphics.drawable.GradientDrawable();
+        background.setColor(LyricSettings.getBackdropColor());
+        background.setCornerRadius(dp(6));
+        return background;
     }
 
     private void displayLyricsInOverlay() {
@@ -2031,28 +2206,51 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
 
+        // 三类歌词各有一个由用户设定的字号（设置页可调）
+        final int originalFontSize = LyricSettings.getOriginalFontSize(this);
+        final int romanizationFontSize = LyricSettings.getRomanizationFontSize(this);
+        final int translationFontSize = LyricSettings.getTranslationFontSize(this);
+        // 可选的文字底衬：在浅色或花哨的自定义背景上，白字经常会看不清
+        final boolean backdropEnabled = LyricSettings.isBackdropEnabled(this);
+        final int backdropPadding = backdropEnabled ? dp(8) : 0;
+
         for (LyricLine line : lyricLines) {
             // Container for each lyric line (original + optional translation)
             LinearLayout lineLayout = new LinearLayout(this);
             lineLayout.setOrientation(LinearLayout.VERTICAL);
             lineLayout.setGravity(Gravity.CENTER_HORIZONTAL);
-            lineLayout.setPadding(0, dp(5), 0, dp(5));
+            // 底衬打开时左右留出内边距，否则文字会贴着色块边缘
+            lineLayout.setPadding(backdropPadding, dp(5), backdropPadding, dp(5));
+            if (backdropEnabled) {
+                lineLayout.setBackground(buildLyricBackdrop());
+            }
 
             // Original lyrics text
             TextView tv = new TextView(this);
             tv.setText(line.text);
             tv.setTextColor(0xB3FFFFFF);
-            tv.setTextSize(13);
+            tv.setTextSize(originalFontSize);
             tv.setGravity(Gravity.CENTER);
             lineLayout.addView(tv);
             lyricViews.add(tv);
+
+            // 音译（音）— 紧跟原文，读法比翻译更贴近原文位置
+            if (romanizationEnabled && line.romanization != null && !line.romanization.isEmpty()) {
+                TextView tvRoma = new TextView(this);
+                tvRoma.setText(line.romanization);
+                tvRoma.setTextColor(0x99BB86FC);
+                tvRoma.setTextSize(romanizationFontSize);
+                tvRoma.setGravity(Gravity.CENTER);
+                tvRoma.setPadding(0, dp(1), 0, 0);
+                lineLayout.addView(tvRoma);
+            }
 
             // Translation text (if available and enabled)
             if (translationEnabled && line.translation != null && !line.translation.isEmpty()) {
                 TextView tvTrans = new TextView(this);
                 tvTrans.setText(line.translation);
                 tvTrans.setTextColor(0x61FFFFFF);
-                tvTrans.setTextSize(11);
+                tvTrans.setTextSize(translationFontSize);
                 tvTrans.setGravity(Gravity.CENTER);
                 tvTrans.setPadding(0, dp(1), 0, 0);
                 lineLayout.addView(tvTrans);
@@ -2095,8 +2293,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     }
 
                     int newIndex = -1;
+                    // 歌词偏移只作用在这个比较上，解析出来的时间戳保持原样 ——
+                    // 否则原文 / 音译 / 翻译三份歌词之间靠时间戳对齐的映射会被破坏。
+                    int lyricRefPos = LyricSettings.referencePosition(MainActivity.this, currentPos);
                     for (int i = 0; i < lyricLines.size(); i++) {
-                        if (lyricLines.get(i).timeMs <= currentPos) {
+                        if (lyricLines.get(i).timeMs <= lyricRefPos) {
                             newIndex = i;
                         } else {
                             break;
@@ -2109,7 +2310,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                         if (currentHighlightIndex < lyricViews.size()) {
                             TextView currentView = lyricViews.get(currentHighlightIndex);
                             currentView.setTextColor(0xFFFFFFFF);
-                            currentView.setTextSize(14);
+                            // 高亮行比常态大 1sp，跟着用户设定的原文字号走
+                            currentView.setTextSize(
+                                    LyricSettings.getOriginalFontSize(MainActivity.this) + 1);
 
                             if (lyricScrollMode == LYRIC_MODE_FOLLOW || !lyricsUserScrolled) {
                                 scrollOverlayToLine(currentHighlightIndex);
@@ -2132,6 +2335,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         translationMap.clear();
         currentTlyricText = null;
         btnTranslationToggle = null;
+        romanizationMap.clear();
+        currentRomalrcText = null;
+        btnRomanizationToggle = null;
         currentHighlightIndex = -1;
         lyricsGestureDetector = null;
         lyricsUserScrolled = false;
@@ -2274,6 +2480,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 dismissOverlay();
             });
 
+            // 长按弹出队列操作菜单（下一首播放 / 从队列移除）
+            itemLayout.setOnLongClickListener(v -> {
+                showPlaylistItemActions(index);
+                return true;
+            });
+
             listLayout.addView(itemLayout);
         }
 
@@ -2291,6 +2503,47 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         rootView.addView(overlayContainer);
+    }
+
+    /**
+     * 长按播放队列某一项时弹出的操作菜单。
+     *
+     * <p>用统一的 {@link WatchConfirmDialog#showChoice} 弹窗，样式与其它确认框一致；
+     * 移除是破坏性操作，所以再套一层二次确认。</p>
+     */
+    private void showPlaylistItemActions(int index) {
+        java.util.List<Song> queue = playerManager.getPlaylist();
+        if (index < 0 || index >= queue.size()) {
+            return;
+        }
+        Song song = queue.get(index);
+        String title = (song.getName() != null && !song.getName().isEmpty())
+                ? song.getName() : "歌曲";
+        final boolean isCurrent = (index == playerManager.getCurrentIndex());
+
+        String[] labels = new String[]{"下一首播放", "从队列移除"};
+        Runnable[] actions = new Runnable[]{
+                () -> {
+                    if (playerManager.moveToNextInPlaylist(index)) {
+                        Toast.makeText(this, "已设为下一首播放", Toast.LENGTH_SHORT).show();
+                        dismissOverlay();
+                        showPlaylistOverlay();
+                    } else {
+                        Toast.makeText(this, "这一首正在播放", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                () -> WatchConfirmDialog.show(this, "确认移除",
+                        isCurrent ? "移除正在播放的这首歌？" : "从播放队列移除「" + title + "」？",
+                        () -> {
+                            playerManager.removeFromPlaylist(index);
+                            Toast.makeText(this, "已移除", Toast.LENGTH_SHORT).show();
+                            dismissOverlay();
+                            showPlaylistOverlay();
+                        },
+                        WatchConfirmDialog.Options.destructiveOptions())
+        };
+        WatchConfirmDialog.showChoice(this, title, "队列操作", labels, actions,
+                WatchConfirmDialog.Options.defaultOptions());
     }
 
     private void showSpeedOptions() {
@@ -3629,6 +3882,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             moveTaskToBack(true);
             finishAffinity();
         }
+    }
+
+    @Override
+    public void onSleepTimerPendingStop() {
+        // 「放完当前曲再停」：倒计时到点了，但这一首还没结束
+        Toast.makeText(this, "定时已到，本曲结束后将停止播放", Toast.LENGTH_LONG).show();
     }
 
     private final Runnable seekBarUpdateRunnable = new Runnable() {

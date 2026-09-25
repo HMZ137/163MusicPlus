@@ -15,8 +15,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
@@ -33,7 +31,7 @@ import java.io.InputStream;
  * with larger rows; other info (age, follows, fans, register time, VIP) is
  * shown read-only.
  */
-public class ProfileActivity extends AppCompatActivity {
+public class ProfileActivity extends BaseWatchActivity {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final int REQ_PICK_AVATAR = 4001;
@@ -361,8 +359,4 @@ public class ProfileActivity extends AppCompatActivity {
         contentLayout.addView(row);
     }
 
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
-    }
 }

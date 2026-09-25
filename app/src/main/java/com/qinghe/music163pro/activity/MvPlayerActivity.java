@@ -36,6 +36,14 @@ public class MvPlayerActivity extends BaseWatchActivity {
     private boolean playWhenReady = true;
     private boolean activityStarted;
 
+    /**
+     * 页面标题栏里已经有返回控件，不再叠加左上角浮动返回按钮，避免出现两个返回入口。
+     */
+    @Override
+    protected boolean shouldShowBackButton() {
+        return false;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

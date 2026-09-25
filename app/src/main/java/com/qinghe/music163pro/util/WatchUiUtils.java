@@ -41,6 +41,9 @@ public final class WatchUiUtils {
         if (screenWidth <= 0) {
             screenWidth = (int) DESIGN_WIDTH_PX;
         }
-        return (int) (baseValue * screenWidth / DESIGN_WIDTH_PX + 0.5f);
+        // 用户自定义缩放：XML 布局靠 densityDpi 缩放，代码里拼的界面必须在这里
+        // 乘同一个系数，否则会出现「文字变大了、间距没变」的错位。
+        float scale = UiScale.getScale(context);
+        return (int) (baseValue * screenWidth / DESIGN_WIDTH_PX * scale + 0.5f);
     }
 }

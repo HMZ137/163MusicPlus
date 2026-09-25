@@ -10,11 +10,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
+import com.qinghe.music163pro.util.LyricSettings;
+import com.qinghe.music163pro.util.UiScale;
 
 /**
  * Toggle settings activity - contains boolean/toggle options:
@@ -23,7 +24,7 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
  * - Sleep timer mode total/net playback (cyclic selection)
  * - Speed mode 3-value cyclic row (tap to cycle)
  */
-public class ToggleSettingsActivity extends AppCompatActivity {
+public class ToggleSettingsActivity extends BaseWatchActivity {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String PREF_RECOGNITION_MODE = "song_recognition_mode";
@@ -37,9 +38,13 @@ public class ToggleSettingsActivity extends AppCompatActivity {
     // Lyric scroll modes: 0=每行 (follow current line), 1=阻塞 (blocked by user scroll)
     private static final int LYRIC_MODE_FOLLOW = 0;
     private static final int LYRIC_MODE_BLOCK = 1;
-    // Sleep timer modes: 0=总时长, 1=播放净时长
-    private static final int SLEEP_TIMER_TOTAL = 0;
-    private static final int SLEEP_TIMER_NET = 1;
+    // 定时关闭模式的取值统一由 MusicPlayerManager 定义，避免两处各维护一套
+    private static final int SLEEP_TIMER_TOTAL = MusicPlayerManager.SLEEP_TIMER_MODE_TOTAL;
+    private static final int SLEEP_TIMER_NET = MusicPlayerManager.SLEEP_TIMER_MODE_NET;
+    private static final int SLEEP_TIMER_FINISH_TRACK =
+            MusicPlayerManager.SLEEP_TIMER_MODE_FINISH_TRACK;
+    /** 定时模式的可选文案，循环切换与回显共用同一份，避免顺序对不上。 */
+    private static final String[] SLEEP_TIMER_LABELS = {"总时长", "播放净时长", "放完当前曲"};
     // Fav modes: 0=本地, 1=云端
     private static final int FAV_MODE_LOCAL = 0;
     private static final int FAV_MODE_CLOUD = 1;
@@ -52,6 +57,7 @@ public class ToggleSettingsActivity extends AppCompatActivity {
     private TextView tvRecognitionModeValue;
     private TextView tvLyricScrollModeValue;
     private TextView tvLyricResumeIntervalValue;
+    private TextView tvLyricOffsetValue;
     private LinearLayout rowLyricResumeInterval;
     private SharedPreferences prefs;
 
@@ -84,6 +90,18 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         LinearLayout rowFavMode = findViewById(R.id.row_fav_mode);
         LinearLayout rowSleepTimerMode = findViewById(R.id.row_sleep_timer_mode);
         rowLyricResumeInterval = findViewById(R.id.row_lyric_resume_interval);
+
+        // 歌词偏移：± 各 0.5s，用于歌词整体偏快/偏慢时的人工校正
+        tvLyricOffsetValue = findViewById(R.id.tv_lyric_offset_value);
+        TextView btnLyricOffsetMinus = findViewById(R.id.btn_lyric_offset_minus);
+        TextView btnLyricOffsetPlus = findViewById(R.id.btn_lyric_offset_plus);
+        if (btnLyricOffsetMinus != null) {
+            btnLyricOffsetMinus.setOnClickListener(v -> changeLyricOffset(-1));
+        }
+        if (btnLyricOffsetPlus != null) {
+            btnLyricOffsetPlus.setOnClickListener(v -> changeLyricOffset(1));
+        }
+        updateLyricOffsetValue();
 
         // Initialise switch states from prefs
         syncSwitchStates();
@@ -118,6 +136,170 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         rowRecognitionMode.setOnClickListener(v -> cycleRecognitionMode());
         rowLyricScrollMode.setOnClickListener(v -> cycleLyricScrollMode());
         rowLyricResumeInterval.setOnClickListener(v -> editLyricResumeInterval());
+
+        // 界面缩放与歌词字号：这几项结构完全一样（标题 + 数值 + −/+ 或循环切换），
+        // 用代码生成，免得在布局里堆四份重复的 XML。
+        buildDisplaySettings();
+    }
+
+    /** 界面缩放 + 原文/音译/翻译 三类歌词字号。 */
+    private void buildDisplaySettings() {
+        LinearLayout container = findViewById(R.id.layout_toggle_settings_content);
+        if (container == null) {
+            return;
+        }
+        container.addView(buildSectionTitle("显示"));
+
+        // 页面缩放：循环切换档位。改完需要页面重建才会生效，所以切换后立刻 recreate。
+        final TextView scaleValue = buildStepperRow(container, "界面缩放",
+                "100%",
+                () -> {
+                    UiScale.cycle(this);
+                    recreate();
+                },
+                () -> {
+                    UiScale.cycle(this);
+                    recreate();
+                });
+        scaleValue.setText(UiScale.getPercent(this) + "%");
+        // 循环档位用整行点击更顺手，−/+ 只是备用入口
+        scaleValue.setOnClickListener(v -> {
+            int percent = UiScale.cycle(this);
+            Toast.makeText(this, "界面缩放: " + percent + "%（重新进入页面后生效）",
+                    Toast.LENGTH_SHORT).show();
+            recreate();
+        });
+
+        // 歌词字号：音 / 词 / 译 各一个
+        final TextView originalValue = buildStepperRow(container, "歌词字号·原文",
+                "", () -> stepFont(0, -1), () -> stepFont(0, 1));
+        final TextView romajiValue = buildStepperRow(container, "歌词字号·音译",
+                "", () -> stepFont(1, -1), () -> stepFont(1, 1));
+        final TextView translationValue = buildStepperRow(container, "歌词字号·翻译",
+                "", () -> stepFont(2, -1), () -> stepFont(2, 1));
+
+        // 歌词底衬：用真开关，因为它就是一个二值项，用「−/+」反而别扭
+        LinearLayout backdropRow = new LinearLayout(this);
+        backdropRow.setOrientation(LinearLayout.HORIZONTAL);
+        backdropRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        backdropRow.setPadding(dpToPx(16), dpToPx(4), dpToPx(16), dpToPx(4));
+        backdropRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(48)));
+
+        LinearLayout backdropText = new LinearLayout(this);
+        backdropText.setOrientation(LinearLayout.VERTICAL);
+        backdropText.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView backdropTitle = new TextView(this);
+        backdropTitle.setText("歌词底衬");
+        backdropTitle.setTextColor(getResources().getColor(R.color.text_primary));
+        backdropTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        backdropText.addView(backdropTitle);
+
+        TextView backdropHint = new TextView(this);
+        backdropHint.setText("给歌词/音/译加半透明底，避免背景太亮看不清");
+        backdropHint.setTextColor(getResources().getColor(R.color.text_secondary));
+        backdropHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        backdropText.addView(backdropHint);
+
+        backdropRow.addView(backdropText);
+
+        SwitchMaterial backdropSwitch = new SwitchMaterial(this);
+        backdropSwitch.setChecked(LyricSettings.isBackdropEnabled(this));
+        backdropSwitch.setOnCheckedChangeListener((button, checked) ->
+                LyricSettings.setBackdropEnabled(this, checked));
+        backdropRow.addView(backdropSwitch);
+
+        container.addView(backdropRow);
+
+        lyricFontValues = new TextView[]{originalValue, romajiValue, translationValue};
+        refreshLyricFontValues();
+    }
+
+    /** 原文 / 音译 / 翻译 三个字号数值控件，用来在调整后刷新显示。 */
+    private TextView[] lyricFontValues;
+
+    private void stepFont(int which, int direction) {
+        LyricSettings.stepFontSize(this, which, direction);
+        refreshLyricFontValues();
+    }
+
+    private void refreshLyricFontValues() {
+        if (lyricFontValues == null) {
+            return;
+        }
+        if (lyricFontValues[0] != null) {
+            lyricFontValues[0].setText(LyricSettings.getOriginalFontSize(this) + "sp");
+        }
+        if (lyricFontValues[1] != null) {
+            lyricFontValues[1].setText(LyricSettings.getRomanizationFontSize(this) + "sp");
+        }
+        if (lyricFontValues[2] != null) {
+            lyricFontValues[2].setText(LyricSettings.getTranslationFontSize(this) + "sp");
+        }
+    }
+
+    /** 分组小标题。 */
+    private TextView buildSectionTitle(String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(0x80FFFFFF);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        tv.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(4));
+        return tv;
+    }
+
+    /**
+     * 生成一行「标题 + 数值 + −/+」的设置项。
+     *
+     * @return 显示数值的 TextView，交给调用方刷新
+     */
+    private TextView buildStepperRow(LinearLayout container, String title, String initialValue,
+                                     Runnable onMinus, Runnable onPlus) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(dpToPx(16), dpToPx(4), dpToPx(16), dpToPx(4));
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(48)));
+
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        textColumn.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        textColumn.addView(tvTitle);
+
+        TextView tvValue = new TextView(this);
+        tvValue.setText(initialValue);
+        tvValue.setTextColor(getResources().getColor(R.color.colorPrimary));
+        tvValue.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        textColumn.addView(tvValue);
+        row.addView(textColumn);
+
+        row.addView(buildStepperButton("−", onMinus));
+        row.addView(buildStepperButton("+", onPlus));
+
+        container.addView(row);
+        return tvValue;
+    }
+
+    private TextView buildStepperButton(String label, Runnable action) {
+        TextView button = new TextView(this);
+        button.setText(label);
+        button.setTextColor(getResources().getColor(R.color.text_primary));
+        button.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setPadding(dpToPx(12), dpToPx(8), dpToPx(12), dpToPx(8));
+        button.setClickable(true);
+        button.setFocusable(true);
+        button.setOnClickListener(v -> action.run());
+        return button;
     }
 
     @Override
@@ -155,18 +337,19 @@ public class ToggleSettingsActivity extends AppCompatActivity {
 
     private void cycleSleepTimerMode() {
         int current = prefs.getInt(PREF_SLEEP_TIMER_MODE, SLEEP_TIMER_TOTAL);
-        int next = (current + 1) % 2;
+        int next = (current + 1) % SLEEP_TIMER_LABELS.length;
         prefs.edit().putInt(PREF_SLEEP_TIMER_MODE, next).apply();
         updateSleepTimerModeValue();
-        String[] labels = {"总时长", "播放净时长"};
-        Toast.makeText(this, "定时关闭模式: " + labels[next], Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "定时关闭模式: " + SLEEP_TIMER_LABELS[next], Toast.LENGTH_SHORT).show();
     }
 
     private void updateSleepTimerModeValue() {
         if (tvSleepTimerModeValue == null) return;
         int mode = prefs.getInt(PREF_SLEEP_TIMER_MODE, SLEEP_TIMER_TOTAL);
-        String[] labels = {"总时长", "播放净时长"};
-        tvSleepTimerModeValue.setText(labels[mode]);
+        if (mode < 0 || mode >= SLEEP_TIMER_LABELS.length) {
+            mode = SLEEP_TIMER_TOTAL;
+        }
+        tvSleepTimerModeValue.setText(SLEEP_TIMER_LABELS[mode]);
     }
 
     private void cycleSpeedMode() {
@@ -201,6 +384,25 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         int mode = prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO);
         String[] labels = {"手动暂停", "自动识别"};
         tvRecognitionModeValue.setText(labels[mode]);
+    }
+
+    /**
+     * 调整歌词时间轴偏移（direction 为 +1 / -1），每步 0.5 秒。
+     *
+     * <p>正值表示歌词整体延后出现，负值表示提前。生效方式见 {@link LyricSettings}。</p>
+     */
+    private void changeLyricOffset(int direction) {
+        int offset = LyricSettings.stepOffsetMs(this, direction);
+        updateLyricOffsetValue();
+        Toast.makeText(this, "歌词偏移: " + LyricSettings.formatOffset(offset),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateLyricOffsetValue() {
+        if (tvLyricOffsetValue == null) {
+            return;
+        }
+        tvLyricOffsetValue.setText(LyricSettings.formatOffset(LyricSettings.getOffsetMs(this)));
     }
 
     private void cycleLyricScrollMode() {

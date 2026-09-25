@@ -35,6 +35,8 @@
         <activity android:name=".activity.SearchActivity" android:exported="false" />
         <activity android:name=".activity.FavoritesListActivity" android:exported="false" />
         <activity android:name=".activity.DownloadListActivity" android:exported="false" />
+        <activity android:name=".activity.LocalMusicActivity" android:exported="false" />
+        <activity android:name=".activity.PlaybackStatsActivity" android:exported="false" />
         <activity android:name=".activity.SettingsActivity" android:exported="false" />
         <activity android:name=".activity.LoginActivity" android:exported="false" />
         <activity android:name=".activity.ToggleSettingsActivity" android:exported="false" />

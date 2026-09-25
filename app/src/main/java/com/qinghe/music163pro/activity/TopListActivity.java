@@ -15,8 +15,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -32,7 +30,7 @@ import java.util.List;
  * Top List activity - shows different chart categories.
  * Designed for watch screen (320x360 dpi).
  */
-public class TopListActivity extends AppCompatActivity {
+public class TopListActivity extends BaseWatchActivity {
 
     private ListView lvTopList;
     private final List<TopListItem> items = new ArrayList<>();
@@ -148,11 +146,6 @@ public class TopListActivity extends AppCompatActivity {
                 Toast.makeText(TopListActivity.this, "加载失败: " + message, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 
     @Override

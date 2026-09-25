@@ -10,9 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-public class OpenSourceActivity extends AppCompatActivity {
+public class OpenSourceActivity extends BaseWatchActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,8 +98,4 @@ public class OpenSourceActivity extends AppCompatActivity {
         return divider;
     }
 
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
-    }
 }

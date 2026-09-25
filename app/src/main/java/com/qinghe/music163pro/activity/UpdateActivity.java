@@ -17,7 +17,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -35,7 +34,7 @@ import java.util.List;
  * Fetches available download sources and lets the user choose one.
  * Handles APK download and installation.
  */
-public class UpdateActivity extends AppCompatActivity {
+public class UpdateActivity extends BaseWatchActivity {
 
     private static final String APK_SAVE_PATH =
             Environment.getExternalStorageDirectory() + "/163Music/update.apk";
@@ -93,6 +92,10 @@ public class UpdateActivity extends AppCompatActivity {
         tvVersionInfo = makeText("最新版本：获取中...", 0xFFAAAAAA, px(13), false, Gravity.CENTER);
         root.addView(tvVersionInfo);
 
+        // 明确告知：这是修改版，只提示、不下载安装，避免被官方新版覆盖
+        root.addView(makeText("当前为修改版，仅提示新版本，不提供下载安装",
+                0xFFCF6679, px(12), false, Gravity.CENTER));
+
         root.addView(makeSpacer(px(10)));
 
         TextView tvUpdateTitle = makeText("更新日志", 0xFFFFFFFF, px(16), true, Gravity.START);
@@ -106,7 +109,8 @@ public class UpdateActivity extends AppCompatActivity {
         root.addView(makeSpacer(px(10)));
 
         // Hint
-        tvSourceHint = makeText("建议优先选择上面的下载源", 0xFF888888, px(12), false, Gravity.CENTER);
+        tvSourceHint = makeText("本版本不提供下载，列表仅作版本信息参考",
+                0xFF888888, px(12), false, Gravity.CENTER);
         tvSourceHint.setVisibility(android.view.View.GONE);
         root.addView(tvSourceHint);
 
@@ -307,7 +311,7 @@ public class UpdateActivity extends AppCompatActivity {
             tvDomain.setLayoutParams(domainParams);
 
             TextView tvDownload = new TextView(this);
-            tvDownload.setText("下载");
+            tvDownload.setText("仅提示");
             tvDownload.setTextColor(0xFFBB86FC);
             tvDownload.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
             tvDownload.setGravity(Gravity.CENTER);
@@ -336,19 +340,25 @@ public class UpdateActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 已停用「下载并安装更新」。
+     *
+     * <p>本项目是修改版：装上官方新版会把它整个覆盖掉，返回按钮、多选批量操作、
+     * 随机播放修复、下载命名等改动会一起丢失。所以这里改成只提示，
+     * 不再申请存储权限、也不再下载 APK。</p>
+     */
     private void requestPermissionAndDownload() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{
-                                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                                Manifest.permission.READ_EXTERNAL_STORAGE
-                        }, STORAGE_PERMISSION_REQUEST);
-                return;
-            }
+        showDownloadDisabledNotice();
+    }
+
+    /** 统一的「不提供下载」提示，同时更新页面上的进度文字。 */
+    private void showDownloadDisabledNotice() {
+        String message = "当前为修改版，不提供下载安装，以免覆盖已有改动";
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        if (tvProgress != null) {
+            tvProgress.setVisibility(android.view.View.VISIBLE);
+            tvProgress.setText(message);
         }
-        startDownload();
     }
 
     @Override
@@ -364,45 +374,8 @@ public class UpdateActivity extends AppCompatActivity {
     }
 
     private void startDownload() {
-        if (downloading || selectedUrl == null) return;
-        downloading = true;
-
-        // Disable all source rows
-        for (int i = 0; i < sourcesContainer.getChildCount(); i++) {
-            sourcesContainer.getChildAt(i).setClickable(false);
-        }
-
-        progressBar.setVisibility(android.view.View.VISIBLE);
-        tvProgress.setVisibility(android.view.View.VISIBLE);
-        tvProgress.setText("0%");
-
-        File dir = new File(Environment.getExternalStorageDirectory(), "163Music");
-        if (!dir.exists() && !dir.mkdirs()) {
-            Toast.makeText(this, "无法创建下载目录", Toast.LENGTH_SHORT).show();
-            resetDownloadState();
-            return;
-        }
-
-        UpdateChecker.downloadUpdate(selectedUrl, APK_SAVE_PATH, new UpdateChecker.DownloadCallback() {
-            @Override
-            public void onProgress(int percent) {
-                progressBar.setProgress(percent);
-                tvProgress.setText(percent + "%");
-            }
-
-            @Override
-            public void onComplete(String filePath) {
-                tvProgress.setText("下载完成，正在安装...");
-                installApk(filePath);
-            }
-
-            @Override
-            public void onError(String error) {
-                resetDownloadState();
-                tvProgress.setText("下载失败: " + error);
-                Toast.makeText(UpdateActivity.this, "下载失败: " + error, Toast.LENGTH_SHORT).show();
-            }
-        });
+        // 双保险：即便还有别的路径（例如权限回调）走到这里，也不发起下载
+        showDownloadDisabledNotice();
     }
 
     private void resetDownloadState() {
@@ -453,8 +426,4 @@ public class UpdateActivity extends AppCompatActivity {
         return spacer;
     }
 
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (baseValue * screenWidth / 320f + 0.5f);
-    }
 }

@@ -8,7 +8,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -17,7 +16,7 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
  * Login activity - contains Cookie input, QR login and SMS login.
  * Moved from the old SettingsActivity.
  */
-public class LoginActivity extends AppCompatActivity {
+public class LoginActivity extends BaseWatchActivity {
 
     private static final String PREFS_NAME = "music163_settings";
 

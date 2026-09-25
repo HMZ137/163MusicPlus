@@ -14,8 +14,6 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
@@ -29,7 +27,7 @@ import java.util.List;
  * Album detail activity - shows album name, cover, and track list.
  * Designed for watch screen (320x360 dpi).
  */
-public class AlbumDetailActivity extends AppCompatActivity {
+public class AlbumDetailActivity extends BaseWatchActivity {
 
     private ListView lvSongs;
     private final List<Song> displayList = new ArrayList<>();
@@ -200,12 +198,6 @@ public class AlbumDetailActivity extends AppCompatActivity {
                 tvStatus.setText("加载失败: " + message);
             }
         });
-    }
-
-    private int px(int baseValue) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        float scale = screenWidth / 320f;
-        return Math.round(baseValue * scale);
     }
 
     @Override

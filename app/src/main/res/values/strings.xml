@@ -37,4 +37,26 @@
     <string name="play_mv">播放MV</string>
     <string name="tap_to_view_detail">点击查看详情</string>
     <string name="back">返回</string>
+
+    <!-- 多选模式 -->
+    <string name="multi_select_header">已选 %1$d 项</string>
+    <string name="multi_select_delete">删除</string>
+    <string name="multi_select_cancel">取消</string>
+    <string name="multi_select_selected">已选中</string>
+    <string name="multi_select_unselected">未选中</string>
+    <string name="multi_select_favorite">收藏</string>
+    <string name="multi_select_favoriting">正在收藏 %1$d 首…</string>
+    <string name="multi_select_favorite_done">已收藏 %1$d 首</string>
+    <string name="multi_select_favorite_partial">已收藏 %1$d 首，%2$d 首失败</string>
+    <string name="multi_select_favorite_failed">收藏失败 %1$d 首</string>
+    <string name="multi_select_favorite_existed">选中的歌曲均已收藏</string>
+    <string name="multi_select_favorite_need_login">请先登录以使用云端收藏</string>
+    <string name="download_tidy">整理</string>
+    <string name="local_music">本地音乐</string>
+    <string name="local_music_entry">本地</string>
+    <string name="local_music_shuffle">随机</string>
+    <string name="playback_stats">播放统计</string>
+    <string name="playback_stats_clear">清空统计</string>
+    <string name="bilibili_entry">听bilibili</string>
+    <string name="export_music">导出下载的音乐</string>
 </resources>

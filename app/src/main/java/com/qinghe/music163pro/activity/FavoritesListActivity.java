@@ -15,10 +15,9 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.MultiSelectController;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.FavoritesManager;
 import com.qinghe.music163pro.manager.PlaylistManager;
@@ -26,6 +25,7 @@ import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.LocalTracks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +33,7 @@ import java.util.List;
 /**
  * Favorites list activity - shows favorited songs and playlists.
  * Supports both local and cloud modes, with tabs for songs and playlists.
+ * 本地收藏的歌曲列表支持长按进入多选批量取消收藏。
  */
 public class FavoritesListActivity extends BaseWatchActivity {
 
@@ -48,6 +49,7 @@ public class FavoritesListActivity extends BaseWatchActivity {
     private ListView lvFavPlaylists;
     private TextView tabFavSongs;
     private TextView tabFavPlaylists;
+    private MultiSelectController multiSelect;
 
     private boolean isSongTab = true;
 
@@ -77,7 +79,14 @@ public class FavoritesListActivity extends BaseWatchActivity {
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
                     tvName.setText(song.getName());
-                    tvArtist.setText(song.getArtist());
+                    // 本地收藏带「本地」标签：它的 id 是路径派生的负数，
+                    // 不属于网易云曲目体系（没有云端音质/评论/歌单可用）。
+                    if (LocalTracks.isLocalId(song.getId())) {
+                        tvName.setText(song.getName() + " [本地]");
+                        tvArtist.setText(LocalTracks.safeName(song.getArtist()));
+                    } else {
+                        tvArtist.setText(song.getArtist());
+                    }
                     if (ivCover != null) {
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
                     }
@@ -168,13 +177,64 @@ public class FavoritesListActivity extends BaseWatchActivity {
             return true;
         });
 
+        // 长按进入多选模式。云端收藏不支持批量本地删除，此时控制器会被禁用，
+        // 长按仍然回落到上面的单条「取消收藏」逻辑。
+        multiSelect = MultiSelectController.attach(this, lvFavorites,
+                new MultiSelectController.Callback() {
+                    @Override
+                    public List<MultiSelectController.Action> getActions() {
+                        return java.util.Collections.singletonList(
+                                MultiSelectController.Action.delete(FavoritesListActivity.this));
+                    }
+
+                    @Override
+                    public void onAction(MultiSelectController.Action action, List<Integer> positions) {
+                        if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
+                            confirmDeleteSelected(positions);
+                        }
+                    }
+                });
+        if (multiSelect != null) {
+            addBackInterceptor(multiSelect::handleBackPressed);
+        }
+
         loadData();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        // 列表数据在 onResume 会重新加载，选中下标可能失效，先退出多选。
+        if (multiSelect != null) {
+            multiSelect.exitSelectionMode();
+        }
         loadData();
+    }
+
+    /**
+     * 删除选中的本地收藏歌曲。
+     */
+    private void confirmDeleteSelected(List<Integer> positions) {
+        final List<Song> targets = new ArrayList<>();
+        for (int position : positions) {
+            if (position >= 0 && position < favoritesList.size()) {
+                targets.add(favoritesList.get(position));
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        showConfirmDialog("取消收藏",
+                "确定取消收藏选中的 " + targets.size() + " 首歌曲？", () -> {
+                    for (Song song : targets) {
+                        favoritesManager.removeFavorite(song);
+                    }
+                    if (multiSelect != null) {
+                        multiSelect.exitSelectionMode();
+                    }
+                    loadData();
+                    Toast.makeText(FavoritesListActivity.this, "已取消收藏", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void switchToSongTab() {
@@ -194,6 +254,10 @@ public class FavoritesListActivity extends BaseWatchActivity {
         //
         tabFavSongs.setTextColor(0xB3FFFFFF);
         lvFavorites.setVisibility(View.GONE);
+        // 歌曲列表已隐藏，退出多选避免动作栏残留在歌单页上
+        if (multiSelect != null) {
+            multiSelect.setEnabled(false);
+        }
         loadPlaylists();
     }
 
@@ -208,6 +272,11 @@ public class FavoritesListActivity extends BaseWatchActivity {
     private void loadFavorites() {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
+
+        // 多选批量删除只针对本地收藏；云端收藏由 API 管理，保持原有的单条「取消收藏」交互。
+        if (multiSelect != null) {
+            multiSelect.setEnabled(!isCloud);
+        }
 
         if (isCloud) {
             loadCloudFavorites();
@@ -441,7 +510,7 @@ public class FavoritesListActivity extends BaseWatchActivity {
      */
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         WatchConfirmDialog.show(this, title, message, onConfirm,
-                new WatchConfirmDialog.Options(0xFF1E1E1E, 0xFFBB86FC, true));
+                WatchConfirmDialog.Options.defaultOptions());
     }
 
     @Override

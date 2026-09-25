@@ -3,6 +3,8 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,10 +17,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.MultiSelectController;
+import com.qinghe.music163pro.util.BatchFavoriteHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -32,7 +34,7 @@ import java.util.Map;
 
 /**
  * Download list activity - shows all downloaded songs from /sdcard/163Music/Download/
- * Long press to delete with confirmation dialog.
+ * 长按进入多选，可批量收藏 / 批量删除。
  */
 public class DownloadListActivity extends BaseWatchActivity {
 
@@ -40,6 +42,27 @@ public class DownloadListActivity extends BaseWatchActivity {
     private ArrayAdapter<Song> adapter;
     private ListView lvDownloads;
     private TextView tvEmpty;
+    private TextView tvTitle;
+    private MultiSelectController multiSelect;
+
+    /** 有下载/整理在进行中时，用来定时刷新列表（进度、新完成的条目）。 */
+    private static final long REFRESH_INTERVAL_MS = 1000L;
+
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable refreshTick = new Runnable() {
+        @Override
+        public void run() {
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
+            updateTitleText();
+            // 队列空了就自然停下来，不需要外部再取消
+            if (DownloadManager.getActiveDownloadCount() > 0) {
+                refreshHandler.postDelayed(this, REFRESH_INTERVAL_MS);
+            }
+        }
+    };
+    private boolean tidyInProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +73,20 @@ public class DownloadListActivity extends BaseWatchActivity {
 
         lvDownloads = findViewById(R.id.lv_downloads);
         tvEmpty = findViewById(R.id.tv_empty);
+        tvTitle = findViewById(R.id.tv_downloads_title);
+
+        // 「整理」：把早期下载固定的 song.mp3 / song.flac 改成「曲名 - 曲师」
+        View btnTidy = findViewById(R.id.btn_tidy_downloads);
+        if (btnTidy != null) {
+            btnTidy.setOnClickListener(v -> confirmTidyFileNames());
+        }
+
+        // 「本地」：去看卡里已有的、不属于本 App 下载的音乐
+        View btnLocalMusic = findViewById(R.id.btn_local_music);
+        if (btnLocalMusic != null) {
+            btnLocalMusic.setOnClickListener(v ->
+                    startActivity(new Intent(this, LocalMusicActivity.class)));
+        }
 
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, downloadedSongs) {
             @Override
@@ -66,6 +103,7 @@ public class DownloadListActivity extends BaseWatchActivity {
                         // coverUrl may be local file:// path or remote URL
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
                     }
+                    applyDownloadState(view, song);
                 }
                 return view;
             }
@@ -79,20 +117,29 @@ public class DownloadListActivity extends BaseWatchActivity {
             playDownloadedSong(position);
         });
 
-        lvDownloads.setOnItemLongClickListener((parent, view, position, id) -> {
-            Song song = downloadedSongs.get(position);
-            showConfirmDialog("确认删除", "确定删除「" + song.getName() + "」？\n文件将被永久删除。", () -> {
-                boolean deleted = DownloadManager.deleteDownload(song);
-                if (deleted) {
-                    Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
-                    loadDownloads();
-                    updateEmptyState();
-                } else {
-                    Toast.makeText(this, "删除失败", Toast.LENGTH_SHORT).show();
-                }
-            });
-            return true;
-        });
+        // 长按进入多选模式，多选后可通过动作栏批量收藏或批量删除
+        multiSelect = MultiSelectController.attach(this, lvDownloads,
+                new MultiSelectController.Callback() {
+                    @Override
+                    public List<MultiSelectController.Action> getActions() {
+                        List<MultiSelectController.Action> actions = new ArrayList<>();
+                        actions.add(MultiSelectController.Action.favorite(DownloadListActivity.this));
+                        actions.add(MultiSelectController.Action.delete(DownloadListActivity.this));
+                        return actions;
+                    }
+
+                    @Override
+                    public void onAction(MultiSelectController.Action action, List<Integer> positions) {
+                        if (MultiSelectController.Action.ID_FAVORITE.equals(action.id)) {
+                            favoriteSelected(positions);
+                        } else if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
+                            confirmDeleteSelected(positions);
+                        }
+                    }
+                });
+        if (multiSelect != null) {
+            addBackInterceptor(multiSelect::handleBackPressed);
+        }
 
         loadDownloads();
         updateEmptyState();
@@ -101,8 +148,177 @@ public class DownloadListActivity extends BaseWatchActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // 列表数据在 onResume 会重新加载，选中下标可能失效，先退出多选。
+        if (multiSelect != null) {
+            multiSelect.exitSelectionMode();
+        }
         loadDownloads();
         updateEmptyState();
+        // 进页面时若还有下载在跑，就跟一下进度
+        if (DownloadManager.getActiveDownloadCount() > 0) {
+            refreshHandler.removeCallbacks(refreshTick);
+            refreshHandler.post(refreshTick);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // 页面不可见时停止刷新，别白耗电
+        refreshHandler.removeCallbacks(refreshTick);
+    }
+
+    /**
+     * 行内显示这首歌的下载状态：「排队中…」/「下载中 45%」。
+     * 不在队列里就隐藏，对已完成或已删除的条目没有影响。
+     */
+    private void applyDownloadState(View row, Song song) {
+        TextView tvProgress = row.findViewById(R.id.tv_item_progress);
+        if (tvProgress == null) {
+            return;
+        }
+        DownloadManager.DownloadTask task = DownloadManager.getActiveDownload(song.getId());
+        if (task == null) {
+            tvProgress.setVisibility(View.GONE);
+            return;
+        }
+        tvProgress.setVisibility(View.VISIBLE);
+        if (task.state == DownloadManager.DownloadState.QUEUED) {
+            tvProgress.setText("排队中…");
+        } else if (task.percent >= 0) {
+            tvProgress.setText("下载中 " + task.percent + "%");
+        } else {
+            tvProgress.setText("下载中…");
+        }
+    }
+
+    /** 标题按优先级显示：整理进度 > 下载队列 > 常态标题。 */
+    private void updateTitleText() {
+        if (tvTitle == null || tidyInProgress) {
+            return;
+        }
+        int pending = DownloadManager.getActiveDownloadCount();
+        if (pending > 0) {
+            tvTitle.setText("下载中 " + pending + " 项");
+        } else {
+            tvTitle.setText(R.string.downloads);
+        }
+    }
+
+    /**
+     * 删除选中的下载项。先确认，再逐首删除本地文件。
+     */
+    private void confirmDeleteSelected(List<Integer> positions) {
+        final List<Song> targets = new ArrayList<>();
+        for (int position : positions) {
+            if (position >= 0 && position < downloadedSongs.size()) {
+                targets.add(downloadedSongs.get(position));
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        showConfirmDialog("确认删除",
+                "确定删除选中的 " + targets.size() + " 首歌曲？\n文件将被永久删除。", () -> {
+                    int deleted = 0;
+                    for (Song song : targets) {
+                        if (DownloadManager.deleteDownload(song)) {
+                            deleted++;
+                        }
+                    }
+                    if (multiSelect != null) {
+                        multiSelect.exitSelectionMode();
+                    }
+                    loadDownloads();
+                    updateEmptyState();
+                    Toast.makeText(DownloadListActivity.this,
+                            "已删除 " + deleted + " 首", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    /**
+     * 批量收藏选中的下载歌曲。
+     *
+     * <p>收藏口径与单曲收藏保持一致：设置里切到「云端收藏」时走网易云接口（需要登录），
+     * 否则写入本地收藏。详见 {@link BatchFavoriteHelper}。</p>
+     */
+    private void favoriteSelected(List<Integer> positions) {
+        final List<Song> targets = new ArrayList<>();
+        for (int position : positions) {
+            if (position >= 0 && position < downloadedSongs.size()) {
+                targets.add(downloadedSongs.get(position));
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        Toast.makeText(this, getString(R.string.multi_select_favoriting, targets.size()),
+                Toast.LENGTH_SHORT).show();
+        BatchFavoriteHelper.favoriteAll(this, targets, new BatchFavoriteHelper.Callback() {
+            @Override
+            public void onFinished(int added, int skipped, int failed, int total) {
+                if (multiSelect != null) {
+                    multiSelect.exitSelectionMode();
+                }
+                Toast.makeText(DownloadListActivity.this,
+                        BatchFavoriteHelper.buildResultMessage(DownloadListActivity.this, added, failed),
+                        Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNeedLogin() {
+                Toast.makeText(DownloadListActivity.this,
+                        R.string.multi_select_favorite_need_login, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /**
+     * 「整理」入口：把早期下载固定的 {@code song.mp3} / {@code song.flac}
+     * 改成「曲名 - 曲师」。会改动磁盘上的文件名，所以先二次确认。
+     */
+    private void confirmTidyFileNames() {
+        showConfirmDialog("整理文件名",
+                "把早期下载的 song.mp3 改名为「曲名 - 曲师」？\n"
+                        + "只影响早期下载的固定文件名，不会动你自己放进目录里的音乐。",
+                this::tidyFileNames);
+    }
+
+    private void tidyFileNames() {
+        tidyInProgress = true;
+        Toast.makeText(this, "正在整理…", Toast.LENGTH_SHORT).show();
+        DownloadManager.migrateLegacyFileNames(new DownloadManager.MigrateCallback() {
+            @Override
+            public void onProgress(int done, int total, String currentName) {
+                // 进度直接写在标题上：表盘小，弹进度条反而挡列表
+                if (tvTitle != null) {
+                    tvTitle.setText("整理中 " + done + "/" + total);
+                }
+            }
+
+            @Override
+            public void onFinished(int renamed, int skipped, int failed) {
+                tidyInProgress = false;
+                String message;
+                if (failed < 0) {
+                    message = "整理失败，请重试";
+                } else if (renamed == 0 && skipped == 0) {
+                    message = "没有需要整理的文件";
+                } else {
+                    message = "已改名 " + renamed + " 首";
+                    if (skipped > 0) {
+                        message += "，跳过 " + skipped + " 首";
+                    }
+                    if (failed > 0) {
+                        message += "，失败 " + failed + " 首";
+                    }
+                }
+                Toast.makeText(DownloadListActivity.this, message, Toast.LENGTH_LONG).show();
+                updateTitleText();
+                loadDownloads();
+                updateEmptyState();
+            }
+        });
     }
 
     private void loadDownloads() {
@@ -128,6 +344,7 @@ public class DownloadListActivity extends BaseWatchActivity {
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
+        updateTitleText();
 
         // Fetch covers from network for songs without covers (legacy downloads)
         fetchMissingCovers();
@@ -206,13 +423,12 @@ public class DownloadListActivity extends BaseWatchActivity {
     }
 
     /**
-     * Convert a legacy flat .mp3 file to a Song (id=0, parsed from filename).
+     * Convert a loose audio file in the download root to a Song
+     * (id=0, name/artist parsed from the 曲名 - 曲师 file name).
      */
     private Song fileToSong(File file) {
-        String name = file.getName();
-        if (name.endsWith(".mp3")) {
-            name = name.substring(0, name.length() - 4);
-        }
+        // 先去掉扩展名（.mp3 / .flac / …），再按「曲名 - 曲师」解析
+        String name = DownloadManager.stripAudioExtension(file.getName());
         String songName = name;
         String artist = "";
         int dashIdx = name.indexOf(" - ");
@@ -230,12 +446,13 @@ public class DownloadListActivity extends BaseWatchActivity {
      */
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         WatchConfirmDialog.show(this, title, message, onConfirm,
-                new WatchConfirmDialog.Options(0xFF424242, 0xFFBB86FC, true));
+                WatchConfirmDialog.Options.defaultOptions());
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        refreshHandler.removeCallbacks(refreshTick);
         NetworkImageLoader.cancelAll();
     }
 

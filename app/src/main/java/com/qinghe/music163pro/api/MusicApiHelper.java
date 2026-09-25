@@ -272,7 +272,12 @@ public class MusicApiHelper {
     }
 
     public interface LyricsFullCallback {
-        void onResult(String lrcText, String tlyricText);
+        /**
+         * @param lrcText     原文歌词
+         * @param tlyricText  翻译歌词，可能为空
+         * @param romalrcText 音译 / 罗马音歌词（日文歌的发音），可能为空
+         */
+        void onResult(String lrcText, String tlyricText, String romalrcText);
         void onError(String message);
     }
 
@@ -2670,7 +2675,11 @@ public class MusicApiHelper {
 
     /**
      * Fetch lyrics with translation for a song by its ID.
-     * Returns both original LRC and translated LRC (tlyric).
+     * Returns original LRC, translated LRC (tlyric) and romanized LRC (romalrc).
+     *
+     * <p>音译歌词（romalrc，日文歌的发音）走同一个 /api/song/lyric/v1 接口。
+     * {@link #buildLyricRequestData} 里的 {@code rv=0} 不需要改 —— 既有的 {@code tv=0}
+     * 一样能拿到 tlyric，说明这些标志位 0 表示「按默认返回」而不是禁用。</p>
      */
     public static void getLyricsWithTranslation(long songId, String cookie, LyricsFullCallback callback) {
         executor.execute(() -> {
@@ -2688,9 +2697,15 @@ public class MusicApiHelper {
                 if (tlyricObj != null) {
                     tlyric = tlyricObj.optString("lyric", "");
                 }
+                String romalrc = "";
+                JSONObject romalrcObj = json.optJSONObject("romalrc");
+                if (romalrcObj != null) {
+                    romalrc = romalrcObj.optString("lyric", "");
+                }
                 final String finalLrc = lrc;
                 final String finalTlyric = tlyric;
-                mainHandler.post(() -> callback.onResult(finalLrc, finalTlyric));
+                final String finalRomalrc = romalrc;
+                mainHandler.post(() -> callback.onResult(finalLrc, finalTlyric, finalRomalrc));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取歌词(含翻译)失败: " + songId, e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
@@ -2715,6 +2730,27 @@ public class MusicApiHelper {
             return null;
         } catch (Exception e) {
             MusicLog.w(TAG, "翻译歌词同步获取失败: " + songId, e);
+            return null;
+        }
+    }
+
+    /**
+     * Fetch romanized lyrics synchronously (used when downloading, so the
+     * 音译歌词 can be played offline too). Returns null when unavailable.
+     */
+    public static String fetchRomajiLyricsSync(long songId, String cookie) {
+        try {
+            JSONObject data = buildLyricRequestData(songId, cookie);
+            String response = weapiPost("/api/song/lyric/v1", data.toString(), cookie);
+            JSONObject json = new JSONObject(response);
+            JSONObject romalrcObj = json.optJSONObject("romalrc");
+            if (romalrcObj != null) {
+                String romalrc = romalrcObj.optString("lyric", "");
+                if (!romalrc.isEmpty()) return romalrc;
+            }
+            return null;
+        } catch (Exception e) {
+            MusicLog.w(TAG, "音译歌词同步获取失败: " + songId, e);
             return null;
         }
     }

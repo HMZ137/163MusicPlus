@@ -9,7 +9,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -25,7 +24,7 @@ import com.qinghe.music163pro.util.MusicLog;
  * If server returns -462 (needs CAPTCHA), launches WebVerifyActivity and
  * retries login automatically after WebView verification completes.
  */
-public class SmsLoginActivity extends AppCompatActivity {
+public class SmsLoginActivity extends BaseWatchActivity {
 
     private static final String TAG = "SmsLoginActivity";
     private static final int REQ_WEB_VERIFY = 201;

@@ -34,6 +34,7 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.WatchBackButton;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 
 import org.json.JSONArray;
@@ -139,6 +140,8 @@ public class CommentActivity extends BaseWatchActivity {
         LinearLayout nameRow = new LinearLayout(this);
         nameRow.setOrientation(LinearLayout.HORIZONTAL);
         nameRow.setGravity(Gravity.CENTER_VERTICAL);
+        // 给左上角浮动返回按钮让位（用统一的计算，别写死像素值）
+        nameRow.setPadding(WatchBackButton.getReservedStartPadding(this), 0, 0, 0);
 
         TextView songTitle = new TextView(this);
         songTitle.setText(songName);
@@ -167,7 +170,8 @@ public class CommentActivity extends BaseWatchActivity {
         LinearLayout tabRow = new LinearLayout(this);
         tabRow.setOrientation(LinearLayout.HORIZONTAL);
         tabRow.setGravity(Gravity.CENTER_VERTICAL);
-        tabRow.setPadding(0, px(4), 0, px(2));
+        // 同样要给左上角浮动返回按钮让位，否则第一个排序标签会被压住点不到
+        tabRow.setPadding(WatchBackButton.getReservedStartPadding(this), px(4), 0, px(2));
 
         tabRecommend = makeSortTab("推荐", 99);
         tabHot = makeSortTab("最热", 2);
@@ -976,7 +980,7 @@ public class CommentActivity extends BaseWatchActivity {
      */
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         WatchConfirmDialog.show(this, title, message, onConfirm,
-                new WatchConfirmDialog.Options(0xFF1E1E1E, 0xFFBB86FC, true));
+                WatchConfirmDialog.Options.defaultOptions());
     }
 
     @Override

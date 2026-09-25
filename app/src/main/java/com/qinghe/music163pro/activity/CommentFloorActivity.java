@@ -128,6 +128,8 @@ public class CommentFloorActivity extends BaseWatchActivity {
         title.setTextColor(COLOR_TEXT_PRIMARY);
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
         title.setTypeface(title.getTypeface(), Typeface.BOLD);
+        // 给左上角浮动返回按钮让位
+        title.setPadding(px(38), 0, 0, 0);
         topBar.addView(title);
 
         return topBar;
@@ -973,7 +975,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
 
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         WatchConfirmDialog.show(this, title, message, onConfirm,
-                new WatchConfirmDialog.Options(0xFF1E1E1E, 0xFFBB86FC, false));
+                WatchConfirmDialog.Options.defaultOptionsNoOutsideDismiss());
     }
 
     @Override

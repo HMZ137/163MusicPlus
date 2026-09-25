@@ -23,7 +23,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -40,7 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class SongRecognitionActivity extends AppCompatActivity {
+public class SongRecognitionActivity extends BaseWatchActivity {
 
     private static final String TAG = "SongRecognitionActivity";
     private static final String PREFS_NAME = "music163_settings";
@@ -655,11 +654,6 @@ public class SongRecognitionActivity extends AppCompatActivity {
         spacer.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, heightPx));
         parent.addView(spacer);
-    }
-
-    private int px(int base) {
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        return (int) (base * screenWidth / 320f + 0.5f);
     }
 
     private int calculateRecordedSeconds(long totalBytes) {

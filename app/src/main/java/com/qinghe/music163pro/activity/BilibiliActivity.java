@@ -1,9 +1,7 @@
 package com.qinghe.music163pro.activity;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -12,16 +10,32 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.qinghe.music163pro.R;
-import com.qinghe.music163pro.util.WatchUiUtils;
 
 /**
- * Bilibili feature menu - lists available functions:
- * - 从BV号打开 (open by BV ID)
- * - 登录 (Bilibili QR login)
+ * 「听bilibili」功能菜单。
+ *
+ * <p>这里只保留两条**不依赖 B 站账号**的链路：</p>
+ * <ul>
+ *   <li><b>从BV号打开</b> —— 解析视频信息、取音频流播放（下游还会用到分 P 与字幕）；</li>
+ *   <li><b>收藏</b> —— 本机收藏的 B 站视频，与账号无关。</li>
+ * </ul>
+ *
+ * <p>已移除的入口：搜索视频、登录B站、云端收藏，以及底部的登录状态提示行。</p>
+ *
+ * <p>⚠️ 被移除的入口对应的页面（{@code BilibiliSearchActivity} / {@code BilibiliLoginActivity} /
+ * {@code BilibiliCloudFavoritesActivity} / {@code BilibiliCloudFavoriteVideosActivity}）
+ * 以及 {@code BilibiliApiHelper} 里的相关接口**代码都保留着**，只是不再有入口。
+ * 这是有意的取舍：改动最小、可逆，将来想恢复只要把磁贴加回来即可。</p>
  */
 public class BilibiliActivity extends BaseWatchActivity {
 
-    private LinearLayout cloudFavoritesItem;
+    /**
+     * 页面标题栏里已经有返回控件，不再叠加左上角浮动返回按钮，避免出现两个返回入口。
+     */
+    @Override
+    protected boolean shouldShowBackButton() {
+        return false;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,78 +51,16 @@ public class BilibiliActivity extends BaseWatchActivity {
 
         container.addView(createTitleBar());
 
-        container.addView(createMenuItem(R.drawable.ic_search, "搜索视频",
-                () -> startActivity(new Intent(this, BilibiliSearchActivity.class))));
-
-        // Menu item: 从BV号打开
+        // 核心入口：解析 BV 号并打开视频
         container.addView(createMenuItem(R.drawable.ic_video_library, "从BV号打开",
                 () -> startActivity(new Intent(this, BilibiliBvidActivity.class))));
 
+        // 本机收藏的 B 站视频（不需要登录）
         container.addView(createMenuItem(R.drawable.ic_favorite_border, "收藏",
                 () -> startActivity(new Intent(this, BilibiliFavoritesActivity.class))));
 
-        // Menu item: 登录
-        container.addView(createMenuItem(R.drawable.ic_qr_code, "登录B站",
-                () -> startActivity(new Intent(this, BilibiliLoginActivity.class))));
-
-        cloudFavoritesItem = createMenuItem(R.drawable.ic_cloud, "云端收藏",
-                () -> startActivity(new Intent(this, BilibiliCloudFavoritesActivity.class)));
-        container.addView(cloudFavoritesItem);
-
-        // Show login status
-        LinearLayout statusRow = new LinearLayout(this);
-        statusRow.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        statusRow.setOrientation(LinearLayout.HORIZONTAL);
-        statusRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        statusParams.topMargin = px(8);
-        statusRow.setLayoutParams(statusParams);
-        statusRow.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
-        statusRow.setPadding(px(10), px(8), px(10), px(8));
-
-        TextView tvLoginStatus = new TextView(this);
-        tvLoginStatus.setId(android.R.id.text1);
-        tvLoginStatus.setTextColor(getResources().getColor(R.color.text_secondary));
-        tvLoginStatus.setTextSize(11);
-        updateLoginStatus(tvLoginStatus);
-        updateCloudFavoritesVisibility();
-        statusRow.addView(tvLoginStatus);
-        container.addView(statusRow);
-
         scrollView.addView(container);
         setContentView(scrollView);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        TextView tvStatus = findViewById(android.R.id.text1);
-        if (tvStatus != null) {
-            updateLoginStatus(tvStatus);
-        }
-        updateCloudFavoritesVisibility();
-    }
-
-    private void updateLoginStatus(TextView tv) {
-        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        String cookie = prefs.getString("bilibili_cookie", "");
-        if (!TextUtils.isEmpty(cookie) && cookie.contains("SESSDATA")) {
-            tv.setText("已登录B站");
-        } else {
-            tv.setText("未登录B站（不影响大部分功能）");
-        }
-    }
-
-    private void updateCloudFavoritesVisibility() {
-        if (cloudFavoritesItem == null) {
-            return;
-        }
-        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        String cookie = prefs.getString("bilibili_cookie", "");
-        cloudFavoritesItem.setVisibility(
-                !TextUtils.isEmpty(cookie) && cookie.contains("SESSDATA") ? android.view.View.VISIBLE : android.view.View.GONE);
     }
 
     private LinearLayout createTitleBar() {
@@ -118,7 +70,8 @@ public class BilibiliActivity extends BaseWatchActivity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(30), px(30)));
+        back.setPadding(px(5), px(5), px(5), px(5));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
         back.setOnClickListener(v -> finish());
@@ -135,8 +88,9 @@ public class BilibiliActivity extends BaseWatchActivity {
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         bar.addView(title);
 
+        // 右侧占位，让标题保持在视觉中间
         ImageView placeholder = new ImageView(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(30), px(30)));
         bar.addView(placeholder);
         return bar;
     }

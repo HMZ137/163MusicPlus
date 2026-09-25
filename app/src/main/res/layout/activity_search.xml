@@ -7,10 +7,12 @@
     android:padding="6dp">
 
     <!-- Search bar -->
+    <!-- paddingStart 给左上角浮动返回按钮让位 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingStart="40dp">
 
         <EditText
             android:id="@+id/et_search"

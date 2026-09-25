@@ -9,7 +9,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -23,7 +22,7 @@ import com.qinghe.music163pro.util.QrCodeGenerator;
  * 2. Build QR URL locally: https://music.163.com/login?codekey=KEY
  * 3. /api/login/qrcode/client/login (weapi) - poll for scan status
  */
-public class QrLoginActivity extends AppCompatActivity {
+public class QrLoginActivity extends BaseWatchActivity {
 
     private ImageView ivQrCode;
     private TextView tvStatus;

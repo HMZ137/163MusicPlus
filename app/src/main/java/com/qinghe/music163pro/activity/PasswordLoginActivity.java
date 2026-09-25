@@ -7,7 +7,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -18,7 +17,7 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
  * Login with phone number and password.
  * Cookie handling follows the same pattern as SmsLoginActivity.
  */
-public class PasswordLoginActivity extends AppCompatActivity {
+public class PasswordLoginActivity extends BaseWatchActivity {
 
     private EditText etPhone;
     private EditText etPassword;
