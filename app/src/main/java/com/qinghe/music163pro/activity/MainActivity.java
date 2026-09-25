@@ -3777,6 +3777,32 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Update playlist indicator visibility
         updatePlaylistIndicator();
         updateChorusMarker(playerManager.getDuration());
+        adjustTitleGravity();
+    }
+
+    /**
+     * 主界面歌名跑马灯修正。
+     *
+     * 歌名 TextView 同时设了 {@code android:gravity="center"} 与 {@code ellipsize="marquee"}，
+     * 这是 Android 的一个已知问题：居中对齐会让 marquee 只滚动极短一段就跳回开头、反复如此
+     * （用户反馈的「滚动一小段后突然回到第一个字」）。
+     *
+     * 修法：文本能放下时保持居中（短歌名更好看），放不下、需要跑马灯时改为 {@code START}，
+     * 让 marquee 从行首完整滚动。此方法只在切歌 / 刷新界面时调用，不会逐帧触发、不会反复重置动画。
+     */
+    private void adjustTitleGravity() {
+        tvSongName.post(() -> {
+            int w = tvSongName.getWidth();
+            if (w <= 0) return; // 尚未完成首次布局，跳过本次判断
+            CharSequence t = tvSongName.getText();
+            if (t == null || t.length() == 0) {
+                tvSongName.setGravity(Gravity.CENTER);
+                return;
+            }
+            float textW = tvSongName.getPaint().measureText(t.toString());
+            int avail = w - tvSongName.getTotalPaddingLeft() - tvSongName.getTotalPaddingRight();
+            tvSongName.setGravity(textW > avail ? Gravity.START : Gravity.CENTER);
+        });
     }
 
     private void updatePlaylistIndicator() {
@@ -3795,6 +3821,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     public void onSongChanged(Song song) {
         tvSongName.setText(song.getName());
         tvArtist.setText(song.getArtist());
+        adjustTitleGravity();
         ensureChorusLoaded(song);
         startPlaybackService(song.getName(), song.getArtist(), song.getCoverUrl(), true);
         // Save to play history
