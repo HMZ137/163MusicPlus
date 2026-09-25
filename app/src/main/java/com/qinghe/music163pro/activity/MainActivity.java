@@ -983,12 +983,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         barParams.bottomMargin = dp(8);
         titleBar.setLayoutParams(barParams);
 
+        int closeSize = dp(26);
+        int closeMarginEnd = Math.max(dp(4), WatchUiUtils.cornerInset(this));
+        // 标题两侧留出关闭按钮（X）的占位：标题是 match_parent + 居中，不留位的话
+        // 长标题（如「播放列表 (N首)」）右端会伸到 X 底下被压住 —— 就是「标题遮挡 X」。
+        // 两侧取同一个值，标题仍然视觉居中。
+        int titleReserve = closeSize + closeMarginEnd;
+
         // Centered title
         TextView title = new TextView(this);
         title.setText(titleText);
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setPadding(titleReserve, 0, titleReserve, 0);
         FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         titleParams.gravity = Gravity.CENTER;
@@ -999,10 +1009,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         ImageView btnClose = new ImageView(this);
         btnClose.setImageResource(R.drawable.ic_close);
         btnClose.setColorFilter(0xFFFFFFFF);
-        int closeSize = dp(26);
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(closeSize, closeSize);
         closeParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        closeParams.setMarginEnd(Math.max(dp(4), WatchUiUtils.cornerInset(this)));
+        closeParams.setMarginEnd(closeMarginEnd);
         btnClose.setLayoutParams(closeParams);
         btnClose.setClickable(true);
         btnClose.setFocusable(true);
@@ -2514,6 +2523,27 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             itemLayout.addView(textLayout);
 
+            // 「下一首播放」角标（叠加时带序号，方便看清排队顺序）
+            int queuedPos = playerManager.queuedNextPosition(song);
+            if (queuedPos > 0) {
+                TextView badge = new TextView(this);
+                badge.setText(queuedPos > 1 ? "下一首 " + queuedPos : "下一首");
+                badge.setTextColor(0xFF1D1D1D);
+                badge.setTextSize(10);
+                badge.setPadding(dp(5), dp(2), dp(5), dp(2));
+                android.graphics.drawable.GradientDrawable badgeBg =
+                        new android.graphics.drawable.GradientDrawable();
+                badgeBg.setColor(0xFFBB86FC);
+                badgeBg.setCornerRadius(dp(3));
+                badge.setBackground(badgeBg);
+                LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                badgeLp.gravity = Gravity.CENTER_VERTICAL;
+                badgeLp.setMarginStart(dp(4));
+                badge.setLayoutParams(badgeLp);
+                itemLayout.addView(badge);
+            }
+
             itemLayout.setOnClickListener(v -> {
                 playerManager.playFromCurrentPlaylist(index);
                 dismissOverlay();
@@ -2559,12 +2589,23 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String title = (song.getName() != null && !song.getName().isEmpty())
                 ? song.getName() : "歌曲";
         final boolean isCurrent = (index == playerManager.getCurrentIndex());
+        final boolean queued = playerManager.queuedNextPosition(song) > 0;
 
-        String[] labels = new String[]{"下一首播放", "从队列移除"};
+        String[] labels = new String[]{queued ? "取消下一首播放" : "下一首播放", "从队列移除"};
         Runnable[] actions = new Runnable[]{
                 () -> {
-                    if (playerManager.moveToNextInPlaylist(index)) {
-                        Toast.makeText(this, "已设为下一首播放", Toast.LENGTH_SHORT).show();
+                    if (queued) {
+                        playerManager.cancelQueuedNext(song);
+                        Toast.makeText(this, "已取消下一首播放", Toast.LENGTH_SHORT).show();
+                        dismissOverlay();
+                        showPlaylistOverlay();
+                        return;
+                    }
+                    if (playerManager.queueNextInPlaylist(index)) {
+                        int pos = playerManager.queuedNextPosition(song);
+                        Toast.makeText(this,
+                                pos > 1 ? "已排入下一首播放（第 " + pos + " 首）" : "已设为下一首播放",
+                                Toast.LENGTH_SHORT).show();
                         dismissOverlay();
                         showPlaylistOverlay();
                     } else {

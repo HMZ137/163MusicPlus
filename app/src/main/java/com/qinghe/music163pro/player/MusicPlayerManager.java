@@ -85,6 +85,18 @@ public class MusicPlayerManager {
     private MediaPlayer mediaPlayer;
     private final List<Song> playlist = new ArrayList<>();
     private int currentIndex = -1;
+
+    /**
+     * 「下一首播放」队列（可叠加）。
+     *
+     * <p>长按播放列表里的一首选「下一首播放」，就把它排进来。连选多首会按选择顺序
+     * 依次排在当前歌之后（而不是互相顶替，也不是倒序）。</p>
+     *
+     * <p>同时维护两处：这里存 Song 引用（用于显示角标、判重、随机模式下也能优先播），
+     * {@link #playlist} 里则把这些歌**物理挪到** {@code currentIndex+1} 之后的连续位置 ——
+     * 后者保证顺序播放在队列放完之后能自然接回「原本的下一首」。</p>
+     */
+    private final List<Song> playNextQueue = new ArrayList<>();
     private boolean isPlaying = false;
     private PlayerCallback callback;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -154,6 +166,8 @@ public class MusicPlayerManager {
     public void setPlaylist(List<Song> songs, int startIndex) {
         playlist.clear();
         playlist.addAll(songs);
+        // 整条队列被换掉，「下一首播放」随之作废
+        playNextQueue.clear();
         currentIndex = startIndex;
         clearSourcePlaylistInfo();
         personalFmMode = false;
@@ -171,6 +185,8 @@ public class MusicPlayerManager {
                                        long creatorUserId, boolean isLiked) {
         playlist.clear();
         playlist.addAll(songs);
+        // 整条队列被换掉，「下一首播放」随之作废
+        playNextQueue.clear();
         currentIndex = startIndex;
         sourcePlaylistId = playlistId;
         sourcePlaylistName = playlistName;
@@ -191,6 +207,8 @@ public class MusicPlayerManager {
     public void setPersonalFmPlaylist(List<Song> songs, int startIndex, String mode, String subMode) {
         playlist.clear();
         playlist.addAll(songs);
+        // 整条队列被换掉，「下一首播放」随之作废
+        playNextQueue.clear();
         currentIndex = startIndex;
         clearSourcePlaylistInfo();
         personalFmMode = true;
@@ -682,6 +700,8 @@ public class MusicPlayerManager {
         }
 
         if (playlist.isEmpty()) return;
+        // 「下一首播放」优先于播放模式（含单曲循环）：用户明确指定了下一首是什么
+        if (consumeQueuedNext()) return;
         switch (playMode) {
             case SINGLE_REPEAT:
                 // Replay current song
@@ -712,6 +732,8 @@ public class MusicPlayerManager {
      */
     public void next() {
         if (playlist.isEmpty()) return;
+        // 「下一首播放」优先：用户明确指定了接下来听什么，随机模式下也让位于它
+        if (consumeQueuedNext()) return;
         if (playMode == PlayMode.RANDOM && !personalFmMode) {
             playShuffle(true);
         } else {
@@ -756,7 +778,14 @@ public class MusicPlayerManager {
             return false;
         }
         boolean removedCurrent = (index == currentIndex);
-        playlist.remove(index);
+        Song removed = playlist.remove(index);
+        // 被删掉的歌若在「下一首播放」队列里，标记一并清除。
+        // （这里手写倒序循环而不是 List#removeIf —— 后者是 Java 8 默认方法，minSdk 23 上没有）
+        for (int i = playNextQueue.size() - 1; i >= 0; i--) {
+            if (isSameSong(playNextQueue.get(i), removed)) {
+                playNextQueue.remove(i);
+            }
+        }
 
         if (playlist.isEmpty()) {
             currentIndex = -1;
@@ -780,25 +809,139 @@ public class MusicPlayerManager {
         return true;
     }
 
+    // ==================== 「下一首播放」队列（可叠加） ====================
+
+    /** 已排入「下一首播放」的歌（按顺序，返回副本）。 */
+    public List<Song> getPlayNextQueue() {
+        return new ArrayList<>(playNextQueue);
+    }
+
+    /** 这首歌是否已排入「下一首播放」。 */
+    public boolean isQueuedNext(Song song) {
+        return indexOfQueuedNext(song) >= 0;
+    }
+
+    /** 这首歌在「下一首播放」队列里的序号（1 起）；未排入返回 0。 */
+    public int queuedNextPosition(Song song) {
+        int i = indexOfQueuedNext(song);
+        return i < 0 ? 0 : i + 1;
+    }
+
+    private int indexOfQueuedNext(Song song) {
+        if (song == null) {
+            return -1;
+        }
+        for (int i = 0; i < playNextQueue.size(); i++) {
+            if (isSameSong(playNextQueue.get(i), song)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /**
-     * 把队列里的某一首挪到「下一首播放」的位置，当前播放的曲目不受影响。
+     * 同一首歌的判据：先比引用，再比「id + url」。
      *
-     * @return true 表示确实移动了（点当前曲目本身时返回 false）
+     * <p>播放列表里可能出现 id 相同但来源不同的条目（云端 / 本地），带上 url 才区分得开。</p>
      */
-    public boolean moveToNextInPlaylist(int index) {
+    private boolean isSameSong(Song a, Song b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (a == b) {
+            return true;
+        }
+        if (a.getId() != b.getId()) {
+            return false;
+        }
+        String ua = a.getUrl();
+        String ub = b.getUrl();
+        return ua == null ? ub == null : ua.equals(ub);
+    }
+
+    private int indexOfSongInPlaylist(Song song) {
+        for (int i = 0; i < playlist.size(); i++) {
+            if (isSameSong(playlist.get(i), song)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 把队列里的某一首排到「下一首播放」（可叠加）。
+     *
+     * <p>插入位置是「当前歌之后、已排入的那些之后」，所以连选多首会**按选择顺序**
+     * 依次播放。原实现每次都插到 {@code currentIndex+1}，连选两首会互相顶替、
+     * 播出倒序 —— 这就是「不能叠加」的原因。</p>
+     *
+     * @return true 表示确实排入了；点当前正在播放的那首、或已经排过的，返回 false
+     */
+    public boolean queueNextInPlaylist(int index) {
         if (index < 0 || index >= playlist.size() || index == currentIndex) {
             return false;
         }
-        Song song = playlist.remove(index);
+        Song song = playlist.get(index);
+        if (isQueuedNext(song)) {
+            return false;
+        }
+        playlist.remove(index);
         // 抽走的是当前曲目之前的项时，当前下标要跟着前移一位
         if (index < currentIndex) {
             currentIndex--;
         }
-        int insertAt = Math.min(currentIndex + 1, playlist.size());
+        // 追加在已排入的歌之后，保证叠加顺序 = 选择顺序
+        int insertAt = Math.min(currentIndex + 1 + playNextQueue.size(), playlist.size());
         playlist.add(insertAt, song);
+        playNextQueue.add(song);
         invalidateShuffleOrder();
         savePlaybackState();
         return true;
+    }
+
+    /**
+     * 取消「下一首播放」：去掉标记，并把它挪到队尾（不再插队）。
+     *
+     * <p>不去还原「最初的位置」—— 排入时已经把它从原位置抽走，之后再增删会让原位置
+     * 失去意义。挪到队尾是歧义最小、也最符合「取消下次优先」直觉的做法。</p>
+     *
+     * @return true 表示确实取消了
+     */
+    public boolean cancelQueuedNext(Song song) {
+        int qi = indexOfQueuedNext(song);
+        if (qi < 0) {
+            return false;
+        }
+        playNextQueue.remove(qi);
+        int idx = indexOfSongInPlaylist(song);
+        if (idx >= 0) {
+            Song s = playlist.remove(idx);
+            if (idx < currentIndex) {
+                currentIndex--;
+            }
+            playlist.add(s);
+        }
+        invalidateShuffleOrder();
+        savePlaybackState();
+        return true;
+    }
+
+    /**
+     * 切下一首时优先消费「下一首播放」队列。
+     *
+     * @return true 表示已切到队列里的歌；队列为空（或里面那些已不在播放列表）时返回 false
+     */
+    private boolean consumeQueuedNext() {
+        while (!playNextQueue.isEmpty()) {
+            Song head = playNextQueue.remove(0);
+            int idx = indexOfSongInPlaylist(head);
+            if (idx >= 0) {
+                currentIndex = idx;
+                playCurrent();
+                return true;
+            }
+        }
+        return false;
     }
 
     public void playCurrent() {
