@@ -82,8 +82,8 @@ public class LetterPickerActivity extends BaseWatchActivity {
         }
 
         if (tvTitle != null) {
-            tvTitle.setText(getString(R.string.letter_picker_title)
-                    + " · " + groups.size() + "组");
+            // 用带占位符的资源，不拼字符串 —— 拼接既不能被翻译，lint 也会报 SetTextI18n
+            tvTitle.setText(getString(R.string.letter_picker_title_groups, groups.size()));
             // 标题行的高度直接对齐浮动返回按钮的占位：标题落在按钮右侧、竖直居中，
             // 网格也就自然从按钮下方开始，不必再给网格加一段 padding。
             // （一开始是给网格加 paddingTop，但取的是 getReservedStartPadding() —— 那是
@@ -179,7 +179,9 @@ public class LetterPickerActivity extends BaseWatchActivity {
 
                 tvCount = new TextView(LetterPickerActivity.this);
                 tvCount.setGravity(Gravity.CENTER);
-                tvCount.setTextSize(9);
+                // 副标题字号。原来取 9sp，在 320px 表盘上太吃力了 —— 用户反馈的正是
+                // 「字太小不好认」，别在新页面里重犯。10sp 是还能塞进格子的上限。
+                tvCount.setTextSize(10);
                 tvCount.setTextColor(getResources().getColor(R.color.text_secondary));
                 tvCount.setIncludeFontPadding(false);
                 LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(
