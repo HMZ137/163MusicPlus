@@ -1495,6 +1495,12 @@ public class MusicPlayerManager {
                 }
                 if (current.isForceLocalPlayback()) {
                     songJson.put(KEY_FORCE_LOCAL_PLAYBACK, true);
+                    // 持久化本地文件绝对路径：重开后才能直接拿真实路径播放，
+                    // 否则 forceLocalPlayback=true 而 url 为空，手动拷入的本地歌
+                    // 经 getDownloadedMp3Path 反查会失败 -> 提示「找不到文件」。
+                    if (!TextUtils.isEmpty(current.getUrl())) {
+                        songJson.put("url", current.getUrl());
+                    }
                 }
                 editor.putString(KEY_CURRENT_SONG_JSON, songJson.toString());
             } else {
@@ -1518,7 +1524,12 @@ public class MusicPlayerManager {
                 if (s.getAlbumId() > 0) {
                     obj.put("albumId", s.getAlbumId());
                 }
-                if (s.isForceLocalPlayback()) obj.put(KEY_FORCE_LOCAL_PLAYBACK, true);
+                if (s.isForceLocalPlayback()) {
+                    obj.put(KEY_FORCE_LOCAL_PLAYBACK, true);
+                    if (!TextUtils.isEmpty(s.getUrl())) {
+                        obj.put("url", s.getUrl());
+                    }
+                }
                 playlistArr.put(obj);
             }
             editor.putString(KEY_PLAYLIST_JSON, playlistArr.toString());
@@ -1588,6 +1599,12 @@ public class MusicPlayerManager {
                     song.setAlbumId(albumId);
                 }
                 song.setForceLocalPlayback(obj.optBoolean(KEY_FORCE_LOCAL_PLAYBACK, false));
+                // 恢复本地文件的绝对路径，让 playCurrent 的 forceLocalPlayback 分支
+                // 能直接拿到真实路径，避免重开后「找不到文件」。
+                String restoredUrl = obj.optString("url", null);
+                if (restoredUrl != null && !restoredUrl.isEmpty()) {
+                    song.setUrl(restoredUrl);
+                }
                 restoredList.add(song);
             }
 

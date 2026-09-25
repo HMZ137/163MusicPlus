@@ -120,6 +120,9 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         titleRow.addView(btnAZ);
 
         root.addView(titleRow);
+        // 标题栏撑到左上角浮动返回按钮（X）的占位：本页此前漏了这一句（其它 17 个页面都调了），
+        // 标题行高只有 20 多像素，X 按钮（58px）会探进标题行 / 压在第一条歌单上。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleRow);
 
         // Status text
         tvStatus = new TextView(this);

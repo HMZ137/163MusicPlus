@@ -356,6 +356,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 plIntent.putExtra("creator_user_id", playerManager.getSourcePlaylistCreatorUserId());
                 plIntent.putExtra("is_liked_playlist", playerManager.getSourcePlaylistIsLiked());
                 startActivity(plIntent);
+            } else if (currentSong != null && LocalTracks.isLocalOnly(currentSong)) {
+                // 本地歌没有云端歌单 id，左上角按钮直接展示当前播放队列（本机音乐列表）。
+                showPlaylistOverlay();
             }
         });
 
@@ -3808,8 +3811,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void updatePlaylistIndicator() {
         if (btnPlaylistIndicator != null) {
             Song currentSong = playerManager.getCurrentSong();
+            // 三种情况都在左上角给一个「播放列表」入口：
+            //  - 云端歌单（hasSourcePlaylist）
+            //  - B 站视频（自带视频列表）
+            //  - 本地歌（本机音乐）
+            // 本地歌走 setPlaylist() 会 clearSourcePlaylistInfo()，hasSourcePlaylist() 为 false，
+            // 以前就导致左上角按钮消失，只能从「更多功能」(⋯) 菜单里点「播放列表」——
+            // 这就是「本地音乐的歌单按钮没挪到左上角」的原因。
             if (playerManager.hasSourcePlaylist()
-                    || (currentSong != null && currentSong.isBilibili())) {
+                    || (currentSong != null && currentSong.isBilibili())
+                    || (currentSong != null && LocalTracks.isLocalOnly(currentSong))) {
                 btnPlaylistIndicator.setVisibility(View.VISIBLE);
             } else {
                 btnPlaylistIndicator.setVisibility(View.GONE);
