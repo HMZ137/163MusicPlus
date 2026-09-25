@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 子页面顶栏标题统一字号：圆角小屏原 14sp 偏小，统一放大到 16sp -->
+    <dimen name="watch_title_text_size">16sp</dimen>
+</resources>

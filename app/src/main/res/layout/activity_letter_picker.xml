@@ -27,7 +27,7 @@
         android:layout_marginBottom="4dp"
         android:text="@string/letter_picker_title"
         android:textColor="@color/text_primary"
-        android:textSize="14sp"
+        android:textSize="@dimen/watch_title_text_size"
         android:textStyle="bold"
         android:letterSpacing="0.05"
         android:gravity="center" />

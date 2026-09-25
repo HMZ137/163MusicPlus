@@ -14,7 +14,7 @@
         android:paddingBottom="4dp"
         android:text="音乐云盘"
         android:textColor="@color/text_primary"
-        android:textSize="15sp"
+        android:textSize="@dimen/watch_title_text_size"
         android:textStyle="bold" />
 
     <TextView
