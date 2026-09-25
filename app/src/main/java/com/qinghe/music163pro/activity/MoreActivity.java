@@ -234,16 +234,25 @@ public class MoreActivity extends BaseWatchActivity {
         java.util.List<String> order = MoreMenuPreferences.getOrder(prefs);
         parent.removeAllViews();
         parent.addView(titleView);
-        // 本地播放模式下把「本机音乐」钉在最前 —— 纯本地播放器最常用的入口就是它。
-        // 注意这里必须显式补回：removeAllViews() 之后只会按 order 重建，不在 order 里的
-        // 视图会永久消失（这正是「漏注册 ≠ 排到后面，而是整块不见了」的那个坑）。
-        if (btnLocalMusic != null
-                && btnLocalMusic.getVisibility() == View.VISIBLE) {
-            parent.addView(btnLocalMusic);
-        }
+        // 本地播放列表（本机音乐）与在线「我的歌单」是同一类入口，排到它前面紧挨着，
+        // 让本地 / 在线两个播放列表在菜单里并排出现（「挪到和在线的播放列表按钮一样的地方」）。
+        // 注意：本机音乐不在 order 列表里（显隐由播放模式决定），必须显式补回，否则
+        // removeAllViews() 之后它会整块消失（「漏注册 ≠ 排到后面，而是整块不见了」那个坑）。
+        boolean localInserted = false;
         for (String key : order) {
+            if (MoreMenuPreferences.KEY_MY_PLAYLISTS.equals(key)
+                    && btnLocalMusic != null
+                    && btnLocalMusic.getVisibility() == View.VISIBLE) {
+                parent.addView(btnLocalMusic);
+                localInserted = true;
+            }
             View view = viewByKey.get(key);
             if (view != null) parent.addView(view);
+        }
+        // 兜底：用户排序里没有「我的歌单」的极端情况，本地音乐回到原先的置顶位置（标题之后）
+        if (!localInserted && btnLocalMusic != null
+                && btnLocalMusic.getVisibility() == View.VISIBLE) {
+            parent.addView(btnLocalMusic, 1);
         }
         parent.addView(btnSettings);
     }

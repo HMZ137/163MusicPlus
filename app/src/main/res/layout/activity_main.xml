@@ -32,12 +32,28 @@
         android:clickable="true"
         android:focusable="true" />
 
-    <!-- Center content -->
+    <!--
+      底部安全区：给圆形表盘下边缘留一点余量，避免最底下一排（音量键）顶到
+      物理圆角被切除。内容块会以 layout_above 停靠在它上方。
+    -->
+    <View
+        android:id="@+id/bottom_safe_area"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:layout_alignParentBottom="true" />
+
+    <!--
+      居中内容块：不再用 layout_centerInParent（那是对父容器全边界居中，UI 放大后
+      会顶到顶栏把「更多」(⋮) 按钮盖住）。改挂到顶栏按钮之下、底部安全区之上，再用
+      gravity="center" 在安全带内竖直居中 —— 任意缩放下都不会再和 ⋮ 重叠。
+    -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:gravity="center_horizontal"
+        android:layout_below="@id/btn_more"
+        android:layout_above="@id/bottom_safe_area"
+        android:layout_centerHorizontal="true"
+        android:gravity="center"
         android:orientation="vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp">

@@ -21,9 +21,13 @@ import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.PinyinUtils;
 
+import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Shows the user's playlists (created + subscribed) from the cloud.
@@ -38,6 +42,15 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     private ArrayAdapter<PlaylistInfo> adapter;
     private TextView tvStatus;
     private long currentUserId = -1;
+
+    /** 打开字母选择页的请求码。 */
+    private static final int REQUEST_LETTER_PICKER = 0x52;
+    /** 分组首字母（与 starts/counts 等长），传给字母选择页。 */
+    private final List<Character> groupLetters = new ArrayList<>();
+    private int[] groupStarts = new int[0];
+    private int[] groupCounts = new int[0];
+    /** 字母跳转后，onResume 会重新拉列表，这里先记下目标位，等拉完再跳过去。 */
+    private int pendingScrollTo = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,9 +95,29 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
                 px(24), px(24));
         btnParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
         btnParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        int idCreate = View.generateViewId();
+        btnCreate.setId(idCreate);
         btnCreate.setLayoutParams(btnParams);
         btnCreate.setOnClickListener(v -> showCreatePlaylistDialog());
         titleRow.addView(btnCreate);
+
+        // 「A-Z」首字母跳转：复用 LetterPickerActivity + PinyinUtils（与本地音乐页同一套）。
+        // 放在「+」左侧，标题居中、本就够短，不会和左右按钮打架。
+        TextView btnAZ = new TextView(this);
+        btnAZ.setText("A-Z");
+        btnAZ.setTextColor(0xFFBB86FC);
+        btnAZ.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
+        btnAZ.setPadding(px(8), px(4), px(8), px(4));
+        btnAZ.setClickable(true);
+        btnAZ.setFocusable(true);
+        android.widget.RelativeLayout.LayoutParams azParams = new android.widget.RelativeLayout.LayoutParams(
+                android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
+        azParams.addRule(android.widget.RelativeLayout.LEFT_OF, idCreate);
+        azParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        btnAZ.setLayoutParams(azParams);
+        btnAZ.setOnClickListener(v -> openLetterPicker());
+        titleRow.addView(btnAZ);
 
         root.addView(titleRow);
 
@@ -212,11 +245,19 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
             public void onResult(List<PlaylistInfo> playlists) {
                 displayList.clear();
                 displayList.addAll(playlists);
+                // 按拼音首字母排序并建立首字母分组，供「A-Z」跳转使用
+                sortAndIndex();
                 // Detect current user ID from the first playlist's creator (if it's their "liked" playlist)
                 if (!playlists.isEmpty() && playlists.get(0).isLikedPlaylist()) {
                     currentUserId = playlists.get(0).getUserId();
                 }
                 adapter.notifyDataSetChanged();
+                // 字母跳转后回来：等列表重建完成再滚到目标位置
+                if (pendingScrollTo >= 0) {
+                    final int pos = pendingScrollTo;
+                    pendingScrollTo = -1;
+                    lvPlaylists.setSelection(pos);
+                }
                 if (playlists.isEmpty()) {
                     tvStatus.setText("暂无歌单");
                 } else {
@@ -227,9 +268,93 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
             @Override
             public void onError(String message) {
+                // 拉取失败，清掉待跳转，避免下次成功加载时误跳
+                pendingScrollTo = -1;
                 tvStatus.setText("加载失败: " + message);
             }
         });
+    }
+
+    // ==================== 首字母索引（复用 PinyinUtils + LetterPickerActivity） ====================
+
+    /**
+     * 按歌单名的拼音首字母排序，并建立「首字母 → 第一首下标」的分组。
+     * 同字母内再按中文排序规则比名称，保证稳定字典序。
+     */
+    private void sortAndIndex() {
+        final Collator collator = Collator.getInstance(Locale.CHINA);
+        Collections.sort(displayList, (left, right) -> {
+            char leftInitial = PinyinUtils.initialOfWord(left.getName());
+            char rightInitial = PinyinUtils.initialOfWord(right.getName());
+            if (leftInitial != rightInitial) {
+                // '#'（数字 / 符号 / 非汉字）永远排在最后
+                if (leftInitial == PinyinUtils.OTHER) return 1;
+                if (rightInitial == PinyinUtils.OTHER) return -1;
+                return Character.compare(leftInitial, rightInitial);
+            }
+            int byName = collator.compare(left.getName(), right.getName());
+            return byName;
+        });
+        buildLetterGroups();
+    }
+
+    /** 按排好序的列表生成分组信息，供字母选择页使用。 */
+    private void buildLetterGroups() {
+        java.util.LinkedHashMap<Character, Integer> firstIndex = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<Character, Integer> counts = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < displayList.size(); i++) {
+            char initial = PinyinUtils.initialOfWord(displayList.get(i).getName());
+            if (!firstIndex.containsKey(initial)) {
+                firstIndex.put(initial, i);
+            }
+            Integer count = counts.get(initial);
+            counts.put(initial, count == null ? 1 : count + 1);
+        }
+        groupLetters.clear();
+        groupStarts = new int[firstIndex.size()];
+        groupCounts = new int[firstIndex.size()];
+        int index = 0;
+        for (java.util.Map.Entry<Character, Integer> entry : firstIndex.entrySet()) {
+            groupLetters.add(entry.getKey());
+            groupStarts[index] = entry.getValue();
+            Integer count = counts.get(entry.getKey());
+            groupCounts[index] = count == null ? 0 : count;
+            index++;
+        }
+    }
+
+    /** 打开独立的字母选择页（与本地音乐页同一套交互）。 */
+    private void openLetterPicker() {
+        if (groupLetters.isEmpty()) {
+            Toast.makeText(this, "还没有可跳转的字母", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        StringBuilder letters = new StringBuilder(groupLetters.size());
+        for (Character letter : groupLetters) {
+            letters.append(letter.charValue());
+        }
+        Intent intent = new Intent(this, LetterPickerActivity.class);
+        intent.putExtra(LetterPickerActivity.EXTRA_LETTERS, letters.toString());
+        intent.putExtra(LetterPickerActivity.EXTRA_STARTS, groupStarts);
+        intent.putExtra(LetterPickerActivity.EXTRA_COUNTS, groupCounts);
+        intent.putExtra(LetterPickerActivity.EXTRA_CURRENT, lvPlaylists.getFirstVisiblePosition());
+        startActivityForResult(intent, REQUEST_LETTER_PICKER);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_LETTER_PICKER || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        int target = data.getIntExtra(LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
+        if (target < 0) {
+            return;
+        }
+        // 记下来：onResume 会重新拉取列表，等拉取完成（列表重建）后再跳过去，
+        // 否则刚 setSelection 就被 reload 冲掉位置。
+        pendingScrollTo = Math.max(0, Math.min(target, displayList.size() - 1));
+        lvPlaylists.setSelection(pendingScrollTo);
     }
 
     private void showOwnPlaylistOptions(PlaylistInfo pl, String cookie) {

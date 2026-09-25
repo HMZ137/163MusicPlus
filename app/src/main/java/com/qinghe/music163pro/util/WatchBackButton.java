@@ -115,11 +115,16 @@ public final class WatchBackButton {
         // 这是把「圆角内缩」从单页（PlaylistDetailActivity）推广到全部子页面顶栏的统一切点：
         // 17 个 XML 页都调用了本方法，一次改动即全员受益。
         int inset = WatchUiUtils.cornerInset(activity);
+        // 左上角浮动返回按钮（X）的占位比圆角内缩更大，必须按它的实际占地预留左内边距，
+        // 否则居中标题（尤其「本地音乐 (N首)」这种较长文本）左半截会压到返回按钮底下。
+        // 所有调用本方法的页面都挂了浮动返回按钮（B 站 / MV 系列自带返回控件、不走本方法），
+        // 所以这里统一把左内边距撑到 max(圆角内缩, 返回按钮占位) 是安全的。
+        int neededStart = Math.max(inset, getReservedStartPadding(activity));
         int padStart = titleBar.getPaddingStart();
         int padEnd = titleBar.getPaddingEnd();
-        if (padStart < inset || padEnd < inset) {
+        if (padStart < neededStart || padEnd < inset) {
             titleBar.setPaddingRelative(
-                    Math.max(padStart, inset),
+                    Math.max(padStart, neededStart),
                     titleBar.getPaddingTop(),
                     Math.max(padEnd, inset),
                     titleBar.getPaddingBottom());
