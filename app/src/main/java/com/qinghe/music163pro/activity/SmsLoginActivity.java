@@ -47,6 +47,10 @@ public class SmsLoginActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sms_login);
 
+        // 标题栏要撑到浮动返回按钮的占位高度：否则下面左对齐的「手机号」标签会被按钮完整盖住
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_sms_login_title));
+
         etPhone = findViewById(R.id.et_phone);
         etCode = findViewById(R.id.et_code);
         btnSendCode = findViewById(R.id.btn_send_code);

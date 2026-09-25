@@ -33,6 +33,11 @@ public class SettingsActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
 
+        // 标题栏要撑到浮动返回按钮的占位高度。这一页原来只剩约 1px 余量 ——
+        // 第一行的图标顶边落在 y≈54，而按钮底边在 y=53，字号稍一变化就会压上去。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_settings_title));
+
         // Apply keep screen on setting
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         if (prefs.getBoolean("keep_screen_on", false)) {

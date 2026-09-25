@@ -71,6 +71,11 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_toggle_settings);
 
+        // 标题栏要撑到浮动返回按钮的占位高度：本页第一项就是「本地播放模式」开关，
+        // 原来它的文字顶边落在 y≈50，按钮底边在 y=53 —— 已经被压到一点了
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_toggle_settings_title));
+
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Apply keep screen on setting

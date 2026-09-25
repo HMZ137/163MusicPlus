@@ -40,6 +40,10 @@ public class XtcModuleActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_xtc_module);
 
+        // 标题栏要撑到浮动返回按钮的占位高度：否则下面那段左对齐的说明文字会被按钮压住
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_xtc_module_title));
+
         btnDownload = findViewById(R.id.btn_download_xtc_module);
         progressBar = findViewById(R.id.progress_download_xtc_module);
         tvStatus = findViewById(R.id.tv_xtc_module_status);

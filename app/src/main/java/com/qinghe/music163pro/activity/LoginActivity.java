@@ -29,6 +29,10 @@ public class LoginActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
+        // 标题栏要撑到浮动返回按钮的占位高度：否则下面那行左对齐的「Cookie」会被按钮压住
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_login_title));
+
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         playerManager = MusicPlayerManager.getInstance();
 

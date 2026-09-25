@@ -15,6 +15,10 @@ public class HelpDetailActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_help_detail);
 
+        // 标题栏要撑到浮动返回按钮的占位高度：否则下面那行左对齐的「问题」会被按钮压住
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_help_detail_title));
+
         TextView tvQuestion = findViewById(R.id.tv_help_detail_question);
         TextView tvAnswer = findViewById(R.id.tv_help_detail_answer);
 
