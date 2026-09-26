@@ -43,6 +43,7 @@ public class MvDetailActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_mv_detail);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, findViewById(R.id.tv_mv_page_title));
 
         mvId = getIntent().getLongExtra("mv_id", 0);
         mvName = getIntent().getStringExtra("mv_name");

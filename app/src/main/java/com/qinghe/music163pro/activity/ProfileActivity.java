@@ -71,6 +71,7 @@ public class ProfileActivity extends BaseWatchActivity {
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 0, 0, px(8));
         contentLayout.addView(title);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
 
         buildAvatarHeader();
 

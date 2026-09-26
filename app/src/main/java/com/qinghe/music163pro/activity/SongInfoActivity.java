@@ -98,7 +98,9 @@ public class SongInfoActivity extends BaseWatchActivity {
         scrollView.addView(contentLayout);
 
         // Title
-        contentLayout.addView(makeText("音乐信息", COLOR_TEXT_PRIMARY, px(18), true, Gravity.CENTER));
+        View theTitle = makeText("音乐信息", COLOR_TEXT_PRIMARY, px(18), true, Gravity.CENTER);
+        contentLayout.addView(theTitle);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, theTitle);
         contentLayout.addView(makeSpacer(px(8)));
 
         // Loading indicator

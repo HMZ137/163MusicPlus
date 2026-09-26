@@ -128,6 +128,7 @@ public class AlbumDetailActivity extends BaseWatchActivity {
         root.addView(lvSongs);
 
         setContentView(root);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar);
 
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, displayList) {
             @Override

@@ -167,6 +167,7 @@ public class UpdateActivity extends BaseWatchActivity {
 
         scrollView.addView(root);
         setContentView(scrollView);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, tvTitle);
     }
 
     private void loadTargetVersionInfo() {

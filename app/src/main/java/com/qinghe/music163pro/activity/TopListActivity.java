@@ -82,6 +82,7 @@ public class TopListActivity extends BaseWatchActivity {
         root.addView(lvTopList);
 
         setContentView(root);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
 
         adapter = new ArrayAdapter<TopListItem>(this, R.layout.item_song, R.id.tv_item_name, items) {
             @Override

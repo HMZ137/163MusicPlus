@@ -108,7 +108,9 @@ public class CommentFloorActivity extends BaseWatchActivity {
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        root.addView(buildTopBar());
+        View topBar = buildTopBar();
+        root.addView(topBar);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, topBar);
         root.addView(buildScrollArea(), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(buildBottomBar());

@@ -190,13 +190,14 @@ public class LocalMusicActivity extends BaseWatchActivity {
         scanning = true;
         final int generation = ++scanGeneration;
         setTitleText("扫描中…");
+        updateEmptyState();
         new Thread(() -> {
             final List<Song> found = scanLocalAudio();
+            final int total = found.size();
             mainHandler.post(() -> {
                 if (generation != scanGeneration) {
                     return;
                 }
-                scanning = false;
                 localSongs.clear();
                 localSongs.addAll(found);
                 // 扫描结果写进缓存：下次启动不必等扫描完就能解析本地歌路径
@@ -205,10 +206,16 @@ public class LocalMusicActivity extends BaseWatchActivity {
                 if (adapter != null) {
                     adapter.notifyDataSetChanged();
                 }
+                // 文件扫完、列表出来了，但曲名/封面还要逐首读标签（后台跑，可能十几秒）。
+                // 先把标题保持在「加载中」状态，否则用户看到「本地音乐 N首」、却半天歌名
+                // 还是文件名、列表也不再动，会以为卡死了。
+                if (total > 0) {
+                    setTitleText("读取歌曲信息中… (0/" + total + ")");
+                }
                 updateEmptyState();
             });
             // 列表已经显示出来之后，再慢慢补元信息（不阻塞「先看到歌单」）
-            readMetadata(found, generation);
+            readMetadata(found, generation, total);
         }).start();
     }
 
@@ -329,7 +336,7 @@ public class LocalMusicActivity extends BaseWatchActivity {
      * <p>两个提前退出的条件：换了一轮扫描（{@code generation} 变了），或者页面已经关了。
      * 后者是必要的 —— 这几百次音频解析很贵，用户点一下就退出的话不该继续烧电。</p>
      */
-    private void readMetadata(List<Song> songs, int generation) {
+    private void readMetadata(List<Song> songs, int generation, int total) {
         boolean changed = false;
         int processed = 0;
         for (Song song : songs) {
@@ -361,28 +368,42 @@ public class LocalMusicActivity extends BaseWatchActivity {
                     changed = true;
                 }
             }
-            // 边补边刷新：让用户看到名字一个个变正确，而不是一次性跳变
-            if (processed % METADATA_NOTIFY_EVERY == 0) {
+            // 边补边刷新：让用户看到名字一个个变正确，而不是一次性跳变；
+            // 同时把进度写进标题，明确表示「还在加载」，避免被误判卡死。
+            if (processed % METADATA_NOTIFY_EVERY == 0 || processed == total) {
+                final int p = processed;
                 mainHandler.post(() -> {
                     if (generation == scanGeneration && adapter != null) {
                         adapter.notifyDataSetChanged();
                     }
+                    if (generation == scanGeneration && total > 0) {
+                        setTitleText("读取歌曲信息中… (" + p + "/" + total + ")");
+                    }
                 });
             }
         }
-        if (!changed) {
+        // 不论有没有字段变化都走收尾：否则 changed=false 时会永远停在「读取歌曲信息中…」。
+        // changed 在循环里被赋值，不是 effectively final，lambda 捕获前先落到 final 变量上。
+        final boolean changedFinal = changed;
+        mainHandler.post(() -> finalizeScan(generation, changedFinal));
+    }
+
+    /**
+     * 扫描 / 读标签收尾：曲名换成元信息里的之后字母归属可能变了，重排一次；
+     * 然后关掉加载态，标题切回正式的「本地音乐 (N首)」。
+     */
+    private void finalizeScan(int generation, boolean changed) {
+        if (generation != scanGeneration || isFinishing() || isDestroyed()) {
             return;
         }
-        mainHandler.post(() -> {
-            if (generation != scanGeneration) {
-                return;
-            }
-            // 曲名换成元信息里的之后，字母归属可能变了，重排一次
+        if (changed) {
             sortAndIndex();
             if (adapter != null) {
                 adapter.notifyDataSetChanged();
             }
-        });
+        }
+        scanning = false;
+        updateEmptyState();
     }
 
     // ==================== 排序与首字母索引 ====================
@@ -544,15 +565,18 @@ public class LocalMusicActivity extends BaseWatchActivity {
     }
 
     private void updateEmptyState() {
-        if (scanning) {
-            setTitleText("扫描中…");
-        } else {
-            setTitleText("本地音乐 (" + localSongs.size() + "首)");
-        }
         boolean empty = localSongs.isEmpty();
+        if (scanning) {
+            // 加载中：保留当前阶段标题（扫描中… / 读取歌曲信息中…），不要覆盖；
+            // 只管列表 / 空态的可见性，避免「扫描中」把正在显示的进度标题冲掉。
+            tvEmpty.setVisibility(View.GONE);
+            lvSongs.setVisibility(empty ? View.GONE : View.VISIBLE);
+            return;
+        }
+        setTitleText("本地音乐 (" + localSongs.size() + "首)");
         tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         lvSongs.setVisibility(empty ? View.GONE : View.VISIBLE);
-        if (empty && !scanning) {
+        if (empty) {
             tvEmpty.setText("未找到本地音乐");
         }
     }

@@ -44,7 +44,7 @@ public class EditMoreActivity extends BaseWatchActivity {
         itemLabels.put(MoreMenuPreferences.KEY_MUSIC_CLOUD, "音乐云盘");
         itemLabels.put(MoreMenuPreferences.KEY_SEARCH, "搜索");
         itemLabels.put(MoreMenuPreferences.KEY_SONG_RECOGNITION, "听歌识曲");
-        itemLabels.put(MoreMenuPreferences.KEY_DOWNLOADS, "下载列表");
+        itemLabels.put(MoreMenuPreferences.KEY_DOWNLOADS, "本地音乐管理");
         itemLabels.put(MoreMenuPreferences.KEY_RINGTONES, "铃声管理");
         itemLabels.put(MoreMenuPreferences.KEY_TOPLIST, "排行榜");
         itemLabels.put(MoreMenuPreferences.KEY_HISTORY, "历史记录");
@@ -72,6 +72,7 @@ public class EditMoreActivity extends BaseWatchActivity {
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 0, 0, px(8));
         root.addView(title);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
 
         enabledContainer = new LinearLayout(this);
         enabledContainer.setOrientation(LinearLayout.VERTICAL);

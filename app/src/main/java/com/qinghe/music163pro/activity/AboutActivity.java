@@ -52,7 +52,9 @@ public class AboutActivity extends BaseWatchActivity {
         content.setPadding(px(12), px(10), px(12), px(16));
 
         // Title
-        content.addView(makeText("关于", 0xFFFFFFFF, px(22), true, Gravity.CENTER));
+        TextView theTitle = makeText("关于", 0xFFFFFFFF, px(22), true, Gravity.CENTER);
+        content.addView(theTitle);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, theTitle);
 
         // App name
         content.addView(makeSpacer(px(10)));

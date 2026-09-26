@@ -53,6 +53,7 @@ public class PersonalFMActivity extends BaseWatchActivity {
         tvTitle.setPadding(0, 0, 0, dp(16));
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         root.addView(tvTitle);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, tvTitle);
 
         // Description
         TextView tvDesc = new TextView(this);

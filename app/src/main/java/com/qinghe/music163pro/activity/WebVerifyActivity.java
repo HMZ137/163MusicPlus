@@ -117,6 +117,7 @@ public class WebVerifyActivity extends BaseWatchActivity {
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
         setContentView(root);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, hint);
 
         MusicLog.op(TAG, "打开验证WebView", verifyUrl);
         webView.loadUrl(verifyUrl);

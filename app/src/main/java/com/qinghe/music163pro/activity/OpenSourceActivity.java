@@ -29,7 +29,9 @@ public class OpenSourceActivity extends BaseWatchActivity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(px(12), px(10), px(12), px(16));
 
-        content.addView(makeText("开源", 0xFFFFFFFF, px(22), true, Gravity.CENTER));
+        TextView theTitle = makeText("开源", 0xFFFFFFFF, px(22), true, Gravity.CENTER);
+        content.addView(theTitle);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, theTitle);
         content.addView(makeSpacer(px(8)));
         content.addView(makeText(
                 "本仓库采用 MIT License 开源，以下为本项目和使用到的开源项目说明。",

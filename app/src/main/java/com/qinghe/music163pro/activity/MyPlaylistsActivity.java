@@ -86,13 +86,15 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         titleRow.addView(tvTitle);
 
         // "+" button (top-right)
+        // 放大到 40px 并保留点击热区：此前只有 24px，低于触控下限，表盘上极易点不中。
         ImageView btnCreate = new ImageView(this);
         btnCreate.setImageResource(R.drawable.ic_add_box);
         btnCreate.setColorFilter(0xFFBB86FC);
         btnCreate.setClickable(true);
         btnCreate.setFocusable(true);
         android.widget.RelativeLayout.LayoutParams btnParams = new android.widget.RelativeLayout.LayoutParams(
-                px(24), px(24));
+                px(40), px(40));
+        btnParams.setMarginEnd(px(2));
         btnParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
         btnParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         int idCreate = View.generateViewId();
@@ -106,8 +108,8 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         TextView btnAZ = new TextView(this);
         btnAZ.setText("A-Z");
         btnAZ.setTextColor(0xFFBB86FC);
-        btnAZ.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
-        btnAZ.setPadding(px(8), px(4), px(8), px(4));
+        btnAZ.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
+        btnAZ.setPadding(px(10), px(6), px(10), px(6));
         btnAZ.setClickable(true);
         btnAZ.setFocusable(true);
         android.widget.RelativeLayout.LayoutParams azParams = new android.widget.RelativeLayout.LayoutParams(

@@ -42,7 +42,9 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         scroll.addView(root);
         setContentView(scroll);
 
-        root.addView(buildTitleBar());
+        View titleBar = buildTitleBar();
+        root.addView(titleBar);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar);
 
         ivPreview = new ImageView(this);
         ivPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);

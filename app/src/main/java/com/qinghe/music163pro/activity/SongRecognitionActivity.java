@@ -171,6 +171,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
 
         scroll.addView(root);
         setContentView(scroll);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
     }
 
     private void onRecordButtonClick() {
