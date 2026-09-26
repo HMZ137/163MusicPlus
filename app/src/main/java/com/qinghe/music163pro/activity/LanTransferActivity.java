@@ -25,7 +25,7 @@ import java.lang.ref.WeakReference;
 
 /**
  * 局域网传歌：开一个临时 HTTP 服务，同一 WiFi 下的电脑打开 {@code http://<手表IP>:<端口>}
- * 就能把音乐传到手表（默认落到 {@code /sdcard/Music}）。
+ * 就能把文件传到手表：音乐落到 {@code /sdcard/Music}，其它文件落到 {@code /sdcard/TransFiles}。
  *
  * <p>服务跑在 {@link LanTransferService}（前台服务）里，关掉本页不会立刻中断传输；
  * 但**用完记得回来点停止** —— 一直监听端口没必要，也不安全。</p>
@@ -117,7 +117,7 @@ public class LanTransferActivity extends BaseWatchActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         ((TextView) root.getChildAt(root.getChildCount() - 1))
                 .setText("用法：电脑与手表连同一个 WiFi → 用浏览器打开上面的地址 → "
-                        + "选音乐文件上传。用完请回来点「停止」。");
+                        + "选文件上传（音乐进 Music，其它进 TransFiles）。用完请回来点「停止」。");
     }
 
     private TextView bodyText(int color, int sizeSp) {
@@ -221,7 +221,8 @@ public class LanTransferActivity extends BaseWatchActivity {
             tvUrl.setText(ip != null
                     ? "http://" + ip + ":" + server.getPort()
                     : "未获取到局域网 IP（请确认已连 WiFi）");
-            tvDir.setText("保存到：" + server.getSaveDir().getAbsolutePath());
+            tvDir.setText("音乐→ " + server.getSaveDir().getAbsolutePath()
+                    + " ｜ 其它→ " + LanTransferServer.defaultTransFilesDir().getAbsolutePath());
             int count = server.getUploadedCount();
             tvCount.setText(count > 0
                     ? "已接收 " + count + " 个文件（最近：" + server.getLastFileName() + "）"
@@ -230,7 +231,8 @@ public class LanTransferActivity extends BaseWatchActivity {
         } else {
             tvStatus.setText("服务已停止");
             tvUrl.setText("—");
-            tvDir.setText("保存目录：" + LanTransferServer.defaultSaveDir().getAbsolutePath());
+            tvDir.setText("保存目录：音乐→ " + LanTransferServer.defaultSaveDir().getAbsolutePath()
+                    + " ｜ 其它→ " + LanTransferServer.defaultTransFilesDir().getAbsolutePath());
             tvCount.setText("点击下面的按钮开始");
             btnToggle.setText("开始");
         }

@@ -28,8 +28,12 @@ import java.util.Locale;
 
 /**
  * 极简 HTTP 服务：同一局域网下的电脑 / 手机打开 {@code http://<手表IP>:<端口>}，
- * 选好音乐文件直接传上来，落盘到 {@code /sdcard/Music}（本机音乐页本来就在扫这个目录，
- * 所以传完不用做任何额外操作就能在列表里看到）。
+ * 选好文件直接传上来。
+ *
+ * <p><b>目录分流</b>：音乐文件（mp3/wav/flac/m4a/aac/ogg）落盘到 {@code /sdcard/Music}
+ * （本机音乐页本来就在扫这个目录，所以传完不用做任何额外操作就能在列表里看到）；
+ * 其它文件（图片、视频、压缩包、文档等）落盘到 {@code /sdcard/TransFiles}，
+ * 与音乐库分开，避免污染「本机音乐」列表。</p>
  *
  * <h3>为什么手写而不用第三方 HTTP 库</h3>
  * <p>只需要「一个上传页 + 接收一个文件流」，引一整个 HTTP 框架（还要依赖仓库能拉到）
@@ -102,6 +106,31 @@ public final class LanTransferServer {
     /** 默认落盘目录：/sdcard/Music —— 与本机音乐页的扫描根目录保持一致。 */
     public static File defaultSaveDir() {
         return new File(Environment.getExternalStorageDirectory(), "Music");
+    }
+
+    /** 非音乐文件的落盘目录：/sdcard/TransFiles —— 与音乐目录分开，避免污染本机音乐库。 */
+    public static File defaultTransFilesDir() {
+        return new File(Environment.getExternalStorageDirectory(), "TransFiles");
+    }
+
+    /**
+     * 是否为可识别的音乐文件（仅这些扩展名会被登记进「本机音乐」库）。
+     * 与 {@link #defaultSaveDir()} / {@link #defaultTransFilesDir()} 的分工保持一致。
+     */
+    private static boolean isMusicFile(String name) {
+        int dot = name.lastIndexOf('.');
+        String ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : "";
+        switch (ext) {
+            case "mp3":
+            case "wav":
+            case "flac":
+            case "m4a":
+            case "aac":
+            case "ogg":
+                return true;
+            default:
+                return false;
+        }
     }
 
     public File getSaveDir() {
@@ -286,7 +315,8 @@ public final class LanTransferServer {
         String name = queryValue(query, "name");
         String safeName = sanitizeFileName(name);
 
-        File dir = saveDir;
+        // 目录分流：音乐文件进 Music，其它文件进 TransFiles（与音乐库隔离）
+        File dir = isMusicFile(safeName) ? saveDir : defaultTransFilesDir();
         if (!dir.exists() && !dir.mkdirs()) {
             byte[] body = "{\"ok\":false,\"error\":\"无法创建保存目录\"}".getBytes("UTF-8");
             writeResponse(out, 500, "Server Error", "application/json; charset=utf-8", body);
@@ -323,14 +353,19 @@ public final class LanTransferServer {
             return;
         }
 
-        // 存下来就登记进本地音乐库缓存，让它立刻可被解析（不必等下一次扫描）
-        try {
-            Song song = new Song(LocalTracks.idForPath(target.getAbsolutePath()),
-                    safeName, "", "");
-            song.setUrl(target.getAbsolutePath());
-            song.setForceLocalPlayback(true);
-            LocalLibraryCache.put(song);
-        } catch (Exception ignored) {
+        // 仅音乐文件登记进本地音乐库缓存，让它立刻可被解析（不必等下一次扫描）；
+        // 非音乐文件只落盘、不登记，避免污染「本机音乐」列表。
+        if (isMusicFile(safeName)) {
+            try {
+                Song song = new Song(LocalTracks.idForPath(target.getAbsolutePath()),
+                        safeName, "", "");
+                song.setUrl(target.getAbsolutePath());
+                song.setForceLocalPlayback(true);
+                LocalLibraryCache.put(song);
+            } catch (Exception ignored) {
+            }
+        } else {
+            Log.i(TAG, "非音乐文件，仅落盘不登记音乐库: " + target.getAbsolutePath());
         }
 
         uploadedCount++;
@@ -607,9 +642,9 @@ public final class LanTransferServer {
             + "li{padding:6px 0;border-bottom:1px solid #2a2a2a}"
             + ".ok{color:#7ee2a8}.err{color:#ff8a80}.muted{color:#9a9a9a}</style></head>"
             + "<body><h1>传歌到手表</h1>"
-            + "<div class=\"sub\">文件会保存到手表的 <code>/sdcard/Music</code>，"
-            + "传完即可在「本机音乐」里看到。</div>"
-            + "<div class=\"box\"><input id=\"f\" type=\"file\" accept=\"audio/*\" multiple>"
+            + "<div class=\"sub\">音乐文件保存到 <code>/sdcard/Music</code>，"
+            + "其它文件保存到 <code>/sdcard/TransFiles</code>（与音乐库分开）。</div>"
+            + "<div class=\"box\"><input id=\"f\" type=\"file\" accept=\"*/*\" multiple>"
             + "<div><button id=\"b\">开始上传</button></div></div>"
             + "<ul id=\"list\"></ul><script>"
             + "var f=document.getElementById('f'),b=document.getElementById('b'),"
