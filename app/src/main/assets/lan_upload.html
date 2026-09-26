@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>163音乐Pro · 局域网传歌</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#0e1014; --panel:#161922; --panel-2:#1d212b; --line:#282e3a;
+  --text:#e6e9f0; --muted:#8b94a7; --accent:#7c5cff; --ok:#2ee6a8; --danger:#ff5f5f;
+  --r:12px; --shadow:0 8px 24px rgba(0,0,0,.35);
+}
+[data-theme="light"]{
+  --bg:#f4f6fa; --panel:#fff; --panel-2:#f0f2f7; --line:#e3e7ef;
+  --text:#1a1f2b; --muted:#6b7488; --accent:#6a47ff; --shadow:0 6px 20px rgba(20,30,60,.08);
+}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* 顶栏 */
+.topbar{
+  display:flex;align-items:center;gap:12px;padding:10px 16px;
+  border-bottom:1px solid var(--line);background:var(--panel);
+  position:sticky;top:0;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:.2px}
+.brand .logo{
+  width:27px;height:27px;border-radius:9px;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--ok));
+}
+.addr{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:999px;
+  padding:5px 13px;cursor:pointer;font-size:12.5px;color:var(--muted);
+  font-family:ui-monospace,Menlo,Consolas,monospace;transition:.15s;max-width:46vw;
+}
+.addr:hover{color:var(--text);border-color:var(--accent)}
+.addr span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;
+  box-shadow:0 0 0 3px rgba(46,230,168,.16)}
+.icon-btn{
+  width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+  color:var(--muted);transition:.15s;flex:none;
+}
+.icon-btn:hover{background:var(--panel-2);color:var(--text)}
+.icon-btn.on{color:var(--accent)}
+
+/* 主区 */
+main{
+  flex:1;min-height:0;width:100%;max-width:1440px;margin:0 auto;
+  padding:14px;display:grid;gap:14px;
+  grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);overflow:hidden;
+}
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);display:flex;flex-direction:column;
+  min-height:0;overflow:hidden;
+}
+.p-head{
+  display:flex;align-items:center;gap:8px;padding:11px 14px;
+  border-bottom:1px solid var(--line);flex:none;
+}
+.p-head h2{margin:0;font-size:13.5px;font-weight:600;letter-spacing:.2px}
+.pill{
+  background:var(--panel-2);color:var(--muted);border-radius:999px;
+  padding:1px 8px;font-size:11.5px;font-weight:600;
+}
+.p-actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+.p-body{
+  flex:1;min-height:0;overflow:auto;padding:12px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.p-foot{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;
+  border-top:1px solid var(--line);flex:none;
+}
+.p-foot .sum{font-size:12.5px;color:var(--muted);margin-right:auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 按钮 */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 12px;
+  border-radius:9px;border:1px solid var(--line);background:var(--panel-2);
+  font-size:13px;font-weight:500;transition:.15s;white-space:nowrap;
+}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover:not(:disabled){filter:brightness(1.1);color:#fff}
+.btn.ghost{background:transparent}
+
+/* 拖拽区 */
+.dropzone{
+  border:1.5px dashed var(--line);border-radius:10px;padding:26px 16px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  color:var(--muted);font-size:13px;text-align:center;transition:.15s;
+}
+.dropzone svg.i{width:22px;height:22px}
+.dropzone:hover{border-color:var(--accent);color:var(--accent);
+  background:rgba(124,92,255,.06)}
+
+/* 列表 */
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.item{
+  display:flex;align-items:center;gap:10px;padding:7px 10px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
+  transition:.15s;
+}
+.item:hover{border-color:#3c465a}
+[data-theme="light"] .item:hover{border-color:#c9d3e6}
+.item.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel-2))}
+.item.dragging{opacity:.4}
+.chkwrap{display:grid;place-items:center;cursor:pointer;flex:none;padding:0 1px}
+.chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.grip{cursor:grab;color:var(--muted);display:grid;place-items:center;padding:2px 0;flex:none}
+.grip:active{cursor:grabbing}
+.badge{
+  width:34px;height:34px;border-radius:8px;flex:none;display:grid;place-items:center;
+  font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c);
+}
+.meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.fname{
+  width:100%;background:transparent;border:1px solid transparent;border-radius:6px;
+  padding:2px 5px;margin:-2px -5px;font:inherit;color:var(--text);
+  text-overflow:ellipsis;
+}
+.fname:hover{border-color:var(--line);background:var(--panel)}
+.fname:focus{outline:none;border-color:var(--accent);background:var(--panel)}
+.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 0}
+.sub{font-size:11.5px;color:var(--muted);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.item .del:hover{color:var(--danger)}
+.item .icon-btn:disabled{opacity:.3;cursor:not-allowed}
+
+.empty{
+  text-align:center;color:var(--muted);font-size:13px;
+  padding:30px 12px;line-height:2;list-style:none;
+}
+.empty span{font-size:12px;opacity:.72}
+
+/* 进度 */
+.progress{
+  padding:10px 14px;border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:6px;flex:none;
+}
+.progress .row{display:flex;justify-content:space-between;gap:12px;font-size:12px;
+  color:var(--muted)}
+.progress .row .nm{color:var(--text);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.bar{height:6px;background:var(--panel-2);border-radius:999px;overflow:hidden}
+.bar>i{
+  display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--ok));
+  transition:width .2s ease;
+}
+
+/* 全屏拖拽遮罩 */
+body.dropping::after{
+  content:"松开鼠标，添加到待发送列表";
+  position:fixed;inset:0;z-index:100;display:grid;place-items:center;
+  background:rgba(124,92,255,.14);backdrop-filter:blur(4px);
+  border:2px dashed var(--accent);color:var(--accent);
+  font-size:17px;font-weight:600;pointer-events:none;
+}
+
+/* Toast */
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--line);color:var(--text);
+  padding:10px 18px;border-radius:999px;font-size:13px;
+  box-shadow:var(--shadow);z-index:200;animation:up .25s ease;
+}
+.toast.out{opacity:0;transition:.3s}
+@keyframes up{from{opacity:0;transform:translate(-50%,10px)}}
+
+/* 响应式 */
+@media(max-width:900px){
+  main{grid-template-columns:1fr;overflow:auto;padding:12px;gap:12px}
+  .panel{min-height:auto}
+  .p-body{overflow:visible}
+  .addr{max-width:38vw}
+  .p-head .btn span{display:none}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- 图标库 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="16" r="2"/></symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 8a2 2 0 012-2h3.4l2 2H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-3 6.2M20 5v6h-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 9h10v10H9zM15 5H5v10h1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><path d="M12 7a5 5 0 100 10 5 5 0 000-10M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16"/></symbol>
+</svg>
+
+<!-- 顶栏 -->
+<header class="topbar">
+  <div class="brand">
+    <span class="logo"><svg class="i" style="width:15px;height:15px"><use href="#i-note"/></svg></span>
+    <span>局域网传歌</span>
+  </div>
+  <div class="addr" id="addr" title="点击复制访问地址">
+    <span class="dot"></span>
+    <span id="addrText">http://…</span>
+    <svg class="i" style="width:13px;height:13px"><use href="#i-copy"/></svg>
+  </div>
+  <button class="icon-btn" id="themeBtn" title="切换主题">
+    <svg class="i"><use href="#i-moon"/></svg>
+  </button>
+</header>
+
+<main>
+  <!-- 左：待发送 -->
+  <section class="panel">
+    <header class="p-head">
+      <h2>待发送</h2>
+      <span class="pill" id="qCount">0</span>
+      <div class="p-actions">
+        <button class="icon-btn" id="selAll" title="全选 / 取消全选"><svg class="i"><use href="#i-check"/></svg></button>
+        <button class="btn ghost" id="addFiles"><svg class="i"><use href="#i-plus"/></svg><span>文件</span></button>
+        <button class="btn ghost" id="addFolder"><svg class="i"><use href="#i-folder"/></svg><span>文件夹</span></button>
+        <button class="icon-btn" id="clearBtn" title="清空列表"><svg class="i"><use href="#i-trash"/></svg></button>
+      </div>
+    </header>
+
+    <div class="p-body">
+      <div class="dropzone" id="dropzone">
+        <svg class="i"><use href="#i-drop"/></svg>
+        <div>拖拽文件到此处，或点击上方「文件 / 文件夹」添加</div>
+      </div>
+      <ul class="list" id="queue"></ul>
+    </div>
+
+    <div class="progress" id="progress" hidden>
+      <div class="row">
+        <span class="nm" id="pName">准备中…</span>
+        <span id="pStat">0%</span>
+      </div>
+      <div class="bar"><i id="pBar"></i></div>
+    </div>
+
+    <footer class="p-foot">
+      <span class="sum" id="qSize">暂无文件</span>
+      <button class="btn ghost" id="delSel" disabled>删除选中</button>
+      <button class="btn ghost" id="cancelBtn" disabled>取消</button>
+      <button class="btn primary" id="sendBtn" disabled>开始传输</button>
+    </footer>
+  </section>
+
+  <!-- 右：收件箱 -->
+  <section class="panel">
+    <header class="p-head">
+      <h2>收件箱</h2>
+      <span class="pill" id="inCount">0</span>
+      <div class="p-actions">
+        <button class="icon-btn" id="refreshBtn" title="刷新"><svg class="i"><use href="#i-refresh"/></svg></button>
+      </div>
+    </header>
+    <div class="p-body">
+      <ul class="list" id="inbox"></ul>
+    </div>
+  </section>
+</main>
+
+<input type="file" id="fileInput" multiple hidden>
+<input type="file" id="dirInput" webkitdirectory directory multiple hidden>
+
+<script>
+/* ============================================================
+ *  163音乐Pro · 局域网传歌 —— 前端逻辑
+ *  上传：文件以「原始字节流」POST 到 /upload?name=<编码后的文件名>
+ *        （与服务端免 multipart 解析的约定一致）
+ *  收件箱：GET /api/inbox、GET /api/download/:id、DELETE /api/inbox/:id
+ * ============================================================ */
+const $ = s => document.querySelector(s);
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID()
+                                       : Date.now() + Math.random().toString(36).slice(2));
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtSize(b){
+  if (b < 1024) return b + ' B';
+  const u = ['KB','MB','GB','TB'];
+  let i = -1;
+  do { b /= 1024; i++; } while (b >= 1024 && i < u.length - 1);
+  return (b < 10 ? b.toFixed(1) : Math.round(b)) + ' ' + u[i];
+}
+function fmtTime(ts){
+  const d = Date.now() - ts;
+  if (d < 60000)    return '刚刚';
+  if (d < 3600000)  return Math.floor(d / 60000) + ' 分钟前';
+  if (d < 86400000) return Math.floor(d / 3600000) + ' 小时前';
+  return new Date(ts).toLocaleDateString();
+}
+const extOf = n => (String(n).match(/\.([a-z0-9]{1,5})$/i) || [,'FILE'])[1];
+
+/* 按扩展名映射徽标颜色 */
+const TYPE_GROUPS = [
+  { c:'#ff6b6b', e:['mp4','mkv','mov','avi','webm','flv','wmv'] },
+  { c:'#7c5cff', e:['png','jpg','jpeg','gif','webp','svg','bmp','ico','heic','avif','tiff'] },
+  { c:'#2ee6a8', e:['mp3','wav','flac','aac','ogg','m4a','wma'] },
+  { c:'#ffb020', e:['zip','rar','7z','tar','gz','xz','bz2','iso'] },
+  { c:'#4f8cff', e:['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','md','csv','rtf'] },
+  { c:'#00c2ff', e:['js','ts','html','css','py','go','rs','java','c','cpp','h','sh','yml','yaml','json','xml'] },
+];
+function typeColor(name){
+  const e = extOf(name).toLowerCase();
+  for (const g of TYPE_GROUPS) if (g.e.includes(e)) return g.c;
+  return '#8b94a7';
+}
+
+function toast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, 2200);
+}
+function copyText(text){
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch(_) {}
+  ta.remove();
+  return Promise.resolve();
+}
+
+/* 状态 */
+const state = {
+  queue: [],        // { id, file, name, size, status }
+  inbox: [],        // { id, name, size, from, time }
+  sending: false,
+  abort: false,
+  xhr: null,
+  selected: new Set(),   // 多选：待发送列表中被勾选的 id
+};
+
+/* ============================================================
+ *  待发送列表（编辑 + 多选）
+ * ============================================================ */
+const queueEl = $('#queue');
+const dropzone = $('#dropzone');
+
+function renderQueue(){
+  const n = state.queue.length;
+  const total = state.queue.reduce((s, i) => s + i.size, 0);
+  const selN = state.selected.size;
+
+  $('#qCount').textContent = n;
+  $('#qSize').textContent  = n ? `共 ${n} 个文件 · ${fmtSize(total)}` : '暂无文件';
+  $('#sendBtn').disabled   = !n || state.sending;
+  $('#clearBtn').disabled  = !n || state.sending;
+  $('#cancelBtn').disabled = !state.sending;
+  $('#delSel').disabled    = !selN || state.sending;
+  $('#delSel').textContent = selN ? `删除选中 (${selN})` : '删除选中';
+  $('#selAll').classList.toggle('on', n > 0 && selN === n);
+  $('#selAll').classList.toggle('active', selN > 0);
+  dropzone.hidden          = n > 0;
+
+  queueEl.innerHTML = state.queue.map(it => `
+    <li class="item${state.selected.has(it.id) ? ' sel' : ''}" data-id="${it.id}" draggable="false">
+      <label class="chkwrap" title="选择此项">
+        <input type="checkbox" class="chk" ${state.selected.has(it.id) ? 'checked' : ''} ${state.sending ? 'disabled' : ''}>
+      </label>
+      <span class="grip" title="按住拖动排序"><svg class="i"><use href="#i-grip"/></svg></span>
+      <span class="badge" style="--c:${typeColor(it.name)}">${esc(extOf(it.name))}</span>
+      <div class="meta">
+        <input class="fname" value="${esc(it.name)}" spellcheck="false"
+               draggable="false" title="点击可重命名" ${state.sending ? 'readonly' : ''}>
+        <span class="sub">${fmtSize(it.size)}${
+          it.status === 'error' ? ' · <b style="color:var(--danger)">发送失败</b>' : ''
+        }</span>
+      </div>
+      <button class="icon-btn del" title="移除" ${state.sending ? 'disabled' : ''}>
+        <svg class="i"><use href="#i-x"/></svg>
+      </button>
+    </li>`).join('');
+}
+
+function addFiles(fileList){
+  const arr = [...fileList];
+  if (!arr.length) return;
+  for (const f of arr){
+    state.queue.push({
+      id: uid(),
+      file: f,
+      name: f.webkitRelativePath || f.name,
+      size: f.size,
+      status: 'idle',
+    });
+  }
+  renderQueue();
+  toast(`已添加 ${arr.length} 个文件`);
+}
+
+/* 列表事件委托 */
+queueEl.addEventListener('click', e => {
+  const del = e.target.closest('.del');
+  if (del && !state.sending){
+    const id = del.closest('.item').dataset.id;
+    state.queue = state.queue.filter(i => i.id !== id);
+    state.selected.delete(id);
+    renderQueue();
+  }
+});
+queueEl.addEventListener('change', e => {
+  if (!e.target.classList.contains('chk')) return;
+  const id = e.target.closest('.item').dataset.id;
+  if (e.target.checked) state.selected.add(id); else state.selected.delete(id);
+  // 仅局部更新选中态，避免整列重渲染打断勾选手感
+  e.target.closest('.item').classList.toggle('sel', e.target.checked);
+  const selN = state.selected.size;
+  $('#delSel').disabled    = !selN || state.sending;
+  $('#delSel').textContent = selN ? `删除选中 (${selN})` : '删除选中';
+  $('#selAll').classList.toggle('on', state.queue.length > 0 && selN === state.queue.length);
+  $('#selAll').classList.toggle('active', selN > 0);
+});
+queueEl.addEventListener('input', e => {
+  if (!e.target.classList.contains('fname')) return;
+  const id = e.target.closest('.item').dataset.id;
+  const item = state.queue.find(i => i.id === id);
+  if (item) item.name = e.target.value;   // 不重渲染，保留焦点
+});
+
+/* 拖拽排序（仅在按住手柄时启用） */
+queueEl.addEventListener('mousedown', e => {
+  const grip = e.target.closest('.grip');
+  if (grip) grip.closest('.item').draggable = true;
+});
+document.addEventListener('mouseup', () => {
+  if (!queueEl.querySelector('.dragging')){
+    queueEl.querySelectorAll('.item').forEach(el => el.draggable = false);
+  }
+});
+queueEl.addEventListener('dragstart', e => {
+  const li = e.target.closest('.item');
+  if (!li) return;
+  li.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', li.dataset.id);
+});
+queueEl.addEventListener('dragover', e => {
+  e.preventDefault();
+  const dragging = queueEl.querySelector('.dragging');
+  if (!dragging) return;
+  const after = [...queueEl.querySelectorAll('.item:not(.dragging)')].find(el => {
+    const r = el.getBoundingClientRect();
+    return e.clientY < r.top + r.height / 2;
+  });
+  after ? queueEl.insertBefore(dragging, after) : queueEl.appendChild(dragging);
+});
+queueEl.addEventListener('dragend', () => {
+  const li = queueEl.querySelector('.dragging');
+  if (li){ li.classList.remove('dragging'); li.draggable = false; }
+  const order = [...queueEl.querySelectorAll('.item')].map(el => el.dataset.id);
+  state.queue.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+});
+
+/* 添加文件入口 */
+$('#addFiles').addEventListener('click', () => $('#fileInput').click());
+$('#addFolder').addEventListener('click', () => $('#dirInput').click());
+$('#fileInput').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+$('#dirInput').addEventListener('change',  e => { addFiles(e.target.files); e.target.value = ''; });
+
+/* 清空 */
+$('#clearBtn').addEventListener('click', () => {
+  if (!state.queue.length || state.sending) return;
+  if (confirm(`确定清空 ${state.queue.length} 个待发送文件？`)){
+    state.queue = [];
+    state.selected.clear();
+    renderQueue();
+  }
+});
+
+/* 多选：全选 / 取消全选 */
+$('#selAll').addEventListener('click', () => {
+  if (state.sending) return;
+  const allSelected = state.queue.length > 0 && state.selected.size === state.queue.length;
+  if (allSelected) state.selected.clear();
+  else state.queue.forEach(i => state.selected.add(i.id));
+  renderQueue();
+});
+
+/* 多选：批量删除 */
+$('#delSel').addEventListener('click', () => {
+  if (state.sending || !state.selected.size) return;
+  state.queue = state.queue.filter(i => !state.selected.has(i.id));
+  state.selected.clear();
+  renderQueue();
+  toast('已移除选中文件');
+});
+
+/* 全局拖拽投放 */
+let dragDepth = 0;
+const hasFiles = e => [...(e.dataTransfer && e.dataTransfer.types || [])].includes('Files');
+document.addEventListener('dragenter', e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  document.body.classList.add('dropping');
+});
+document.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) document.body.classList.remove('dropping');
+});
+document.addEventListener('drop', e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('dropping');
+  if (!state.sending) addFiles(e.dataTransfer.files);
+});
+
+/* ============================================================
+ *  上传（原始字节流 → /upload?name=）
+ * ============================================================ */
+function uploadItem(item, onProgress){
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload?name=' + encodeURIComponent(item.name));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) onProgress(e.loaded, e.total);
+    };
+    xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300)
+                      ? resolve(xhr.responseText)
+                      : reject(new Error('HTTP ' + xhr.status));
+    xhr.onerror = () => reject(new Error('网络错误'));
+    xhr.onabort = () => reject(new Error('已取消'));
+
+    state.xhr = xhr;
+    xhr.send(item.file);   // 直接把文件本体作为请求体
+  });
+}
+
+async function startTransfer(){
+  if (state.sending || !state.queue.length) return;
+
+  state.sending = true;
+  state.abort   = false;
+  $('#sendBtn').disabled  = true;
+  $('#cancelBtn').disabled = false;
+  $('#clearBtn').disabled = true;
+  $('#delSel').disabled   = true;
+  $('#selAll').disabled   = true;
+  $('#progress').hidden   = false;
+  renderQueue();
+
+  const items     = [...state.queue];
+  const totalAll  = items.reduce((s, i) => s + i.size, 0);
+  let   doneBytes = 0;
+
+  for (const item of items){
+    if (state.abort) break;
+
+    $('#pName').textContent = item.name;
+    item.status = 'sending';
+
+    try {
+      await uploadItem(item, (loaded) => {
+        const overall = doneBytes + loaded;
+        const pct = totalAll ? (overall / totalAll) * 100 : 0;
+        $('#pBar').style.width = pct + '%';
+        $('#pStat').textContent = `${fmtSize(overall)} / ${fmtSize(totalAll)} · ${Math.round(pct)}%`;
+      });
+
+      doneBytes += item.size;
+      state.queue = state.queue.filter(i => i.id !== item.id);
+      state.selected.delete(item.id);
+      renderQueue();
+    } catch (err){
+      item.status = 'error';
+      renderQueue();
+      if (state.abort) break;
+      toast(`「${item.name}」发送失败`);
+    }
+  }
+
+  const aborted = state.abort;
+  state.sending = false;
+  state.abort   = false;
+  state.xhr     = null;
+
+  $('#progress').hidden    = true;
+  $('#pBar').style.width   = '0%';
+  $('#cancelBtn').disabled = true;
+  $('#selAll').disabled    = false;
+  renderQueue();
+
+  if (aborted)            toast('已取消传输');
+  else if (!state.queue.length) toast('全部传输完成 ✓');
+
+  loadInbox();
+}
+
+$('#sendBtn').addEventListener('click', startTransfer);
+$('#cancelBtn').addEventListener('click', () => {
+  state.abort = true;
+  if (state.xhr) state.xhr.abort();
+});
+
+/* ============================================================
+ *  收件箱
+ * ============================================================ */
+const inboxEl = $('#inbox');
+
+function renderInbox(){
+  $('#inCount').textContent = state.inbox.length;
+
+  if (!state.inbox.length){
+    inboxEl.innerHTML = `<li class="empty">
+      暂无接收文件<br><span>通过本机地址传来的文件会出现在这里，可下载回电脑或删除</span>
+    </li>`;
+    return;
+  }
+
+  inboxEl.innerHTML = state.inbox.map(f => `
+    <li class="item" data-id="${esc(f.id)}">
+      <span class="badge" style="--c:${typeColor(f.name)}">${esc(extOf(f.name))}</span>
+      <div class="meta">
+        <div class="name" title="${esc(f.name)}">${esc(f.name)}</div>
+        <span class="sub">来自 ${esc(f.from || '未知设备')} · ${fmtSize(f.size)} · ${fmtTime(f.time)}</span>
+      </div>
+      <a class="icon-btn" href="/api/download/${encodeURIComponent(f.id)}"
+         title="下载" download><svg class="i"><use href="#i-dl"/></svg></a>
+      <button class="icon-btn del" title="删除"><svg class="i"><use href="#i-x"/></svg></button>
+    </li>`).join('');
+}
+
+inboxEl.addEventListener('click', async e => {
+  const del = e.target.closest('.del');
+  if (!del) return;
+  const id = del.closest('.item').dataset.id;
+  try {
+    await fetch('/api/inbox/' + encodeURIComponent(id), { method: 'DELETE' });
+  } catch (_) { /* 网络错误也乐观更新 UI */ }
+  state.inbox = state.inbox.filter(f => f.id !== id);
+  renderInbox();
+});
+
+async function loadInbox(){
+  try {
+    const r = await fetch('/api/inbox', { cache: 'no-store' });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    state.inbox = Array.isArray(data) ? data : (data.items || []);
+  } catch (_) {
+    state.inbox = [];
+  }
+  renderInbox();
+}
+$('#refreshBtn').addEventListener('click', loadInbox);
+
+/* ============================================================
+ *  顶栏：地址复制 / 主题切换
+ * ============================================================ */
+$('#addrText').textContent = location.origin;
+$('#addr').addEventListener('click', async () => {
+  await copyText(location.origin);
+  toast('访问地址已复制');
+});
+
+const themeBtn = $('#themeBtn');
+function setTheme(t){
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('theme', t); } catch (_) {}
+  themeBtn.querySelector('use').setAttribute('href', t === 'dark' ? '#i-moon' : '#i-sun');
+}
+themeBtn.addEventListener('click', () => {
+  setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+try {
+  setTheme(localStorage.getItem('theme')
+    || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+} catch (_) {
+  setTheme('dark');
+}
+
+/* 初始化 */
+renderQueue();
+loadInbox();
+setInterval(() => { if (!state.sending) loadInbox(); }, 8000);   // 轮询收件箱
+</script>
+</body>
+</html>

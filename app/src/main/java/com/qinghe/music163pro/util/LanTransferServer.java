@@ -9,6 +9,7 @@ import com.qinghe.music163pro.model.Song;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -18,7 +19,11 @@ import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -32,8 +37,9 @@ import java.util.Locale;
  *
  * <h3>为什么不用 multipart</h3>
  * <p>标准表单上传是 {@code multipart/form-data}，服务端要按边界切分、解析各段头部；
- * 而浏览器可以用 XHR **把文件本体直接当请求体** POST 上来（见 {@link #INDEX_HTML} 里的
- * 前端代码），服务端按 {@code Content-Length} 读满字节写盘即可 —— 省掉一整层解析。</p>
+ * 而浏览器可以用 XHR **把文件本体直接当请求体** POST 上来（见 {@link #FALLBACK_HTML} 里的
+ * 前端代码，正式页面在 assets/lan_upload.html 里注入），服务端按 {@code Content-Length}
+ * 读满字节写盘即可 —— 省掉一整层解析。</p>
  *
  * <h3>注意事项</h3>
  * <ul>
@@ -59,6 +65,31 @@ public final class LanTransferServer {
     private volatile int uploadedCount;
     private volatile String lastFileName;
     private final File saveDir;
+
+    /** 美化后的上传页（从 assets 读取注入；为空时回退到内置精简页）。 */
+    private String indexHtml;
+    /** 已接收文件列表，供「收件箱」面板展示与回下载。单线程处理连接，synchronized 仅作保险。 */
+    private final List<ReceivedFile> received = Collections.synchronizedList(new ArrayList<>());
+    private long rxSeq = 0;
+
+    /** 已接收到的文件（用于「收件箱」面板展示与回下载）。 */
+    private static final class ReceivedFile {
+        final String id;
+        final String name;
+        final long size;
+        final long time;
+        final String from;
+        final String path;
+
+        ReceivedFile(String id, String name, long size, long time, String from, String path) {
+            this.id = id;
+            this.name = name;
+            this.size = size;
+            this.time = time;
+            this.from = from;
+            this.path = path;
+        }
+    }
 
     public LanTransferServer() {
         this(defaultSaveDir());
@@ -91,6 +122,15 @@ public final class LanTransferServer {
 
     public String getLastFileName() {
         return lastFileName;
+    }
+
+    /** 注入美化后的上传页内容（通常来自 assets/lan_upload.html）。 */
+    public void setIndexHtml(String html) {
+        this.indexHtml = html;
+    }
+
+    private String getIndexHtml() {
+        return indexHtml != null ? indexHtml : FALLBACK_HTML;
     }
 
     /**
@@ -219,10 +259,16 @@ public final class LanTransferServer {
             }
 
             if ("GET".equalsIgnoreCase(method) && ("/".equals(path) || "/index.html".equals(path))) {
-                byte[] body = INDEX_HTML.getBytes("UTF-8");
+                byte[] body = getIndexHtml().getBytes("UTF-8");
                 writeResponse(out, 200, "OK", "text/html; charset=utf-8", body);
             } else if ("POST".equalsIgnoreCase(method) && "/upload".equals(path)) {
-                handleUpload(in, out, query, contentLength);
+                handleUpload(socket, in, out, query, contentLength);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/inbox".equals(path)) {
+                handleInboxList(out);
+            } else if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/download/")) {
+                handleDownload(out, path.substring("/api/download/".length()));
+            } else if ("DELETE".equalsIgnoreCase(method) && path.startsWith("/api/inbox/")) {
+                handleInboxDelete(out, path.substring("/api/inbox/".length()));
             } else {
                 byte[] body = "{\"ok\":false,\"error\":\"not found\"}".getBytes("UTF-8");
                 writeResponse(out, 404, "Not Found", "application/json; charset=utf-8", body);
@@ -235,7 +281,7 @@ public final class LanTransferServer {
         }
     }
 
-    private void handleUpload(InputStream in, OutputStream out, String query, int contentLength)
+    private void handleUpload(Socket socket, InputStream in, OutputStream out, String query, int contentLength)
             throws Exception {
         String name = queryValue(query, "name");
         String safeName = sanitizeFileName(name);
@@ -291,8 +337,120 @@ public final class LanTransferServer {
         lastFileName = safeName;
         Log.i(TAG, "收到文件: " + target.getAbsolutePath() + " (" + written + " 字节)");
 
+        // 登记进「收件箱」，前端可在网页上看到、回下载、删除
+        String from = (socket.getInetAddress() != null)
+                ? socket.getInetAddress().getHostAddress() : "未知设备";
+        String rxId = "rx" + (++rxSeq);
+        received.add(new ReceivedFile(rxId, safeName, written, System.currentTimeMillis(), from,
+                target.getAbsolutePath()));
+
         String json = "{\"ok\":true,\"name\":\"" + jsonEscape(safeName) + "\",\"size\":" + written + "}";
         writeResponse(out, 200, "OK", "application/json; charset=utf-8", json.getBytes("UTF-8"));
+    }
+
+    // ==================== 收件箱（已接收文件）接口 ====================
+
+    private void handleInboxList(OutputStream out) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        sb.append('[');
+        synchronized (received) {
+            for (int i = 0; i < received.size(); i++) {
+                ReceivedFile f = received.get(i);
+                if (i > 0) sb.append(',');
+                sb.append("{\"id\":\"").append(f.id).append('"')
+                  .append(",\"name\":\"").append(jsonEscape(f.name)).append('"')
+                  .append(",\"size\":").append(f.size)
+                  .append(",\"from\":\"").append(jsonEscape(f.from)).append('"')
+                  .append(",\"time\":").append(f.time)
+                  .append('}');
+            }
+        }
+        sb.append(']');
+        writeResponse(out, 200, "OK", "application/json; charset=utf-8", sb.toString().getBytes("UTF-8"));
+    }
+
+    private void handleInboxDelete(OutputStream out, String id) throws Exception {
+        ReceivedFile hit = null;
+        synchronized (received) {
+            for (int i = 0; i < received.size(); i++) {
+                if (received.get(i).id.equals(id)) {
+                    hit = received.remove(i);
+                    break;
+                }
+            }
+        }
+        if (hit != null) {
+            try { new File(hit.path).delete(); } catch (Exception ignored) { }
+        }
+        String json = "{\"ok\":true,\"removed\":" + (hit != null) + "}";
+        writeResponse(out, 200, "OK", "application/json; charset=utf-8", json.getBytes("UTF-8"));
+    }
+
+    private void handleDownload(OutputStream out, String id) throws Exception {
+        ReceivedFile hit = null;
+        synchronized (received) {
+            for (ReceivedFile f : received) {
+                if (f.id.equals(id)) { hit = f; break; }
+            }
+        }
+        if (hit == null) {
+            byte[] body = "{\"ok\":false,\"error\":\"not found\"}".getBytes("UTF-8");
+            writeResponse(out, 404, "Not Found", "application/json; charset=utf-8", body);
+            return;
+        }
+        File file = new File(hit.path);
+        if (!file.exists()) {
+            byte[] body = "{\"ok\":false,\"error\":\"file missing\"}".getBytes("UTF-8");
+            writeResponse(out, 404, "Not Found", "application/json; charset=utf-8", body);
+            return;
+        }
+        String ascii = hit.name.replaceAll("[^\\x20-\\x7e]", "_");
+        String encoded = URLEncoder.encode(hit.name, "UTF-8").replace("+", "%20");
+        String disposition = "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" + encoded;
+        streamFile(out, file, mimeOf(hit.name), disposition);
+    }
+
+    /** 以分块方式把文件写回 socket（避免大文件一次性读入内存）。 */
+    private void streamFile(OutputStream out, File file, String contentType, String disposition)
+            throws Exception {
+        StringBuilder h = new StringBuilder();
+        h.append("HTTP/1.1 200 OK\r\n");
+        h.append("Content-Type: ").append(contentType).append("\r\n");
+        h.append("Content-Length: ").append(file.length()).append("\r\n");
+        h.append("Content-Disposition: ").append(disposition).append("\r\n");
+        h.append("Connection: close\r\n");
+        h.append("\r\n");
+        out.write(h.toString().getBytes("ISO-8859-1"));
+        byte[] buf = new byte[BUFFER_SIZE];
+        try (FileInputStream fis = new FileInputStream(file)) {
+            int n;
+            while ((n = fis.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+        }
+        out.flush();
+    }
+
+    private static String mimeOf(String name) {
+        int dot = name.lastIndexOf('.');
+        String ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : "";
+        switch (ext) {
+            case "mp3":  return "audio/mpeg";
+            case "wav":  return "audio/wav";
+            case "flac": return "audio/flac";
+            case "m4a":
+            case "aac":  return "audio/mp4";
+            case "ogg":  return "audio/ogg";
+            case "png":  return "image/png";
+            case "jpg":
+            case "jpeg": return "image/jpeg";
+            case "gif":  return "image/gif";
+            case "webp": return "image/webp";
+            case "mp4":  return "video/mp4";
+            case "txt":  return "text/plain; charset=utf-8";
+            case "json": return "application/json";
+            default:     return "application/octet-stream";
+        }
     }
 
     private static void writeResponse(OutputStream out, int code, String status,
@@ -428,33 +586,32 @@ public final class LanTransferServer {
         return null;
     }
 
-    /** 上传页。文件以「原始字节流」POST 到 /upload，服务端免掉 multipart 解析。 */
-    private static final String INDEX_HTML = ""
+    /**
+     * 内置回退页：仅在 assets/lan_upload.html 没能注入成功时才用上（极少发生，
+     * 比如资源被裁剪）。保持最精简可传即可，不追求美观 —— 真正的美化页在 assets 里。
+     *
+     * <p>文件仍以「原始字节流」POST 到 /upload，服务端免掉 multipart 解析。</p>
+     */
+    private static final String FALLBACK_HTML = ""
             + "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
             + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             + "<title>163音乐Pro · 传歌到手表</title>"
-            + "<style>"
-            + "body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;"
-            + "background:#121212;color:#eee;margin:0;padding:24px;line-height:1.6}"
-            + "h1{font-size:20px;margin:0 0 4px}"
-            + ".sub{color:#9a9a9a;font-size:13px;margin-bottom:20px}"
-            + ".box{border:1px dashed #4a4a4a;border-radius:10px;padding:24px;text-align:center}"
-            + "button{background:#BB86FC;color:#1d1d1d;border:0;border-radius:8px;"
-            + "padding:10px 18px;font-size:14px;cursor:pointer;margin-top:12px}"
-            + "button:disabled{opacity:.5;cursor:default}"
+            + "<style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,"
+            + "sans-serif;background:#121212;color:#eee;margin:0;padding:24px;line-height:1.6}"
+            + "h1{font-size:20px;margin:0 0 4px}.sub{color:#9a9a9a;font-size:13px;"
+            + "margin-bottom:20px}.box{border:1px dashed #4a4a4a;border-radius:10px;"
+            + "padding:24px;text-align:center}button{background:#BB86FC;color:#1d1d1d;"
+            + "border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;"
+            + "margin-top:12px}button:disabled{opacity:.5;cursor:default}"
             + "ul{list-style:none;padding:0;margin-top:18px;font-size:13px}"
             + "li{padding:6px 0;border-bottom:1px solid #2a2a2a}"
-            + ".ok{color:#7ee2a8}.err{color:#ff8a80}.muted{color:#9a9a9a}"
-            + "</style></head><body>"
-            + "<h1>传歌到手表</h1>"
+            + ".ok{color:#7ee2a8}.err{color:#ff8a80}.muted{color:#9a9a9a}</style></head>"
+            + "<body><h1>传歌到手表</h1>"
             + "<div class=\"sub\">文件会保存到手表的 <code>/sdcard/Music</code>，"
             + "传完即可在「本机音乐」里看到。</div>"
-            + "<div class=\"box\">"
-            + "<input id=\"f\" type=\"file\" accept=\"audio/*\" multiple>"
-            + "<div><button id=\"b\">开始上传</button></div>"
-            + "</div>"
-            + "<ul id=\"list\"></ul>"
-            + "<script>"
+            + "<div class=\"box\"><input id=\"f\" type=\"file\" accept=\"audio/*\" multiple>"
+            + "<div><button id=\"b\">开始上传</button></div></div>"
+            + "<ul id=\"list\"></ul><script>"
             + "var f=document.getElementById('f'),b=document.getElementById('b'),"
             + "list=document.getElementById('list');"
             + "function one(file){return new Promise(function(res,rej){"
@@ -474,12 +631,10 @@ public final class LanTransferServer {
             + "b.onclick=function(){var files=f.files;if(!files.length){"
             + "var li=document.createElement('li');li.className='muted';"
             + "li.textContent='请先选择文件';list.appendChild(li);return;}"
-            + "b.disabled=true;"
-            + "var p=Promise.resolve();"
+            + "b.disabled=true;var p=Promise.resolve();"
             + "for(var i=0;i<files.length;i++){(function(file){"
             + "p=p.then(function(){return one(file);});})(files[i]);}"
             + "p.then(function(){b.disabled=false;var li=document.createElement('li');"
             + "li.className='ok';li.textContent='全部完成';list.appendChild(li);})"
-            + ".catch(function(){b.disabled=false;});};"
-            + "</script></body></html>";
+            + ".catch(function(){b.disabled=false;});};</script></body></html>";
 }

@@ -8,11 +8,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
 import com.qinghe.music163pro.util.LanTransferServer;
 import com.qinghe.music163pro.util.LocalLibraryCache;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 /**
  * 局域网传歌的宿主服务。
@@ -45,6 +49,8 @@ public class LanTransferService extends Service {
         LocalLibraryCache.init(this);
         if (server == null) {
             server = new LanTransferServer();
+            // 注入美化后的上传页（参考 UI.html 的 LAN Drop 设计）；读不到就用内置回退页
+            injectLanUploadPage(server);
         }
         if (!server.isRunning()) {
             server.start();
@@ -70,6 +76,28 @@ public class LanTransferService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    /** 从 assets 读取美化后的上传页并注入到服务。读不到（极端情况）就保持内置回退页。 */
+    private void injectLanUploadPage(LanTransferServer server) {
+        InputStream ais = null;
+        try {
+            ais = getAssets().open("lan_upload.html");
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = ais.read(buf)) > 0) {
+                bos.write(buf, 0, n);
+            }
+            server.setIndexHtml(new String(bos.toByteArray(), "UTF-8"));
+            Log.i("LanTransferService", "已注入美化上传页 lan_upload.html");
+        } catch (Exception e) {
+            Log.w("LanTransferService", "读取 lan_upload.html 失败，使用内置回退页", e);
+        } finally {
+            if (ais != null) {
+                try { ais.close(); } catch (Exception ignored) { }
+            }
+        }
     }
 
     private Notification buildNotification() {
