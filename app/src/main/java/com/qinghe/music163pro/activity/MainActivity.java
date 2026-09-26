@@ -664,10 +664,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Swipe right to dismiss + click to dismiss
         addSwipeToDismiss(overlayContainer);
 
-        // Content layout - centered, scrollable
+        // Content layout - centered, scrollable.
+        // 必须 MATCH_PARENT：用 WRAP_CONTENT 时 ScrollView 高度等于内容高度，
+        // 在 378×496 的小屏上「播放列表」(第 5 行) 会被挤到屏幕外且完全没有滚动余量，
+        // 导致点不到。MATCH_PARENT 才有滚动区间把底部项露出来。
         ScrollView scrollView = new ScrollView(this);
         FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
         scrollParams.gravity = Gravity.CENTER;
         scrollView.setLayoutParams(scrollParams);
         scrollView.setOnClickListener(v -> { /* consume click */ });
