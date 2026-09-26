@@ -4215,7 +4215,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * be fetched the default background is used.
      */
     private void updateCoverBackground() {
-        if (!BackgroundUtil.MODE_COVER.equals(BackgroundUtil.getMode(this))) {
+        if (!BackgroundUtil.isCoverMode(BackgroundUtil.getMode(this))) {
             return;
         }
         final View root = getWindow().getDecorView().findViewById(android.R.id.content);
@@ -4225,6 +4225,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             if (BackgroundUtil.hasCoverBackground(cover)) {
                 BackgroundUtil.applyBackground(this, root);
             } else {
+                // 封面优先模式：封面还在异步加载时，先用自定义图（若存在）垫着，
+                // 避免空窗；封面就绪后会再调一次 applyBackground 顶上来。
+                if (BackgroundUtil.MODE_COVER_OR_CUSTOM.equals(BackgroundUtil.getMode(this))) {
+                    BackgroundUtil.applyBackground(this, root);
+                }
                 BackgroundUtil.loadCoverBackground(this, cover,
                         () -> BackgroundUtil.applyBackground(this, root));
             }

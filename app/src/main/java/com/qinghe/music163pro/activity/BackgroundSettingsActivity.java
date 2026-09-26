@@ -56,7 +56,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         root.addView(ivPreview);
 
         TextView hint = new TextView(this);
-        hint.setText("默认跟随专辑封面：每播放一首歌自动以其封面为背景（获取失败用默认背景）");
+        hint.setText("背景模式：跟随专辑封面 / 封面优先（有封面用封面，无封面用下方选定图片）/ 使用选定图片 / 默认背景。选「封面优先」前请先「选择图片」作为无封面的回退。");
         hint.setTextColor(0x80FFFFFF);
         hint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         hint.setGravity(Gravity.CENTER);
@@ -65,6 +65,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
 
         root.addView(buildButton("选择图片", v -> pickImage()));
         root.addView(buildButton("使用专辑封面", v -> useAlbumCover()));
+        root.addView(buildButton("封面优先（无封面用图片）", v -> useCoverOrCustom()));
         root.addView(buildButton("恢复默认背景", v -> resetBackground()));
 
         refreshPreview();
@@ -168,6 +169,29 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         });
     }
 
+    private void useCoverOrCustom() {
+        BackgroundUtil.setMode(this, BackgroundUtil.MODE_COVER_OR_CUSTOM);
+        final Song song = MusicPlayerManager.getInstance().getBackgroundSong();
+        if (song == null) {
+            refreshPreview();
+            Toast.makeText(this, "暂无歌曲，有封面时自动用封面", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String coverUrl = song.getCoverUrl();
+        if (coverUrl != null && !coverUrl.isEmpty()) {
+            Toast.makeText(this, "正在获取专辑封面...", Toast.LENGTH_SHORT).show();
+            BackgroundUtil.loadCoverBackground(this, coverUrl, () -> {
+                refreshPreview();
+                boolean ok = BackgroundUtil.hasCoverBackground(coverUrl);
+                Toast.makeText(this, ok ? "有封面时用封面，无封面时用图片"
+                        : "暂无封面，已使用选定图片", Toast.LENGTH_SHORT).show();
+            });
+        } else {
+            refreshPreview();
+            Toast.makeText(this, "暂无封面，已使用选定图片", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void resetBackground() {
         BackgroundUtil.setMode(this, BackgroundUtil.MODE_DEFAULT);
         BackgroundUtil.clearBackground(this);
@@ -178,33 +202,49 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
 
     private void refreshPreview() {
         String mode = BackgroundUtil.getMode(this);
-        if (BackgroundUtil.MODE_COVER.equals(mode)) {
+        if (BackgroundUtil.MODE_COVER.equals(mode)
+                || BackgroundUtil.MODE_COVER_OR_CUSTOM.equals(mode)) {
             Bitmap cover = BackgroundUtil.getCoverBackground();
             if (cover != null) {
                 ivPreview.setBackgroundColor(0xFF1E1E1E);
                 ivPreview.setImageDrawable(new BitmapDrawable(getResources(), cover));
-            } else {
-                ivPreview.setImageDrawable(null);
-                ivPreview.setBackgroundColor(0xFF1E1E1E);
+                return;
             }
+            // 封面优先：封面空白时，若有自定义图则预览自定义图，否则灰底。
+            if (BackgroundUtil.MODE_COVER_OR_CUSTOM.equals(mode) && decodeAndShowCustom()) {
+                return;
+            }
+            ivPreview.setImageDrawable(null);
+            ivPreview.setBackgroundColor(0xFF1E1E1E);
             return;
         }
-        if (BackgroundUtil.MODE_CUSTOM.equals(mode) && BackgroundUtil.hasCustomBackground(this)) {
-            try {
-                BitmapFactory.Options opts = new BitmapFactory.Options();
-                opts.inSampleSize = 2;
-                Bitmap bmp = BitmapFactory.decodeFile(
-                        BackgroundUtil.getBackgroundFile(this).getAbsolutePath(), opts);
-                if (bmp != null) {
-                    ivPreview.setBackgroundColor(0xFF1E1E1E);
-                    ivPreview.setImageDrawable(new BitmapDrawable(getResources(), bmp));
-                    return;
-                }
-            } catch (Exception ignored) {
-            }
+        if (BackgroundUtil.MODE_CUSTOM.equals(mode) && decodeAndShowCustom()) {
+            return;
         }
         ivPreview.setImageDrawable(null);
         ivPreview.setBackgroundColor(0xFF1E1E1E);
+    }
+
+    /**
+     * 解码已选定的自定义图并填入预览；无图或解码失败返回 false。
+     */
+    private boolean decodeAndShowCustom() {
+        if (!BackgroundUtil.hasCustomBackground(this)) {
+            return false;
+        }
+        try {
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = 2;
+            Bitmap bmp = BitmapFactory.decodeFile(
+                    BackgroundUtil.getBackgroundFile(this).getAbsolutePath(), opts);
+            if (bmp != null) {
+                ivPreview.setBackgroundColor(0xFF1E1E1E);
+                ivPreview.setImageDrawable(new BitmapDrawable(getResources(), bmp));
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
     }
 
     @Override

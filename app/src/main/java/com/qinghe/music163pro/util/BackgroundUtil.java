@@ -25,6 +25,9 @@ import java.net.URL;
  * - MODE_COVER: background follows the playing (or current) song's album cover.
  *   The cover is kept only in memory (never saved to disk) and is always
  *   (re)loaded when the screen is shown, so it never stays blank.
+ * - MODE_COVER_OR_CUSTOM: "cover-first" — uses the album cover when one is
+ *   available, otherwise falls back to the user-picked custom image, and only
+ *   then to the default background.
  * - MODE_CUSTOM: a user-picked static image saved to internal storage.
  * - MODE_DEFAULT: plain dark background.
  *
@@ -37,6 +40,12 @@ public final class BackgroundUtil {
     public static final String MODE_COVER = "cover";
     public static final String MODE_CUSTOM = "custom";
     public static final String MODE_DEFAULT = "default";
+    /**
+     * 封面优先：有专辑封面时用封面，没有（无封面 / 封面获取失败）时回退到用户
+     * 选定的图片（{@link #MODE_CUSTOM} 的同款自定义图）；两者皆无则用默认背景。
+     * 用于「想让有封面的歌自动漂亮、没封面的歌也能有个背景」的场景。
+     */
+    public static final String MODE_COVER_OR_CUSTOM = "cover_or_custom";
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String KEY_MODE = "background_mode";
@@ -68,6 +77,15 @@ public final class BackgroundUtil {
     public static void setMode(Context context, String mode) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putString(KEY_MODE, mode).apply();
+    }
+
+    /**
+     * 该模式是否需要加载（并跟随）专辑封面。
+     * {@link #MODE_COVER} 与 {@link #MODE_COVER_OR_CUSTOM} 都需要封面在位，
+     * 否则前者退化成默认背景、后者退化成选定图片。
+     */
+    public static boolean isCoverMode(String mode) {
+        return MODE_COVER.equals(mode) || MODE_COVER_OR_CUSTOM.equals(mode);
     }
 
     public static File getBackgroundFile(Context context) {
@@ -295,7 +313,24 @@ public final class BackgroundUtil {
             }
             return;
         }
+        if (MODE_COVER_OR_CUSTOM.equals(mode)) {
+            // 有封面用封面；封面还没到位 / 获取失败时回退到自定义图，再不行用默认。
+            if (sCoverBg != null) {
+                root.setBackground(new CenterCropDrawable(sCoverBg));
+            } else {
+                applyCustomOrDefault(context, root);
+            }
+            return;
+        }
         // MODE_CUSTOM
+        applyCustomOrDefault(context, root);
+    }
+
+    /**
+     * 解码用户选定的自定义图并铺满显示；无自定义图 / 解码失败时用默认深色。
+     * 被 {@link #MODE_CUSTOM} 与 {@link #MODE_COVER_OR_CUSTOM}（封面缺失时）共用。
+     */
+    private static void applyCustomOrDefault(Context context, View root) {
         if (!hasCustomBackground(context)) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
             return;
