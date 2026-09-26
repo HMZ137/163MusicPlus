@@ -104,22 +104,33 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         titleRow.addView(btnCreate);
 
         // 「A-Z」首字母跳转：复用 LetterPickerActivity + PinyinUtils（与本地音乐页同一套）。
-        // 放在「+」左侧，标题居中、本就够短，不会和左右按钮打架。
+        // 放在「+」左侧，并让标题用 LEFT_OF 让位，避免「我的歌单」文字压住 A-Z。
+        // 放大字号 + 加大热区 + 卡片底，表盘上能稳定点中。
         TextView btnAZ = new TextView(this);
         btnAZ.setText("A-Z");
         btnAZ.setTextColor(0xFFBB86FC);
-        btnAZ.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
-        btnAZ.setPadding(px(10), px(6), px(10), px(6));
+        btnAZ.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
+        btnAZ.setPadding(px(12), px(6), px(12), px(6));
+        btnAZ.setMinWidth(px(40));
+        btnAZ.setMinHeight(px(34));
+        btnAZ.setGravity(Gravity.CENTER);
+        btnAZ.setBackgroundResource(R.drawable.bg_letter_cell);
         btnAZ.setClickable(true);
         btnAZ.setFocusable(true);
+        int idAZ = View.generateViewId();
+        btnAZ.setId(idAZ);
         android.widget.RelativeLayout.LayoutParams azParams = new android.widget.RelativeLayout.LayoutParams(
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
         azParams.addRule(android.widget.RelativeLayout.LEFT_OF, idCreate);
         azParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        azParams.setMarginEnd(px(4));
         btnAZ.setLayoutParams(azParams);
         btnAZ.setOnClickListener(v -> openLetterPicker());
         titleRow.addView(btnAZ);
+
+        // 标题在 A-Z 左侧收尾，不再与「我的歌单」重叠。
+        titleParams.addRule(android.widget.RelativeLayout.LEFT_OF, idAZ);
 
         root.addView(titleRow);
         // 标题栏撑到左上角浮动返回按钮（X）的占位：本页此前漏了这一句（其它 17 个页面都调了），

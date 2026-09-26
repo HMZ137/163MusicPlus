@@ -59,6 +59,7 @@ import com.qinghe.music163pro.util.LyricSettings;
 import com.qinghe.music163pro.util.PlaybackMode;
 import com.qinghe.music163pro.util.UiScale;
 import com.qinghe.music163pro.util.WatchUiUtils;
+import com.qinghe.music163pro.util.PinyinUtils;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONObject;
@@ -133,6 +134,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // Lyrics overlay state
     private boolean lyricsOverlayShowing = false;
+
+    // 播放列表浮层的 A-Z 首字母跳转：记录滚动容器与列表，供 onActivityResult 滚动定位。
+    private ScrollView playlistOverlayScroll;
+    private LinearLayout playlistOverlayList;
+    private static final int REQ_PLAYLIST_AZ = 7301;
     private final java.util.List<LyricLine> lyricLines = new java.util.ArrayList<>();
     private final java.util.List<TextView> lyricViews = new java.util.ArrayList<>();
     private int currentHighlightIndex = -1;
@@ -977,6 +983,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * Used in all overlay panels.
      */
     private FrameLayout createOverlayTitleBar(String titleText) {
+        return createOverlayTitleBar(titleText, null);
+    }
+
+    /**
+     * 同上，但可在关闭按钮左侧再塞一个操作控件（如播放列表浮层的「A-Z」首字母跳转）。
+     * 标题两侧留白取同一个值（含右侧集群的宽度），保证标题视觉仍居中、
+     * 且文字不会伸到 A-Z / 关闭按钮底下被压住。
+     */
+    private FrameLayout createOverlayTitleBar(String titleText, android.view.View rightAction) {
         FrameLayout titleBar = new FrameLayout(this);
         LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -984,11 +999,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         titleBar.setLayoutParams(barParams);
 
         int closeSize = dp(26);
+        int closeHit = dp(32);
         int closeMarginEnd = Math.max(dp(4), WatchUiUtils.cornerInset(this));
-        // 标题两侧留出关闭按钮（X）的占位：标题是 match_parent + 居中，不留位的话
-        // 长标题（如「播放列表 (N首)」）右端会伸到 X 底下被压住 —— 就是「标题遮挡 X」。
-        // 两侧取同一个值，标题仍然视觉居中。
-        int titleReserve = closeSize + closeMarginEnd;
+
+        // 右侧集群（A-Z + 关闭）的总占位，用来给标题两侧留白。
+        int azWidth = (rightAction != null) ? dp(46) : 0;
+        int azGap = (rightAction != null) ? dp(8) : 0;
+        int clusterWidth = closeHit + azGap + azWidth;
+        int sideReserve = closeSize + closeMarginEnd + clusterWidth + dp(4);
 
         // Centered title
         TextView title = new TextView(this);
@@ -998,26 +1016,44 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         title.setGravity(Gravity.CENTER);
         title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        title.setPadding(titleReserve, 0, titleReserve, 0);
+        title.setPadding(sideReserve, 0, sideReserve, 0);
         FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         titleParams.gravity = Gravity.CENTER;
         title.setLayoutParams(titleParams);
         titleBar.addView(title);
 
-        // Close button on the right
+        // 右侧集群：A-Z（可选）+ 关闭，整体贴右、竖直居中。
+        LinearLayout rightCluster = new LinearLayout(this);
+        rightCluster.setOrientation(LinearLayout.HORIZONTAL);
+        rightCluster.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams clusterParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        clusterParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        clusterParams.setMarginEnd(closeMarginEnd);
+        rightCluster.setLayoutParams(clusterParams);
+
+        if (rightAction != null) {
+            rightAction.setClickable(true);
+            rightAction.setFocusable(true);
+            LinearLayout.LayoutParams raParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            raParams.setMarginEnd(azGap);
+            rightAction.setLayoutParams(raParams);
+            rightCluster.addView(rightAction);
+        }
+
         ImageView btnClose = new ImageView(this);
         btnClose.setImageResource(R.drawable.ic_close);
         btnClose.setColorFilter(0xFFFFFFFF);
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(closeSize, closeSize);
-        closeParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        closeParams.setMarginEnd(closeMarginEnd);
-        btnClose.setLayoutParams(closeParams);
-        btnClose.setClickable(true);
-        btnClose.setFocusable(true);
+        btnClose.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(closeHit, closeHit);
+        closeLp.gravity = Gravity.CENTER_VERTICAL;
+        btnClose.setLayoutParams(closeLp);
         btnClose.setOnClickListener(v -> dismissOverlay());
-        titleBar.addView(btnClose);
+        rightCluster.addView(btnClose);
 
+        titleBar.addView(rightCluster);
         return titleBar;
     }
 
@@ -1088,6 +1124,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void dismissOverlay() {
         stopRingtonePreview();
+        playlistOverlayScroll = null;
+        playlistOverlayList = null;
         if (overlayTimerHandler != null) {
             overlayTimerHandler.removeCallbacksAndMessages(null);
             overlayTimerHandler = null;
@@ -2453,8 +2491,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentLayout.setLayoutParams(contentParams);
         contentLayout.setOnClickListener(v -> { /* consume click */ });
 
-        // Title bar
-        contentLayout.addView(createOverlayTitleBar("播放列表 (" + playlist.size() + "首)"));
+        // Title bar（右侧带「A-Z」首字母跳转，复用 LetterPickerActivity + PinyinUtils）
+        TextView btnPlaylistAz = makeOverlayAzButton();
+        btnPlaylistAz.setOnClickListener(v -> openPlaylistLetterPicker(playlist));
+        contentLayout.addView(createOverlayTitleBar("播放列表 (" + playlist.size() + "首)", btnPlaylistAz));
 
         // Song list in a ScrollView
         ScrollView scrollView = new ScrollView(this);
@@ -2464,6 +2504,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         LinearLayout listLayout = new LinearLayout(this);
         listLayout.setOrientation(LinearLayout.VERTICAL);
         scrollView.addView(listLayout);
+
+        // 记下容器引用，供 A-Z 跳转后滚动定位。
+        playlistOverlayScroll = scrollView;
+        playlistOverlayList = listLayout;
 
         int currentIndex = playerManager.getCurrentIndex();
         for (int i = 0; i < playlist.size(); i++) {
@@ -2572,6 +2616,87 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         rootView.addView(overlayContainer);
+    }
+
+    /**
+     * 播放列表浮层右上角的「A-Z」按钮：紫色文字 + 卡片底，热区放大到可稳定点中。
+     */
+    private TextView makeOverlayAzButton() {
+        TextView btn = new TextView(this);
+        btn.setText("A-Z");
+        btn.setTextColor(0xFFBB86FC);
+        btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dp(16));
+        btn.setPadding(dp(12), dp(6), dp(12), dp(6));
+        btn.setMinWidth(dp(40));
+        btn.setMinHeight(dp(34));
+        btn.setGravity(Gravity.CENTER);
+        btn.setBackgroundResource(R.drawable.bg_letter_cell);
+        return btn;
+    }
+
+    /**
+     * 打开播放列表的 A-Z 首字母选择：按当前播放顺序，把每首歌的拼音首字母分组，
+     * 回传「该字母第一首在列表里的下标」，onActivityResult 里据此滚动定位。
+     * 不重排播放列表，只做首字母跳转 —— 与本地音乐 / 我的歌单同一套交互。
+     */
+    private void openPlaylistLetterPicker(java.util.List<Song> playlist) {
+        java.util.LinkedHashMap<Character, Integer> firstIdx = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<Character, Integer> counts = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < playlist.size(); i++) {
+            char ini = PinyinUtils.initialOfWord(playlist.get(i).getName());
+            if (!firstIdx.containsKey(ini)) {
+                firstIdx.put(ini, i);
+            }
+            Integer c = counts.get(ini);
+            counts.put(ini, c == null ? 1 : c + 1);
+        }
+        if (firstIdx.isEmpty()) {
+            Toast.makeText(this, "没有可跳转的字母", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        StringBuilder letters = new StringBuilder(firstIdx.size());
+        int[] starts = new int[firstIdx.size()];
+        int[] cnts = new int[firstIdx.size()];
+        int k = 0;
+        for (java.util.Map.Entry<Character, Integer> e : firstIdx.entrySet()) {
+            letters.append(e.getKey());
+            starts[k] = e.getValue();
+            cnts[k] = counts.get(e.getKey());
+            k++;
+        }
+        // 当前可视的第一首（用于高亮所在分组）
+        int current = 0;
+        if (playlistOverlayList != null && playlistOverlayScroll != null) {
+            int sy = playlistOverlayScroll.getScrollY();
+            for (int i = 0; i < playlistOverlayList.getChildCount(); i++) {
+                View child = playlistOverlayList.getChildAt(i);
+                if (child.getTop() - sy >= 0) {
+                    current = i;
+                    break;
+                }
+                current = i;
+            }
+        }
+        Intent intent = new Intent(this, LetterPickerActivity.class);
+        intent.putExtra(LetterPickerActivity.EXTRA_LETTERS, letters.toString());
+        intent.putExtra(LetterPickerActivity.EXTRA_STARTS, starts);
+        intent.putExtra(LetterPickerActivity.EXTRA_COUNTS, cnts);
+        intent.putExtra(LetterPickerActivity.EXTRA_CURRENT, current);
+        startActivityForResult(intent, REQ_PLAYLIST_AZ);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PLAYLIST_AZ && resultCode == RESULT_OK && data != null) {
+            int target = data.getIntExtra(LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
+            if (target >= 0 && playlistOverlayList != null && playlistOverlayScroll != null) {
+                View child = playlistOverlayList.getChildAt(target);
+                if (child != null) {
+                    playlistOverlayScroll.smoothScrollTo(0, Math.max(0, child.getTop()));
+                }
+            }
+        }
     }
 
     /**
