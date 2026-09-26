@@ -135,10 +135,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     // Lyrics overlay state
     private boolean lyricsOverlayShowing = false;
 
-    // 播放列表浮层的 A-Z 首字母跳转：记录滚动容器与列表，供 onActivityResult 滚动定位。
+    // 播放列表浮层：仅对「显示」做首字母排序（不动真实队列）。
+    // playlistOverlayMap 把「显示位置 → 真实队列下标」映射出来，点歌 / 长按都用真实下标。
     private ScrollView playlistOverlayScroll;
     private LinearLayout playlistOverlayList;
-    private static final int REQ_PLAYLIST_AZ = 7301;
+    private java.util.List<Song> playlistOverlaySongs;
+    private int[] playlistOverlayMap;
+    private boolean playlistOverlaySorted = false;
+    private TextView playlistOverlayAzBtn;
     private final java.util.List<LyricLine> lyricLines = new java.util.ArrayList<>();
     private final java.util.List<TextView> lyricViews = new java.util.ArrayList<>();
     private int currentHighlightIndex = -1;
@@ -1126,6 +1130,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         stopRingtonePreview();
         playlistOverlayScroll = null;
         playlistOverlayList = null;
+        playlistOverlaySongs = null;
+        playlistOverlayMap = null;
+        playlistOverlaySorted = false;
+        playlistOverlayAzBtn = null;
         if (overlayTimerHandler != null) {
             overlayTimerHandler.removeCallbacksAndMessages(null);
             overlayTimerHandler = null;
@@ -2491,9 +2499,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentLayout.setLayoutParams(contentParams);
         contentLayout.setOnClickListener(v -> { /* consume click */ });
 
-        // Title bar（右侧带「A-Z」首字母跳转，复用 LetterPickerActivity + PinyinUtils）
+        // Title bar（右侧「A-Z」按钮：仅对浮层显示做首字母排序，不动真实队列）
         TextView btnPlaylistAz = makeOverlayAzButton();
-        btnPlaylistAz.setOnClickListener(v -> openPlaylistLetterPicker(playlist));
+        playlistOverlayAzBtn = btnPlaylistAz;
+        btnPlaylistAz.setOnClickListener(v -> togglePlaylistSort());
         contentLayout.addView(createOverlayTitleBar("播放列表 (" + playlist.size() + "首)", btnPlaylistAz));
 
         // Song list in a ScrollView
@@ -2505,110 +2514,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         listLayout.setOrientation(LinearLayout.VERTICAL);
         scrollView.addView(listLayout);
 
-        // 记下容器引用，供 A-Z 跳转后滚动定位。
+        // 记下容器与歌曲引用，供排序后重渲染与滚动定位。
+        playlistOverlaySongs = playlist;
         playlistOverlayScroll = scrollView;
         playlistOverlayList = listLayout;
-
-        int currentIndex = playerManager.getCurrentIndex();
-        for (int i = 0; i < playlist.size(); i++) {
-            final int index = i;
-            Song song = playlist.get(i);
-
-            LinearLayout itemLayout = new LinearLayout(this);
-            itemLayout.setOrientation(LinearLayout.HORIZONTAL);
-            itemLayout.setPadding(dp(8), dp(6), dp(8), dp(6));
-            itemLayout.setClickable(true);
-            itemLayout.setFocusable(true);
-
-            // Highlight current playing song
-            if (i == currentIndex) {
-                itemLayout.setBackgroundColor(0xFF2D2D2D);
-            }
-
-            // Cover thumbnail
-            ImageView ivCover = new ImageView(this);
-            int coverSize = dp(36);
-            LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(coverSize, coverSize);
-            coverLp.gravity = Gravity.CENTER_VERTICAL;
-            ivCover.setLayoutParams(coverLp);
-            ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            android.graphics.drawable.GradientDrawable coverBg = new android.graphics.drawable.GradientDrawable();
-            coverBg.setColor(0xFF333333);
-            coverBg.setCornerRadius(dp(2));
-            ivCover.setBackground(coverBg);
-            NetworkImageLoader.load(ivCover, song.getCoverUrl());
-            itemLayout.addView(ivCover);
-
-            // Text column
-            LinearLayout textLayout = new LinearLayout(this);
-            textLayout.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-            textLp.gravity = Gravity.CENTER_VERTICAL;
-            textLp.setMarginStart(dp(8));
-            textLayout.setLayoutParams(textLp);
-
-            TextView tvName = new TextView(this);
-            String prefix = (i == currentIndex) ? "▶ " : (i + 1) + ". ";
-            tvName.setText(prefix + song.getName());
-            tvName.setTextColor(i == currentIndex ? 0xFFBB86FC : 0xFFFFFFFF);
-            tvName.setTextSize(13);
-            tvName.setSingleLine(true);
-            tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            textLayout.addView(tvName);
-
-            TextView tvArtist = new TextView(this);
-            tvArtist.setText(song.getArtist());
-            tvArtist.setTextColor(0x80FFFFFF);
-            tvArtist.setTextSize(11);
-            tvArtist.setSingleLine(true);
-            tvArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            textLayout.addView(tvArtist);
-
-            itemLayout.addView(textLayout);
-
-            // 「下一首播放」角标（叠加时带序号，方便看清排队顺序）
-            int queuedPos = playerManager.queuedNextPosition(song);
-            if (queuedPos > 0) {
-                TextView badge = new TextView(this);
-                badge.setText(queuedPos > 1 ? "下一首 " + queuedPos : "下一首");
-                badge.setTextColor(0xFF1D1D1D);
-                badge.setTextSize(10);
-                badge.setPadding(dp(5), dp(2), dp(5), dp(2));
-                android.graphics.drawable.GradientDrawable badgeBg =
-                        new android.graphics.drawable.GradientDrawable();
-                badgeBg.setColor(0xFFBB86FC);
-                badgeBg.setCornerRadius(dp(3));
-                badge.setBackground(badgeBg);
-                LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                badgeLp.gravity = Gravity.CENTER_VERTICAL;
-                badgeLp.setMarginStart(dp(4));
-                badge.setLayoutParams(badgeLp);
-                itemLayout.addView(badge);
-            }
-
-            itemLayout.setOnClickListener(v -> {
-                playerManager.playFromCurrentPlaylist(index);
-                dismissOverlay();
-            });
-
-            // 长按弹出队列操作菜单（下一首播放 / 从队列移除）
-            itemLayout.setOnLongClickListener(v -> {
-                showPlaylistItemActions(index);
-                return true;
-            });
-
-            listLayout.addView(itemLayout);
-        }
+        buildPlaylistMap();
+        renderPlaylistItems();
 
         contentLayout.addView(scrollView);
         overlayContainer.addView(contentLayout);
 
-        // Scroll to current song
-        if (currentIndex > 0) {
+        // Scroll to current song（按「显示位置」定位，而非真实队列下标）
+        int curDisplay = displayPositionOf(playerManager.getCurrentIndex());
+        if (curDisplay >= 0) {
             scrollView.post(() -> {
-                View child = listLayout.getChildAt(currentIndex);
+                View child = listLayout.getChildAt(curDisplay);
                 if (child != null) {
                     scrollView.smoothScrollTo(0, child.getTop());
                 }
@@ -2635,67 +2555,168 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * 打开播放列表的 A-Z 首字母选择：按当前播放顺序，把每首歌的拼音首字母分组，
-     * 回传「该字母第一首在列表里的下标」，onActivityResult 里据此滚动定位。
-     * 不重排播放列表，只做首字母跳转 —— 与本地音乐 / 我的歌单同一套交互。
+     * 构造「显示位置 → 真实队列下标」映射。未排序时为恒等映射；
+     * 排序时按歌名拼音首字母（中文走 PinyinUtils，其余按 Collator）A→Z 排。
      */
-    private void openPlaylistLetterPicker(java.util.List<Song> playlist) {
-        java.util.LinkedHashMap<Character, Integer> firstIdx = new java.util.LinkedHashMap<>();
-        java.util.LinkedHashMap<Character, Integer> counts = new java.util.LinkedHashMap<>();
-        for (int i = 0; i < playlist.size(); i++) {
-            char ini = PinyinUtils.initialOfWord(playlist.get(i).getName());
-            if (!firstIdx.containsKey(ini)) {
-                firstIdx.put(ini, i);
+    private void buildPlaylistMap() {
+        int n = playlistOverlaySongs.size();
+        playlistOverlayMap = new int[n];
+        if (!playlistOverlaySorted) {
+            for (int i = 0; i < n; i++) {
+                playlistOverlayMap[i] = i;
             }
-            Integer c = counts.get(ini);
-            counts.put(ini, c == null ? 1 : c + 1);
-        }
-        if (firstIdx.isEmpty()) {
-            Toast.makeText(this, "没有可跳转的字母", Toast.LENGTH_SHORT).show();
             return;
         }
-        StringBuilder letters = new StringBuilder(firstIdx.size());
-        int[] starts = new int[firstIdx.size()];
-        int[] cnts = new int[firstIdx.size()];
-        int k = 0;
-        for (java.util.Map.Entry<Character, Integer> e : firstIdx.entrySet()) {
-            letters.append(e.getKey());
-            starts[k] = e.getValue();
-            cnts[k] = counts.get(e.getKey());
-            k++;
+        Integer[] idx = new Integer[n];
+        for (int i = 0; i < n; i++) {
+            idx[i] = i;
         }
-        // 当前可视的第一首（用于高亮所在分组）
-        int current = 0;
-        if (playlistOverlayList != null && playlistOverlayScroll != null) {
-            int sy = playlistOverlayScroll.getScrollY();
-            for (int i = 0; i < playlistOverlayList.getChildCount(); i++) {
-                View child = playlistOverlayList.getChildAt(i);
-                if (child.getTop() - sy >= 0) {
-                    current = i;
-                    break;
-                }
-                current = i;
+        final java.text.Collator collator = java.text.Collator.getInstance(java.util.Locale.CHINA);
+        java.util.Arrays.sort(idx, (a, b) -> {
+            Song sa = playlistOverlaySongs.get(a);
+            Song sb = playlistOverlaySongs.get(b);
+            char ia = PinyinUtils.initialOfWord(sa.getName());
+            char ib = PinyinUtils.initialOfWord(sb.getName());
+            if (ia != ib) {
+                if (ia == PinyinUtils.OTHER) return 1;
+                if (ib == PinyinUtils.OTHER) return -1;
+                return Character.compare(ia, ib);
             }
+            return collator.compare(sa.getName(), sb.getName());
+        });
+        for (int i = 0; i < n; i++) {
+            playlistOverlayMap[i] = idx[i];
         }
-        Intent intent = new Intent(this, LetterPickerActivity.class);
-        intent.putExtra(LetterPickerActivity.EXTRA_LETTERS, letters.toString());
-        intent.putExtra(LetterPickerActivity.EXTRA_STARTS, starts);
-        intent.putExtra(LetterPickerActivity.EXTRA_COUNTS, cnts);
-        intent.putExtra(LetterPickerActivity.EXTRA_CURRENT, current);
-        startActivityForResult(intent, REQ_PLAYLIST_AZ);
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_PLAYLIST_AZ && resultCode == RESULT_OK && data != null) {
-            int target = data.getIntExtra(LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
-            if (target >= 0 && playlistOverlayList != null && playlistOverlayScroll != null) {
-                View child = playlistOverlayList.getChildAt(target);
-                if (child != null) {
-                    playlistOverlayScroll.smoothScrollTo(0, Math.max(0, child.getTop()));
-                }
+    /**
+     * 按 playlistOverlayMap 重渲染浮层列表。显示位置 d → 真实队列下标 playlistOverlayMap[d]，
+     * 点歌 / 长按都走真实下标，所以排序只改「显示」、不动真实播放队列与「下一首播放」。
+     */
+    private void renderPlaylistItems() {
+        if (playlistOverlayList == null || playlistOverlaySongs == null
+                || playlistOverlayMap == null) {
+            return;
+        }
+        playlistOverlayList.removeAllViews();
+        int curReal = playerManager.getCurrentIndex();
+        int n = playlistOverlaySongs.size();
+        for (int d = 0; d < n; d++) {
+            final int realIndex = playlistOverlayMap[d];
+            Song song = playlistOverlaySongs.get(realIndex);
+
+            LinearLayout itemLayout = new LinearLayout(this);
+            itemLayout.setOrientation(LinearLayout.HORIZONTAL);
+            itemLayout.setPadding(dp(8), dp(6), dp(8), dp(6));
+            itemLayout.setClickable(true);
+            itemLayout.setFocusable(true);
+
+            if (realIndex == curReal) {
+                itemLayout.setBackgroundColor(0xFF2D2D2D);
             }
+
+            ImageView ivCover = new ImageView(this);
+            int coverSize = dp(36);
+            LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(coverSize, coverSize);
+            coverLp.gravity = Gravity.CENTER_VERTICAL;
+            ivCover.setLayoutParams(coverLp);
+            ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            android.graphics.drawable.GradientDrawable coverBg = new android.graphics.drawable.GradientDrawable();
+            coverBg.setColor(0xFF333333);
+            coverBg.setCornerRadius(dp(2));
+            ivCover.setBackground(coverBg);
+            NetworkImageLoader.load(ivCover, song.getCoverUrl());
+            itemLayout.addView(ivCover);
+
+            LinearLayout textLayout = new LinearLayout(this);
+            textLayout.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+            textLp.gravity = Gravity.CENTER_VERTICAL;
+            textLp.setMarginStart(dp(8));
+            textLayout.setLayoutParams(textLp);
+
+            TextView tvName = new TextView(this);
+            String prefix = (realIndex == curReal) ? "▶ " : (d + 1) + ". ";
+            tvName.setText(prefix + song.getName());
+            tvName.setTextColor(realIndex == curReal ? 0xFFBB86FC : 0xFFFFFFFF);
+            tvName.setTextSize(13);
+            tvName.setSingleLine(true);
+            tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            textLayout.addView(tvName);
+
+            TextView tvArtist = new TextView(this);
+            tvArtist.setText(song.getArtist());
+            tvArtist.setTextColor(0x80FFFFFF);
+            tvArtist.setTextSize(11);
+            tvArtist.setSingleLine(true);
+            tvArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            textLayout.addView(tvArtist);
+
+            itemLayout.addView(textLayout);
+
+            // 「下一首播放」角标（按 Song 身份判定，与显示顺序无关）
+            int queuedPos = playerManager.queuedNextPosition(song);
+            if (queuedPos > 0) {
+                TextView badge = new TextView(this);
+                badge.setText(queuedPos > 1 ? "下一首 " + queuedPos : "下一首");
+                badge.setTextColor(0xFF1D1D1D);
+                badge.setTextSize(10);
+                badge.setPadding(dp(5), dp(2), dp(5), dp(2));
+                android.graphics.drawable.GradientDrawable badgeBg =
+                        new android.graphics.drawable.GradientDrawable();
+                badgeBg.setColor(0xFFBB86FC);
+                badgeBg.setCornerRadius(dp(3));
+                badge.setBackground(badgeBg);
+                LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                badgeLp.gravity = Gravity.CENTER_VERTICAL;
+                badgeLp.setMarginStart(dp(4));
+                badge.setLayoutParams(badgeLp);
+                itemLayout.addView(badge);
+            }
+
+            itemLayout.setOnClickListener(v -> {
+                playerManager.playFromCurrentPlaylist(realIndex);
+                dismissOverlay();
+            });
+
+            // 长按弹出队列操作菜单（下一首播放 / 从队列移除）
+            itemLayout.setOnLongClickListener(v -> {
+                showPlaylistItemActions(realIndex);
+                return true;
+            });
+
+            playlistOverlayList.addView(itemLayout);
+        }
+    }
+
+    /**
+     * 真实队列下标 → 当前显示位置；找不到返回 -1。
+     */
+    private int displayPositionOf(int realIndex) {
+        if (playlistOverlayMap == null || realIndex < 0) {
+            return -1;
+        }
+        for (int d = 0; d < playlistOverlayMap.length; d++) {
+            if (playlistOverlayMap[d] == realIndex) {
+                return d;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * A-Z 按钮：在「播放顺序」与「按歌名 A→Z」两种显示间切换。仅改浮层显示，
+     * 不动真实播放队列，所以「下一首播放」、当前播放位置都不受影响。
+     */
+    private void togglePlaylistSort() {
+        playlistOverlaySorted = !playlistOverlaySorted;
+        buildPlaylistMap();
+        renderPlaylistItems();
+        if (playlistOverlayAzBtn != null) {
+            playlistOverlayAzBtn.setText(playlistOverlaySorted ? "原序" : "A-Z");
+            playlistOverlayAzBtn.setTextColor(playlistOverlaySorted ? 0xFFFFFFFF : 0xFFBB86FC);
         }
     }
 
