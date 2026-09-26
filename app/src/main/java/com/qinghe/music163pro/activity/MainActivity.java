@@ -4115,21 +4115,44 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * （用户反馈的「滚动一小段后突然回到第一个字」）。
      *
      * 修法：文本能放下时保持居中（短歌名更好看），放不下、需要跑马灯时改为 {@code START}，
-     * 让 marquee 从行首完整滚动。此方法只在切歌 / 刷新界面时调用，不会逐帧触发、不会反复重置动画。
+     * 让 marquee 从行首完整滚动。
+     *
+     * 关键陷阱：{@link android.widget.TextView#setGravity(int)} 会触发 {@code requestLayout()}，
+     * 而布局重排会把 marquee 的偏移量重置回行首 —— 也就是说，只要在跑马灯滚动途中再调一次
+     * {@code setGravity()}（哪怕值没变），动画就会「跳回开头」重来。这正是「滚一小段就跳回」的
+     * 真正元凶：本方法若被多次进入（切歌回调 {@code onSongChanged} 重入、{@code onResume} 与
+     * 切歌叠加等），每进一次就把动画重置一次。
+     *
+     * 因此用 {@link #setGravityIfNeeded(int)} 做幂等保护：只有 gravity 真的变化时才调用
+     * {@code setGravity()}，重复进入不会再打断动画。同时顺手重新 {@code setSelected(true)}，
+     * 保证布局完成后跑马灯一定处于启用状态。
      */
     private void adjustTitleGravity() {
         tvSongName.post(() -> {
             int w = tvSongName.getWidth();
             if (w <= 0) return; // 尚未完成首次布局，跳过本次判断
+            // 布局完成后重新确认选中态，确保 marquee 已启用
+            if (!tvSongName.isSelected()) tvSongName.setSelected(true);
             CharSequence t = tvSongName.getText();
             if (t == null || t.length() == 0) {
-                tvSongName.setGravity(Gravity.CENTER);
+                setGravityIfNeeded(Gravity.CENTER);
                 return;
             }
             float textW = tvSongName.getPaint().measureText(t.toString());
             int avail = w - tvSongName.getTotalPaddingLeft() - tvSongName.getTotalPaddingRight();
-            tvSongName.setGravity(textW > avail ? Gravity.START : Gravity.CENTER);
+            setGravityIfNeeded(textW > avail ? Gravity.START : Gravity.CENTER);
         });
+    }
+
+    /**
+     * 幂等设置 {@code tvSongName} 的 gravity：仅当目标值与当前值不同才调用
+     * {@link android.widget.TextView#setGravity(int)}，避免其内部的 {@code requestLayout()}
+     * 反复重置 marquee 动画、导致「滚一小段就跳回开头」。
+     */
+    private void setGravityIfNeeded(int gravity) {
+        if (tvSongName.getGravity() != gravity) {
+            tvSongName.setGravity(gravity);
+        }
     }
 
     private void updatePlaylistIndicator() {
