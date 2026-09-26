@@ -142,7 +142,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private java.util.List<Song> playlistOverlaySongs;
     private int[] playlistOverlayMap;
     private boolean playlistOverlaySorted = false;
-    private TextView playlistOverlayAzBtn;
+    private TextView playlistOverlaySortBtn;
+    /** 打开「首字母查找」页（LetterPickerActivity）的请求码。 */
+    private static final int REQ_PLAYLIST_AZ = 7302;
     private final java.util.List<LyricLine> lyricLines = new java.util.ArrayList<>();
     private final java.util.List<TextView> lyricViews = new java.util.ArrayList<>();
     private int currentHighlightIndex = -1;
@@ -983,19 +985,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * Create a title bar with centered title and close button on the right.
-     * Used in all overlay panels.
+     * 居中标题 + 可选左侧操作 + 可选右侧操作（A-Z 之类）+ 关闭，供各类浮层复用。
+     * 标题两侧留白取左右两集群里较宽的一侧，保证标题视觉仍居中、
+     * 且文字不会伸到任一侧按钮底下被压住。
      */
     private FrameLayout createOverlayTitleBar(String titleText) {
-        return createOverlayTitleBar(titleText, null);
+        return createOverlayTitleBar(titleText, null, null);
     }
 
     /**
-     * 同上，但可在关闭按钮左侧再塞一个操作控件（如播放列表浮层的「A-Z」首字母跳转）。
-     * 标题两侧留白取同一个值（含右侧集群的宽度），保证标题视觉仍居中、
-     * 且文字不会伸到 A-Z / 关闭按钮底下被压住。
+     * 三参版本：标题居中，leftAction 贴左（如播放列表浮层的「排序」），
+     * rightAction 贴右（如「A-Z」首字母查找），最右是关闭按钮。
      */
-    private FrameLayout createOverlayTitleBar(String titleText, android.view.View rightAction) {
+    private FrameLayout createOverlayTitleBar(String titleText,
+                                              android.view.View leftAction,
+                                              android.view.View rightAction) {
         FrameLayout titleBar = new FrameLayout(this);
         LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1006,11 +1010,19 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int closeHit = dp(32);
         int closeMarginEnd = Math.max(dp(4), WatchUiUtils.cornerInset(this));
 
-        // 右侧集群（A-Z + 关闭）的总占位，用来给标题两侧留白。
+        // 右侧集群（A-Z + 关闭）占位
         int azWidth = (rightAction != null) ? dp(46) : 0;
         int azGap = (rightAction != null) ? dp(8) : 0;
-        int clusterWidth = closeHit + azGap + azWidth;
-        int sideReserve = closeSize + closeMarginEnd + clusterWidth + dp(4);
+        int rightClusterWidth = closeHit + azGap + azWidth;
+
+        // 左侧集群（排序之类）占位
+        int leftWidth = (leftAction != null) ? dp(46) : 0;
+        int leftGap = (leftAction != null) ? dp(8) : 0;
+        int leftClusterWidth = leftWidth + leftGap;
+
+        // 标题两侧留白取左右较宽一侧 + 关闭外边距，保证不被任一侧压住。
+        int sideReserve = Math.max(leftClusterWidth, rightClusterWidth)
+                + closeMarginEnd + dp(4);
 
         // Centered title
         TextView title = new TextView(this);
@@ -1026,6 +1038,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         titleParams.gravity = Gravity.CENTER;
         title.setLayoutParams(titleParams);
         titleBar.addView(title);
+
+        // 左侧集群（可选）
+        if (leftAction != null) {
+            LinearLayout leftCluster = new LinearLayout(this);
+            leftCluster.setOrientation(LinearLayout.HORIZONTAL);
+            leftCluster.setGravity(Gravity.CENTER_VERTICAL);
+            FrameLayout.LayoutParams leftParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+            leftParams.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
+            leftParams.setMarginStart(closeMarginEnd);
+            leftCluster.setLayoutParams(leftParams);
+            leftAction.setClickable(true);
+            leftAction.setFocusable(true);
+            leftCluster.addView(leftAction);
+            titleBar.addView(leftCluster);
+        }
 
         // 右侧集群：A-Z（可选）+ 关闭，整体贴右、竖直居中。
         LinearLayout rightCluster = new LinearLayout(this);
@@ -1133,7 +1161,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         playlistOverlaySongs = null;
         playlistOverlayMap = null;
         playlistOverlaySorted = false;
-        playlistOverlayAzBtn = null;
+        playlistOverlaySortBtn = null;
         if (overlayTimerHandler != null) {
             overlayTimerHandler.removeCallbacksAndMessages(null);
             overlayTimerHandler = null;
@@ -1167,6 +1195,27 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
                 rootView.removeView(overlayContainer);
                 overlayContainer = null;
+            }
+        }
+    }
+
+    /**
+     * 「首字母查找」页（LetterPickerActivity）返回：把播放列表浮层滚到所选字母的第一首。
+     * 返回的是「显示位置」，直接拿去滚即可，无需关心真实队列下标。
+     */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PLAYLIST_AZ && resultCode == RESULT_OK && data != null) {
+            int target = data.getIntExtra(LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
+            if (target >= 0 && playlistOverlayScroll != null && playlistOverlayList != null) {
+                final int t = target;
+                playlistOverlayScroll.post(() -> {
+                    View child = playlistOverlayList.getChildAt(t);
+                    if (child != null) {
+                        playlistOverlayScroll.smoothScrollTo(0, child.getTop());
+                    }
+                });
             }
         }
     }
@@ -2499,11 +2548,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         contentLayout.setLayoutParams(contentParams);
         contentLayout.setOnClickListener(v -> { /* consume click */ });
 
-        // Title bar（右侧「A-Z」按钮：仅对浮层显示做首字母排序，不动真实队列）
-        TextView btnPlaylistAz = makeOverlayAzButton();
-        playlistOverlayAzBtn = btnPlaylistAz;
-        btnPlaylistAz.setOnClickListener(v -> togglePlaylistSort());
-        contentLayout.addView(createOverlayTitleBar("播放列表 (" + playlist.size() + "首)", btnPlaylistAz));
+        // Title bar：左侧「排序」开关（仅对浮层显示做首字母排序，不动真实队列），
+        // 右侧「A-Z」首字母查找页按钮（位置不变）。
+        TextView btnSort = makeOverlaySortButton();
+        playlistOverlaySortBtn = btnSort;
+        btnSort.setOnClickListener(v -> togglePlaylistSort());
+
+        TextView btnAz = makeOverlayAzButton();
+        btnAz.setOnClickListener(v -> openPlaylistLetterPicker());
+
+        contentLayout.addView(createOverlayTitleBar(
+                "播放列表 (" + playlist.size() + "首)", btnSort, btnAz));
 
         // Song list in a ScrollView
         ScrollView scrollView = new ScrollView(this);
@@ -2540,11 +2595,29 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     /**
      * 播放列表浮层右上角的「A-Z」按钮：紫色文字 + 卡片底，热区放大到可稳定点中。
+     * 点击打开「首字母查找」页（LetterPickerActivity），仅做跳转、不动真实队列。
      */
     private TextView makeOverlayAzButton() {
         TextView btn = new TextView(this);
         btn.setText("A-Z");
         btn.setTextColor(0xFFBB86FC);
+        btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dp(16));
+        btn.setPadding(dp(12), dp(6), dp(12), dp(6));
+        btn.setMinWidth(dp(40));
+        btn.setMinHeight(dp(34));
+        btn.setGravity(Gravity.CENTER);
+        btn.setBackgroundResource(R.drawable.bg_letter_cell);
+        return btn;
+    }
+
+    /**
+     * 播放列表浮层左上角的「排序」按钮：在「播放顺序」与「按歌名 A→Z」两种显示间切换。
+     * 仅改浮层显示、不动真实播放队列；标签在「排序 / 原序」间翻转以提示当前状态。
+     */
+    private TextView makeOverlaySortButton() {
+        TextView btn = new TextView(this);
+        btn.setText("排序");
+        btn.setTextColor(0xFFFFFFFF);
         btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dp(16));
         btn.setPadding(dp(12), dp(6), dp(12), dp(6));
         btn.setMinWidth(dp(40));
@@ -2707,17 +2780,78 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * A-Z 按钮：在「播放顺序」与「按歌名 A→Z」两种显示间切换。仅改浮层显示，
+     * 「排序」按钮：在「播放顺序」与「按歌名 A→Z」两种显示间切换。仅改浮层显示，
      * 不动真实播放队列，所以「下一首播放」、当前播放位置都不受影响。
      */
     private void togglePlaylistSort() {
-        playlistOverlaySorted = !playlistOverlaySorted;
+        setPlaylistSorted(!playlistOverlaySorted);
+    }
+
+    /** 设置浮层是否按歌名首字母排序显示（仅显示，不动真实队列），并刷新按钮标签。 */
+    private void setPlaylistSorted(boolean sorted) {
+        playlistOverlaySorted = sorted;
         buildPlaylistMap();
         renderPlaylistItems();
-        if (playlistOverlayAzBtn != null) {
-            playlistOverlayAzBtn.setText(playlistOverlaySorted ? "原序" : "A-Z");
-            playlistOverlayAzBtn.setTextColor(playlistOverlaySorted ? 0xFFFFFFFF : 0xFFBB86FC);
+        updateSortButtonLabel();
+    }
+
+    /** 刷新「排序 / 原序」按钮的标签与配色，提示当前是否处于首字母排序态。 */
+    private void updateSortButtonLabel() {
+        if (playlistOverlaySortBtn != null) {
+            playlistOverlaySortBtn.setText(playlistOverlaySorted ? "原序" : "排序");
+            playlistOverlaySortBtn.setTextColor(
+                    playlistOverlaySorted ? 0xFFBB86FC : 0xFFFFFFFF);
         }
+    }
+
+    /**
+     * 打开「首字母查找」页（独立一屏大格子）。首字母跳转只有在「按首字母排序」后才成立，
+     * 所以进来若还是播放原序，先排好再开页；返回时把列表滚到所选字母的第一首。
+     */
+    private void openPlaylistLetterPicker() {
+        if (playlistOverlaySongs == null || playlistOverlayMap == null) {
+            return;
+        }
+        // 首字母查找依赖「按首字母排好序」的显示，原序下先排好再开页。
+        if (!playlistOverlaySorted) {
+            setPlaylistSorted(true);
+        }
+        int n = playlistOverlaySongs.size();
+        java.util.LinkedHashMap<Character, Integer> firstIndex =
+                new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<Character, Integer> counts =
+                new java.util.LinkedHashMap<>();
+        for (int d = 0; d < n; d++) {
+            Song song = playlistOverlaySongs.get(playlistOverlayMap[d]);
+            char initial = PinyinUtils.initialOfWord(song.getName());
+            if (!firstIndex.containsKey(initial)) {
+                firstIndex.put(initial, d);
+            }
+            Integer c = counts.get(initial);
+            counts.put(initial, c == null ? 1 : c + 1);
+        }
+        if (firstIndex.isEmpty()) {
+            Toast.makeText(this, "没有可跳转的字母", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        StringBuilder letters = new StringBuilder(firstIndex.size());
+        int[] starts = new int[firstIndex.size()];
+        int[] groupCounts = new int[firstIndex.size()];
+        int idx = 0;
+        for (Character key : firstIndex.keySet()) {
+            letters.append(key.charValue());
+            starts[idx] = firstIndex.get(key);
+            Integer c = counts.get(key);
+            groupCounts[idx] = c == null ? 0 : c;
+            idx++;
+        }
+        Intent intent = new Intent(this, LetterPickerActivity.class);
+        intent.putExtra(LetterPickerActivity.EXTRA_LETTERS, letters.toString());
+        intent.putExtra(LetterPickerActivity.EXTRA_STARTS, starts);
+        intent.putExtra(LetterPickerActivity.EXTRA_COUNTS, groupCounts);
+        intent.putExtra(LetterPickerActivity.EXTRA_CURRENT,
+                displayPositionOf(playerManager.getCurrentIndex()));
+        startActivityForResult(intent, REQ_PLAYLIST_AZ);
     }
 
     /**
