@@ -65,6 +65,10 @@ public class SongInfoActivity extends BaseWatchActivity {
     private String currentBlockCode = "";
     // Collected similar songs from the current block for playlist filling
     private final List<Song> currentBlockSongs = new ArrayList<>();
+    /** 「查看歌手主页」入口是否已添加（失败分支会先加一次，避免重复）。 */
+    private boolean artistEntryAdded = false;
+    /** 「查看歌手主页 / 相似歌曲」入口行是否已添加。 */
+    private boolean songNavAdded = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,6 +122,7 @@ public class SongInfoActivity extends BaseWatchActivity {
             public void onResult(JSONObject songDetail) {
                 contentLayout.removeView(tvLoading);
                 displaySongDetail(songDetail);
+                addSongNavEntries();
                 // After detail, fetch artist desc (then wiki)
                 fetchArtistDesc();
             }
@@ -128,6 +133,7 @@ public class SongInfoActivity extends BaseWatchActivity {
                 // Still show basic info and continue
                 contentLayout.removeView(tvLoading);
                 displayBasicInfo();
+                addSongNavEntries();
                 fetchArtistDesc();
             }
         });
@@ -1042,35 +1048,90 @@ public class SongInfoActivity extends BaseWatchActivity {
 
     /** 「查看歌手主页」入口：带歌手 id 打开歌手页。 */
     private void addArtistEntry() {
+        artistEntryAdded = true;
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        android.graphics.drawable.GradientDrawable bg =
-                new android.graphics.drawable.GradientDrawable();
-        bg.setColor(0x1AFFFFFF);
-        bg.setCornerRadius(px(10));
-        row.setBackground(bg);
-        row.setPadding(px(10), px(4), px(10), px(4));
-        row.setClickable(true);
-        row.setFocusable(true);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, px(3), 0, px(2));
-        row.setLayoutParams(lp);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.addView(buildEntryPill("查看歌手主页 ›", v -> openArtistPage()));
+        contentLayout.addView(row);
+    }
 
+    private void openArtistPage() {
+        Intent intent = new Intent(this, ArtistDetailActivity.class);
+        intent.putExtra("artist_id", artistId);
+        intent.putExtra("artist_name", artistName);
+        startActivity(intent);
+    }
+
+    private void openSimilarSongs() {
+        Intent intent = new Intent(this, SimilarActivity.class);
+        intent.putExtra("mode", SimilarActivity.MODE_SONG);
+        intent.putExtra("id", songId);
+        intent.putExtra("title", songName == null ? "" : songName);
+        startActivity(intent);
+    }
+
+    /**
+     * 歌曲页的两条「顺藤摸瓜」入口：查看歌手主页 / 相似歌曲。
+     *
+     * <p>竖排而不是横排 —— 表盘可用宽度约 358px，两个胶囊横着放就会溢出
+     * （每个中文 ≈ 24px，加内边距后「查看歌手主页 ›」已经占约 200px）。</p>
+     *
+     * <p>这里<strong>不放心动模式</strong>：它以「当前歌 + 所在歌单」为种子，
+     * 单曲来源没有歌单上下文，做不出有意义的队列。入口放在主页面浮层里，
+     * 且只在正在播放歌单时出现。</p>
+     *
+     * <p>只加一次：歌曲详情请求成功走 {@code displaySongDetail}、失败走
+     * {@code displayBasicInfo}，两条路都会走到这里。</p>
+     */
+    private void addSongNavEntries() {
+        if (songNavAdded) {
+            return;
+        }
+        songNavAdded = true;
+
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams colLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        colLp.setMargins(0, px(3), 0, px(2));
+        column.setLayoutParams(colLp);
+
+        // 失败分支里 addArtistEntry() 已经加过歌手入口，这里不要重复加
+        if (artistId > 0 && !artistEntryAdded) {
+            column.addView(buildEntryPill("查看歌手主页 ›", v -> openArtistPage()));
+        }
+        if (songId > 0) {
+            column.addView(buildEntryPill("相似歌曲 ›", v -> openSimilarSongs()));
+        }
+
+        if (column.getChildCount() > 0) {
+            contentLayout.addView(column);
+        }
+    }
+
+    /** 胶囊形入口按钮（半透明底 + 主色文字），歌曲页几个入口共用。 */
+    private TextView buildEntryPill(String text, View.OnClickListener listener) {
         TextView tv = new TextView(this);
-        tv.setText("查看歌手主页 ›");
+        tv.setText(text);
         tv.setTextColor(0xFFBB86FC);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-        row.addView(tv);
-
-        row.setOnClickListener(v -> {
-            Intent intent = new Intent(this, ArtistDetailActivity.class);
-            intent.putExtra("artist_id", artistId);
-            intent.putExtra("artist_name", artistName);
-            startActivity(intent);
-        });
-        contentLayout.addView(row);
+        tv.setGravity(android.view.Gravity.CENTER);
+        tv.setPadding(px(10), px(4), px(10), px(4));
+        GradientDrawable pill = new GradientDrawable();
+        pill.setColor(0x1AFFFFFF);
+        pill.setCornerRadius(px(10));
+        tv.setBackground(pill);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = px(4);
+        tv.setLayoutParams(lp);
+        tv.setClickable(true);
+        tv.setFocusable(true);
+        tv.setOnClickListener(listener);
+        return tv;
     }
 
     private void addInfoRow(String label, String value) {

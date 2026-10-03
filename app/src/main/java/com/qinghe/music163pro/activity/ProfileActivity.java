@@ -43,6 +43,8 @@ public class ProfileActivity extends BaseWatchActivity {
     private String nickname = "";
     private int gender = 0;
     private String signature = "";
+    /** 收藏专辑数（/album/sublist 的 count）；-1 = 未取到，不显示该行。 */
+    private int subscribedAlbumCount = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,13 +148,190 @@ public class ProfileActivity extends BaseWatchActivity {
         MusicApiHelper.getVipInfo(cookie, new MusicApiHelper.VipInfoCallback() {
             @Override
             public void onResult(JSONObject json) {
-                runOnUiThread(() -> displayVipInfo(json));
+                runOnUiThread(() -> {
+                    displayVipInfo(json);
+                    // VIP 之后再拉等级/统计，保证卡片顺序稳定（各接口是异步的）
+                    fetchLevel();
+                });
             }
 
             @Override
             public void onError(String message) {
+                runOnUiThread(ProfileActivity.this::fetchLevel);
             }
         });
+    }
+
+    /** 账号等级卡片（/user/level）。 */
+    private void fetchLevel() {
+        MusicApiHelper.getUserLevel(cookie, new MusicApiHelper.UserLevelCallback() {
+            @Override
+            public void onResult(JSONObject data) {
+                runOnUiThread(() -> {
+                    addLevelCard(data);
+                    fetchSubscribedAlbumCount();
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                runOnUiThread(ProfileActivity.this::fetchSubscribedAlbumCount);
+            }
+        });
+    }
+
+    /**
+     * 专辑数要单独拉（{@code /api/subcount} 里没有 albumCount），而且要先于统计卡片
+     * 拿到，才能把它排在其他收藏数中间。
+     */
+    private void fetchSubscribedAlbumCount() {
+        MusicApiHelper.getSubscribedAlbums(1, 0, cookie,
+                new MusicApiHelper.SubscribedAlbumsCallback() {
+                    @Override
+                    public void onResult(int total, boolean hasMore, java.util.List<MusicApiHelper.AlbumBrief> albums) {
+                        runOnUiThread(() -> {
+                            subscribedAlbumCount = total;
+                            fetchSubcount();
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        runOnUiThread(ProfileActivity.this::fetchSubcount);
+                    }
+                });
+    }
+
+    /** 统计卡片：收藏歌手 / 自建歌单 / 收藏歌单 / 收藏专辑 / MV（{@code /api/subcount}）。 */
+    private void fetchSubcount() {
+        MusicApiHelper.getUserSubcount(cookie, new MusicApiHelper.UserSubcountCallback() {
+            @Override
+            public void onResult(JSONObject data) {
+                runOnUiThread(() -> addStatsSection(data));
+            }
+
+            @Override
+            public void onError(String message) {
+                // 统计拿不到就整块不显示
+            }
+        });
+    }
+
+    /** 等级卡片：大号 Lv + 进度条 + 听歌/登录进度。 */
+    private void addLevelCard(JSONObject d) {
+        if (d == null) {
+            return;
+        }
+        int level = d.optInt("level", 0);
+        if (level <= 0) {
+            return;
+        }
+        double progress = d.optDouble("progress", 0d);
+        int nowPlay = d.optInt("nowPlayCount", 0);
+        int nextPlay = d.optInt("nextPlayCount", 0);
+        int nowLogin = d.optInt("nowLoginCount", 0);
+        int nextLogin = d.optInt("nextLoginCount", 0);
+        String info = d.optString("info", "");
+
+        addSectionTitle("账号等级");
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xFF1E1E1E);
+        bg.setCornerRadius(px(12));
+        card.setBackground(bg);
+        card.setPadding(px(12), px(10), px(12), px(12));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = px(4);
+        card.setLayoutParams(lp);
+
+        // 第一行：Lv.x + 听歌次数
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvLevel = new TextView(this);
+        tvLevel.setText("Lv." + level);
+        tvLevel.setTextColor(0xFFBB86FC);
+        tvLevel.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvLevel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(20));
+        row.addView(tvLevel);
+
+        TextView tvPlay = new TextView(this);
+        tvPlay.setText(nextPlay > 0 ? "听歌 " + nowPlay + " / " + nextPlay : "听歌 " + nowPlay);
+        tvPlay.setTextColor(0xFFAAAAAA);
+        tvPlay.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
+        tvPlay.setGravity(Gravity.END);
+        tvPlay.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(tvPlay);
+        card.addView(row);
+
+        // 进度条：用权重切成 (已达成 | 剩余) 两段，不必等测量就能按比例显示
+        double ratio = progress;
+        if (ratio < 0) ratio = 0;
+        if (ratio > 1) ratio = 1;
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, px(6));
+        barLp.topMargin = px(6);
+        barLp.bottomMargin = px(6);
+        bar.setLayoutParams(barLp);
+        GradientDrawable barBg = new GradientDrawable();
+        barBg.setColor(0xFF333333);
+        barBg.setCornerRadius(px(3));
+        bar.setBackground(barBg);
+        // 权重必须是 >0 的浮点，进度为 0 时给个极小值占位
+        float done = (float) Math.max(ratio, 0.0001d);
+        float left = (float) Math.max(1d - ratio, 0.0001d);
+        View filled = new View(this);
+        GradientDrawable fillBg = new GradientDrawable();
+        fillBg.setColor(0xFFBB86FC);
+        fillBg.setCornerRadius(px(3));
+        filled.setBackground(fillBg);
+        bar.addView(filled, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, done));
+        bar.addView(new View(this), new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, left));
+        card.addView(bar);
+
+        // 第三段：登录天数 / 权益说明
+        if (nextLogin > 0) {
+            TextView tvLogin = new TextView(this);
+            tvLogin.setText("登录 " + nowLogin + " / " + nextLogin + " 天");
+            tvLogin.setTextColor(0xFFAAAAAA);
+            tvLogin.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
+            card.addView(tvLogin);
+        }
+        if (!info.isEmpty()) {
+            TextView tvInfo = new TextView(this);
+            tvInfo.setText(info);
+            tvInfo.setTextColor(0xFF888888);
+            tvInfo.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+            tvInfo.setPadding(0, px(4), 0, 0);
+            card.addView(tvInfo);
+        }
+
+        contentLayout.addView(card);
+    }
+
+    /** 统计卡片：各类收藏数量。{@code subscribedAlbumCount} 为 -1 表示没取到。 */
+    private void addStatsSection(JSONObject data) {
+        addSectionTitle("我的收藏");
+        addInfoRow("歌单", data.optInt("createdPlaylistCount", 0) + " 个");
+        addInfoRow("收藏歌单", data.optInt("subPlaylistCount", 0) + " 个");
+        addInfoRow("收藏歌手", data.optInt("artistCount", 0) + " 位");
+        if (subscribedAlbumCount >= 0) {
+            addInfoRow("收藏专辑", subscribedAlbumCount + " 张");
+        }
+        addInfoRow("收藏 MV", data.optInt("mvCount", 0) + " 个");
+        int djRadio = data.optInt("djRadioCount", 0);
+        if (djRadio > 0) {
+            addInfoRow("收藏电台", djRadio + " 个");
+        }
     }
 
     private void removeLoading() {

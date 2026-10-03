@@ -908,6 +908,18 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
                     v -> onFuncAddToPlaylist(song)));
         }
+        // 心动模式：只有「正在播放某个歌单」时才出现。
+        // 官方智能播放接口 /playmode/intelligence/list 以播放列表为上下文来推曲，
+        // 单曲来源（搜索结果、排行、专辑里直接播）没有可用的歌单种子，推出的一串
+        // 曲目和"随机听点相似的"没区别 —— 那种场景用「相似歌曲」页更合适。
+        // 条件与播放列表浮层里的同名动作（showPlaylistItemActions）保持一致。
+        final boolean canHeartbeat = !cloudBlocked
+                && playerManager.hasSourcePlaylist()
+                && playerManager.getSourcePlaylistId() > 0;
+        if (canHeartbeat) {
+            row5.addView(createFuncItem(R.drawable.ic_favorite, "心动模式",
+                    v -> onFuncHeartbeatMode(song)));
+        }
         contentLayout.addView(row5);
 
         // Row 6: 音质
@@ -1843,6 +1855,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         intent.putExtra("artist_id", 0L); // Will be extracted from wiki API
         intent.putExtra("cookie", playerManager.getCookie());
         startActivity(intent);
+    }
+
+    /**
+     * 主页面浮层里的「心动模式」（只在正在播放歌单时才有这个入口）。
+     * 先收浮层再生成队列 —— 生成期间会弹「正在生成心动队列…」提示，
+     * 浮层压在上面会把它盖住。
+     */
+    private void onFuncHeartbeatMode(Song song) {
+        dismissOverlay();
+        startIntelligenceMode(song);
     }
 
     private void onFuncViewAlbum(Song song) {

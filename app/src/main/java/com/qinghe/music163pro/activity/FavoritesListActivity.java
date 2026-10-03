@@ -37,21 +37,30 @@ import java.util.List;
  */
 public class FavoritesListActivity extends BaseWatchActivity {
 
+    private static final int TAB_SONGS = 0;
+    private static final int TAB_PLAYLISTS = 1;
+    private static final int TAB_ALBUMS = 2;
+
     private final List<Song> favoritesList = new ArrayList<>();
     private final List<PlaylistInfo> playlistsList = new ArrayList<>();
+    private final List<MusicApiHelper.AlbumBrief> albumsList = new ArrayList<>();
     private ArrayAdapter<Song> songAdapter;
     private ArrayAdapter<PlaylistInfo> playlistAdapter;
+    private ArrayAdapter<MusicApiHelper.AlbumBrief> albumAdapter;
     private FavoritesManager favoritesManager;
     private PlaylistManager playlistManager;
     private MusicPlayerManager playerManager;
     private TextView tvEmpty;
     private ListView lvFavorites;
     private ListView lvFavPlaylists;
+    private ListView lvFavAlbums;
     private TextView tabFavSongs;
     private TextView tabFavPlaylists;
+    private TextView tabFavAlbums;
     private MultiSelectController multiSelect;
 
-    private boolean isSongTab = true;
+    /** 当前 Tab：0 单曲 / 1 歌单 / 2 专辑。 */
+    private int tab = TAB_SONGS;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,9 +72,11 @@ public class FavoritesListActivity extends BaseWatchActivity {
 
         lvFavorites = findViewById(R.id.lv_favorites);
         lvFavPlaylists = findViewById(R.id.lv_fav_playlists);
+        lvFavAlbums = findViewById(R.id.lv_fav_albums);
         tvEmpty = findViewById(R.id.tv_empty);
         tabFavSongs = findViewById(R.id.tab_fav_songs);
         tabFavPlaylists = findViewById(R.id.tab_fav_playlists);
+        tabFavAlbums = findViewById(R.id.tab_fav_albums);
 
         favoritesManager = new FavoritesManager(this);
         playlistManager = new PlaylistManager();
@@ -130,9 +141,45 @@ public class FavoritesListActivity extends BaseWatchActivity {
                 position >= 0 && position < playlistsList.size()
                         ? playlistsList.get(position).getCoverUrl() : null);
 
+        // Album adapter（收藏的专辑，复用歌单行布局：封面 + 专辑名 + "N首 · 歌手"）
+        albumAdapter = new ArrayAdapter<MusicApiHelper.AlbumBrief>(this, R.layout.item_playlist,
+                R.id.tv_playlist_name, albumsList) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                MusicApiHelper.AlbumBrief album = getItem(position);
+                if (album != null) {
+                    TextView tvName = view.findViewById(R.id.tv_playlist_name);
+                    TextView tvInfo = view.findViewById(R.id.tv_playlist_info);
+                    ImageView ivCover = view.findViewById(R.id.iv_cover);
+                    tvName.setText(album.name);
+                    StringBuilder info = new StringBuilder();
+                    if (album.size > 0) {
+                        info.append(album.size).append("\u9996");
+                    }
+                    if (album.artist != null && !album.artist.isEmpty()) {
+                        if (info.length() > 0) {
+                            info.append(" \u00b7 ");
+                        }
+                        info.append(album.artist);
+                    }
+                    tvInfo.setText(info.toString());
+                    if (ivCover != null) {
+                        NetworkImageLoader.load(ivCover, album.picUrl);
+                    }
+                }
+                return view;
+            }
+        };
+        lvFavAlbums.setAdapter(albumAdapter);
+        NetworkImageLoader.attachListViewOptimization(lvFavAlbums, albumAdapter, position ->
+                position >= 0 && position < albumsList.size()
+                        ? albumsList.get(position).picUrl : null);
+
         // Tab click handlers
         tabFavSongs.setOnClickListener(v -> switchToSongTab());
         tabFavPlaylists.setOnClickListener(v -> switchToPlaylistTab());
+        tabFavAlbums.setOnClickListener(v -> switchToAlbumTab());
 
         lvFavorites.setOnItemClickListener((parent, view, position, id) -> {
             Song song = favoritesList.get(position);
@@ -160,6 +207,16 @@ public class FavoritesListActivity extends BaseWatchActivity {
             intent.putExtra("creator", pl.getCreator());
             intent.putExtra("creator_user_id", pl.getUserId());
             intent.putExtra("is_liked_playlist", pl.isLikedPlaylist());
+            startActivity(intent);
+        });
+
+        // 收藏的专辑：点进专辑详情（可在那里取消收藏）
+        lvFavAlbums.setOnItemClickListener((parent, view, position, id) -> {
+            MusicApiHelper.AlbumBrief album = albumsList.get(position);
+            Intent intent = new Intent(this, AlbumDetailActivity.class);
+            intent.putExtra("album_id", album.id);
+            intent.putExtra("album_name", album.name);
+            intent.putExtra("album_cover_url", album.picUrl);
             startActivity(intent);
         });
 
@@ -241,22 +298,18 @@ public class FavoritesListActivity extends BaseWatchActivity {
     }
 
     private void switchToSongTab() {
-        isSongTab = true;
-        // active tab: text color only
-        tabFavSongs.setTextColor(0xFFBB86FC);
-        //
-        tabFavPlaylists.setTextColor(0xB3FFFFFF);
+        tab = TAB_SONGS;
+        applyTabStyles();
         lvFavPlaylists.setVisibility(View.GONE);
+        lvFavAlbums.setVisibility(View.GONE);
         loadData();
     }
 
     private void switchToPlaylistTab() {
-        isSongTab = false;
-        // active tab: text color only
-        tabFavPlaylists.setTextColor(0xFFBB86FC);
-        //
-        tabFavSongs.setTextColor(0xB3FFFFFF);
+        tab = TAB_PLAYLISTS;
+        applyTabStyles();
         lvFavorites.setVisibility(View.GONE);
+        lvFavAlbums.setVisibility(View.GONE);
         // 歌曲列表已隐藏，退出多选避免动作栏残留在歌单页上
         if (multiSelect != null) {
             multiSelect.setEnabled(false);
@@ -264,12 +317,68 @@ public class FavoritesListActivity extends BaseWatchActivity {
         loadPlaylists();
     }
 
-    private void loadData() {
-        if (isSongTab) {
-            loadFavorites();
-        } else {
-            loadPlaylists();
+    private void switchToAlbumTab() {
+        tab = TAB_ALBUMS;
+        applyTabStyles();
+        lvFavorites.setVisibility(View.GONE);
+        lvFavPlaylists.setVisibility(View.GONE);
+        if (multiSelect != null) {
+            multiSelect.setEnabled(false);
         }
+        loadAlbums();
+    }
+
+    /** 只改文字色：选中项主色、其余次要色（沿用原两个 Tab 的视觉）。 */
+    private void applyTabStyles() {
+        tabFavSongs.setTextColor(tab == TAB_SONGS ? 0xFFBB86FC : 0xB3FFFFFF);
+        tabFavPlaylists.setTextColor(tab == TAB_PLAYLISTS ? 0xFFBB86FC : 0xB3FFFFFF);
+        tabFavAlbums.setTextColor(tab == TAB_ALBUMS ? 0xFFBB86FC : 0xB3FFFFFF);
+    }
+
+    private void loadData() {
+        if (tab == TAB_SONGS) {
+            loadFavorites();
+        } else if (tab == TAB_PLAYLISTS) {
+            loadPlaylists();
+        } else {
+            loadAlbums();
+        }
+    }
+
+    /** 收藏的专辑（weapi /api/album/sublist），仅云端——专辑收藏本身就是账号数据。 */
+    private void loadAlbums() {
+        albumsList.clear();
+        albumAdapter.notifyDataSetChanged();
+        tvEmpty.setText("正在加载收藏的专辑...");
+        tvEmpty.setVisibility(View.VISIBLE);
+        lvFavAlbums.setVisibility(View.GONE);
+
+        String cookie = playerManager.getCookie();
+        if (cookie == null || cookie.isEmpty()) {
+            tvEmpty.setText("请先登录以查看收藏的专辑");
+            return;
+        }
+
+        MusicApiHelper.getSubscribedAlbums(100, 0, cookie,
+                new MusicApiHelper.SubscribedAlbumsCallback() {
+                    @Override
+                    public void onResult(int total, boolean hasMore, List<MusicApiHelper.AlbumBrief> albums) {
+                        albumsList.clear();
+                        if (albums != null) {
+                            albumsList.addAll(albums);
+                        }
+                        albumAdapter.notifyDataSetChanged();
+                        tvEmpty.setText("暂无收藏的专辑");
+                        updateEmptyState();
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        tvEmpty.setText("加载失败: " + message);
+                        tvEmpty.setVisibility(View.VISIBLE);
+                        lvFavAlbums.setVisibility(View.GONE);
+                    }
+                });
     }
 
     private void loadFavorites() {
@@ -467,7 +576,9 @@ public class FavoritesListActivity extends BaseWatchActivity {
     }
 
     private void updateEmptyState() {
-        if (isSongTab) {
+        if (tab == TAB_SONGS) {
+            lvFavPlaylists.setVisibility(View.GONE);
+            lvFavAlbums.setVisibility(View.GONE);
             if (favoritesList.isEmpty()) {
                 tvEmpty.setVisibility(View.VISIBLE);
                 lvFavorites.setVisibility(View.GONE);
@@ -475,8 +586,9 @@ public class FavoritesListActivity extends BaseWatchActivity {
                 tvEmpty.setVisibility(View.GONE);
                 lvFavorites.setVisibility(View.VISIBLE);
             }
-            lvFavPlaylists.setVisibility(View.GONE);
-        } else {
+        } else if (tab == TAB_PLAYLISTS) {
+            lvFavorites.setVisibility(View.GONE);
+            lvFavAlbums.setVisibility(View.GONE);
             if (playlistsList.isEmpty()) {
                 tvEmpty.setVisibility(View.VISIBLE);
                 lvFavPlaylists.setVisibility(View.GONE);
@@ -484,7 +596,16 @@ public class FavoritesListActivity extends BaseWatchActivity {
                 tvEmpty.setVisibility(View.GONE);
                 lvFavPlaylists.setVisibility(View.VISIBLE);
             }
+        } else {
             lvFavorites.setVisibility(View.GONE);
+            lvFavPlaylists.setVisibility(View.GONE);
+            if (albumsList.isEmpty()) {
+                tvEmpty.setVisibility(View.VISIBLE);
+                lvFavAlbums.setVisibility(View.GONE);
+            } else {
+                tvEmpty.setVisibility(View.GONE);
+                lvFavAlbums.setVisibility(View.VISIBLE);
+            }
         }
     }
     private void showUnfavoriteDialog(Song song, int position) {

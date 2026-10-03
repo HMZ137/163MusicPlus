@@ -36,6 +36,10 @@ public class AlbumDetailActivity extends BaseWatchActivity {
     private TextView tvStatus;
     private ImageView ivAlbumCover;
     private TextView tvAlbumName;
+    private TextView btnAlbumSub;
+
+    private long albumId;
+    private boolean albumSubscribed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,7 +50,7 @@ public class AlbumDetailActivity extends BaseWatchActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
-        long albumId = getIntent().getLongExtra("album_id", 0);
+        albumId = getIntent().getLongExtra("album_id", 0);
         String albumName = getIntent().getStringExtra("album_name");
         String albumCoverUrl = getIntent().getStringExtra("album_cover_url");
 
@@ -72,8 +76,29 @@ public class AlbumDetailActivity extends BaseWatchActivity {
                 android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
         titleParams.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+        // 右侧要放收藏按钮，标题往左留出占位，避免长专辑名压住按钮
+        titleParams.setMargins(0, 0, px(56), 0);
         tvTitle.setLayoutParams(titleParams);
         titleBar.addView(tvTitle);
+
+        // 收藏 / 已收藏（weapi /api/album/sub 与 /api/album/unsub）
+        btnAlbumSub = new TextView(this);
+        btnAlbumSub.setTextSize(12);
+        btnAlbumSub.setGravity(Gravity.CENTER);
+        btnAlbumSub.setPadding(px(7), px(2), px(7), px(2));
+        btnAlbumSub.setClickable(true);
+        btnAlbumSub.setFocusable(true);
+        applyAlbumSubStyle(false);
+        android.widget.RelativeLayout.LayoutParams subParams =
+                new android.widget.RelativeLayout.LayoutParams(
+                        android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
+        subParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
+        subParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        subParams.setMarginEnd(px(6));
+        btnAlbumSub.setLayoutParams(subParams);
+        btnAlbumSub.setOnClickListener(v -> toggleAlbumSub());
+        titleBar.addView(btnAlbumSub);
         root.addView(titleBar);
 
         // Album info row: cover + name
@@ -166,8 +191,80 @@ public class AlbumDetailActivity extends BaseWatchActivity {
 
         if (albumId > 0) {
             loadAlbumDetail(albumId);
+            loadAlbumSubState(albumId);
         } else {
             tvStatus.setText("专辑信息不可用");
+            btnAlbumSub.setVisibility(View.GONE);
+        }
+    }
+
+    /**
+     * 回显收藏按钮的初始状态。
+     *
+     * <p>走「收藏专辑列表」逐页找，不用 {@code /album/detail/dynamic} ——
+     * 后者在本机网络下会一直不返回（连续 15s 读超时，实测）。</p>
+     */
+    private void loadAlbumSubState(long albumId) {
+        String cookie = playerManager.getCookie();
+        if (cookie == null || cookie.isEmpty()) {
+            // 未登录谈不上"已收藏/未收藏"，隐藏按钮比显示一个必然失败的按钮好
+            btnAlbumSub.setVisibility(View.GONE);
+            return;
+        }
+        MusicApiHelper.isAlbumSubscribed(albumId, cookie, new MusicApiHelper.AlbumSubStateCallback() {
+            @Override
+            public void onResult(boolean subscribed) {
+                albumSubscribed = subscribed;
+                applyAlbumSubStyle(subscribed);
+            }
+
+            @Override
+            public void onError(String message) {
+                // 查不到状态就保持"未收藏"，按钮仍可点（点了会真的去收藏）
+                btnAlbumSub.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
+    private void toggleAlbumSub() {
+        if (albumId <= 0) {
+            return;
+        }
+        String cookie = playerManager.getCookie();
+        if (cookie == null || cookie.isEmpty()) {
+            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final boolean target = !albumSubscribed;
+        btnAlbumSub.setEnabled(false);
+        MusicApiHelper.subAlbum(albumId, target, cookie, new MusicApiHelper.AlbumSubCallback() {
+            @Override
+            public void onResult(boolean subscribed) {
+                btnAlbumSub.setEnabled(true);
+                albumSubscribed = subscribed;
+                applyAlbumSubStyle(subscribed);
+                Toast.makeText(AlbumDetailActivity.this,
+                        subscribed ? "已收藏专辑" : "已取消收藏", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onError(String message) {
+                btnAlbumSub.setEnabled(true);
+                Toast.makeText(AlbumDetailActivity.this, "操作失败：" + message,
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void applyAlbumSubStyle(boolean on) {
+        if (on) {
+            btnAlbumSub.setBackgroundResource(R.drawable.bg_btn_accent);
+            btnAlbumSub.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ON_ACCENT);
+            btnAlbumSub.setText("已收藏");
+        } else {
+            btnAlbumSub.setBackgroundResource(R.drawable.bg_btn_outline);
+            btnAlbumSub.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
+            btnAlbumSub.setText("收藏");
         }
     }
 

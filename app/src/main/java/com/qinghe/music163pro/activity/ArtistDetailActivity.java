@@ -48,6 +48,7 @@ public class ArtistDetailActivity extends BaseWatchActivity {
     private TextView tvDesc;
     private TextView btnHot;
     private TextView btnAll;
+    private TextView btnSimilar;
 
     private ListView lvSongs;
     private SongAdapter adapter;
@@ -198,6 +199,24 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         btnAll.setOnClickListener(v -> switchMode(1));
         updateSwitchStyle();
 
+        // ── 「相似歌手」单独占一行、通栏 ──
+        // 它是导航不是模式切换；早先挤在上一行里，三个按钮在 270dpi 表盘上放不下，
+        // 「相似歌手」被折成竖排四个字（实机截图确认）。通栏还顺带把它和上面两个
+        // 模式按钮在视觉上区分开。
+        LinearLayout similarRow = new LinearLayout(this);
+        similarRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams similarRowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        similarRowLp.setMargins(0, 0, 0, px(3));
+        similarRow.setLayoutParams(similarRowLp);
+
+        btnSimilar = buildSwitchButton("相似歌手");
+        applySwitchStyle(btnSimilar, false);   // 永远描边样式，不参与高亮
+        btnSimilar.setOnClickListener(v -> openSimilarArtists());
+        similarRow.addView(btnSimilar, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(similarRow);
+
         // ── 歌曲列表 ──
         lvSongs = new ListView(this);
         lvSongs.setDivider(null);
@@ -251,6 +270,15 @@ public class ArtistDetailActivity extends BaseWatchActivity {
                                 Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    /** 打开「相似歌手」页（/simi/artist），顺着听下去时用来换口味。 */
+    private void openSimilarArtists() {
+        Intent intent = new Intent(this, SimilarActivity.class);
+        intent.putExtra("mode", SimilarActivity.MODE_ARTIST);
+        intent.putExtra("id", artistId);
+        intent.putExtra("title", artistName == null ? "" : artistName);
+        startActivity(intent);
     }
 
     /** 切换到「热门 50 首 / 全部歌曲」。 */

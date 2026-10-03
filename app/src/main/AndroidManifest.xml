@@ -43,6 +43,7 @@
         <activity android:name=".activity.SettingsActivity" android:exported="false" />
         <activity android:name=".activity.LanguageLearningActivity" android:exported="false" />
         <activity android:name=".activity.ArtistDetailActivity" android:exported="false" />
+        <activity android:name=".activity.SimilarActivity" android:exported="false" />
         <activity android:name=".activity.ListeningRankActivity" android:exported="false" />
         <activity android:name=".activity.BackgroundSettingsActivity" android:exported="false" />
         <activity android:name=".activity.ToggleSettingsActivity" android:exported="false" />

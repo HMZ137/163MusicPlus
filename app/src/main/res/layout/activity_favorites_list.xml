@@ -18,7 +18,7 @@
         android:gravity="center"
         android:paddingBottom="6dp" />
 
-    <!-- Tabs: 单曲 / 歌单 -->
+    <!-- Tabs: 单曲 / 歌单 / 专辑 -->
     <LinearLayout
         android:id="@+id/ll_fav_tabs"
         android:layout_width="match_parent"
@@ -51,6 +51,19 @@
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true" />
+
+        <TextView
+            android:id="@+id/tab_fav_albums"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="专辑"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true" />
     </LinearLayout>
 
     <ListView
@@ -63,6 +76,15 @@
 
     <ListView
         android:id="@+id/lv_fav_playlists"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/lv_fav_albums"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"

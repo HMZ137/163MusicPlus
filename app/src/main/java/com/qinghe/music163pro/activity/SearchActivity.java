@@ -74,6 +74,8 @@ public class SearchActivity extends BaseWatchActivity {
     private SharedPreferences prefs;
 
     private String currentKeyword = "";
+    /** 官方默认搜索词（/search/default），用于输入框提示与空输入兜底。 */
+    private String defaultKeyword = "";
     private int currentSongOffset = 0;
     private int currentPlaylistOffset = 0;
     private int currentMvOffset = 0;
@@ -131,6 +133,42 @@ public class SearchActivity extends BaseWatchActivity {
         lvHistory.setAdapter(historyAdapter);
         updateHistoryVisibility();
         updateTabAppearance();
+
+        loadDefaultKeyword();
+    }
+
+    /**
+     * 拉一个官方默认搜索词填进输入框提示。
+     *
+     * <p>手表上打字很难，有默认词至少能让人「不输入也能搜一下」。拿到后同时存进
+     * {@link #defaultKeyword}，空输入时按搜索键会直接用它，而不是毫无反应。</p>
+     */
+    private void loadDefaultKeyword() {
+        final CharSequence originalHint = etSearch.getHint();
+        MusicApiHelper.getDefaultSearchKeyword(playerManager.getCookie(),
+                new MusicApiHelper.DefaultKeywordCallback() {
+                    @Override
+                    public void onResult(String keyword) {
+                        if (keyword == null || keyword.isEmpty()) {
+                            return;
+                        }
+                        defaultKeyword = keyword;
+                        // 用户已经输入了内容就不要改动提示，避免干扰。
+                        // 不写「试试：」前缀 —— 输入框在表盘上只有 ~200px，
+                        // 多两个汉字就把关键词本身挤没了，直接显示词更有用。
+                        if (etSearch.getText().length() == 0) {
+                            etSearch.setHint(keyword);
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        // 拿不到就保持原来的静态提示
+                        if (etSearch.getText().length() == 0) {
+                            etSearch.setHint(originalHint);
+                        }
+                    }
+                });
     }
 
     private void initAdapters() {
@@ -415,7 +453,14 @@ public class SearchActivity extends BaseWatchActivity {
     private void doSearch() {
         String keyword = etSearch.getText().toString().trim();
         if (keyword.isEmpty()) {
-            return;
+            // 空输入：退回官方默认词（/search/default），让搜索键始终有反应
+            if (defaultKeyword != null && !defaultKeyword.isEmpty()) {
+                keyword = defaultKeyword;
+                etSearch.setText(keyword);
+                etSearch.setSelection(keyword.length());
+            } else {
+                return;
+            }
         }
 
         currentKeyword = keyword;

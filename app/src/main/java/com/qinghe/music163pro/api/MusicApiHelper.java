@@ -1183,18 +1183,15 @@ public class MusicApiHelper {
                         }
                     }
                 }
-                // 兜底：心动模式本是为「歌单内智能续播」设计的，没有歌单上下文（如从排行/搜索播放）
-                // 时官方接口会返回空 —— 这时退化为「相似歌曲」，保证按钮始终有反应。
+                // 兜底：心动模式本是为「歌单内智能续播」设计的 —— 实测上游
+                // /api/playmode/intelligence/list 目前直接回
+                // {"success":false,"code":"500"}（歌单上下文给全也一样，2026-10-03 实测），
+                // 所以这里基本总会退化成「相似歌曲」，保证按钮始终有反应。
                 if (out.isEmpty()) {
-                    JSONObject fallback = new JSONObject();
-                    fallback.put("songid", songId);
-                    fallback.put("limit", 30);
-                    fallback.put("offset", 0);
-                    fallback.put("csrf_token", extractCsrfToken(cookie));
-                    String fallbackResp = weapiPost("/api/v1/discovery/simiSong",
-                            fallback.toString(), cookie);
-                    out.addAll(parseSongArray(new JSONObject(fallbackResp).optJSONArray("songs")));
-                    android.util.Log.i("Intelligence", "智能列表为空 → 相似歌曲兜底 n=" + out.size());
+                    JSONArray fallbackSongs = fetchSimiRaw(SIMI_KIND_SONG, songId, cookie);
+                    out.addAll(parseSongArray(fallbackSongs));
+                    android.util.Log.i("Intelligence",
+                            "智能列表为空 → 相似歌曲兜底 n=" + out.size());
                 }
                 final java.util.List<Song> finalOut = out;
                 mainHandler.post(() -> callback.onResult(finalOut));
@@ -1243,6 +1240,49 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(out));
             } catch (Exception e) {
                 MusicLog.w(TAG, "搜索建议失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public interface DefaultKeywordCallback {
+        void onResult(String keyword);
+
+        void onError(String message);
+    }
+
+    /**
+     * 默认搜索关键词（weapi /api/search/defaultkeyword/get）。
+     *
+     * <p>手表上打字很难，启动搜索页时先拿一个官方默认词填进输入框提示，
+     * 用户不用输入也能直接搜。</p>
+     */
+    public static void getDefaultSearchKeyword(String cookie, DefaultKeywordCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String response = weapiPost("/api/search/defaultkeyword/get", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject d = json.optJSONObject("data");
+                String keyword = "";
+                if (d != null) {
+                    // realkeyword 是可直接搜索的词；showKeyword 可能带 emoji / 后缀文案
+                    keyword = d.optString("realkeyword", "");
+                    if (keyword.isEmpty()) {
+                        JSONObject style = d.optJSONObject("styleKeyword");
+                        if (style != null) {
+                            keyword = style.optString("keyWord", "");
+                        }
+                    }
+                    if (keyword.isEmpty()) {
+                        keyword = d.optString("showKeyword", "");
+                    }
+                }
+                final String out = keyword == null ? "" : keyword.trim();
+                mainHandler.post(() -> callback.onResult(out));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取默认搜索词失败", e);
                 mainHandler.post(() -> callback.onError(
                         e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
@@ -1989,6 +2029,74 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
                 MusicLog.e(TAG, "获取账号信息失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public interface UserLevelCallback {
+        /**
+         * @param data 上游 {@code data} 节点（可能为空对象）：level / progress /
+         *             nowPlayCount / nextPlayCount / nowLoginCount / nextLoginCount / info
+         */
+        void onResult(JSONObject data);
+
+        void onError(String message);
+    }
+
+    /**
+     * 用户等级信息（weapi /api/user/level）。
+     *
+     * <p>返回 {@code data} 节点，字段：{@code level} 当前等级、{@code progress} 当前等级进度
+     * (0~1)、{@code nowPlayCount}/{@code nextPlayCount} 已听/升级所需听歌数、
+     * {@code nowLoginCount}/{@code nextLoginCount} 登录天数、{@code info} 权益说明。</p>
+     */
+    public static void getUserLevel(String cookie, UserLevelCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取用户等级", null);
+                JSONObject data = new JSONObject();
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String response = weapiPost("/api/user/level", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject d = json.optJSONObject("data");
+                final JSONObject out = d != null ? d : new JSONObject();
+                mainHandler.post(() -> callback.onResult(out));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取用户等级失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public interface UserSubcountCallback {
+        /**
+         * @param data 上游原始 JSON：artistCount / createdPlaylistCount /
+         *             subPlaylistCount / mvCount / djRadioCount / programCount …
+         */
+        void onResult(JSONObject data);
+
+        void onError(String message);
+    }
+
+    /**
+     * 用户统计（weapi /api/subcount）：收藏歌手数、自建歌单数、收藏歌单数、
+     * MV / 电台 / 节目数。
+     *
+     * <p>注意上游路径是 {@code /weapi/subcount}，不是 {@code /weapi/user/subcount}
+     * —— 后者回 {@code {"code":404,"message":"接口未找到！"}}（2026-10-03 实测）。</p>
+     */
+    public static void getUserSubcount(String cookie, UserSubcountCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取用户统计", null);
+                JSONObject data = new JSONObject();
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String response = weapiPost("/api/subcount", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                mainHandler.post(() -> callback.onResult(json));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取用户统计失败", e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
@@ -2870,6 +2978,134 @@ public class MusicApiHelper {
 
     // ==================== Similar Songs & Playlists ====================
 
+    /** simi 系列里「相似歌曲 / 相似歌单 / 相似歌手」三种。 */
+    private static final int SIMI_KIND_SONG = 0;
+    private static final int SIMI_KIND_PLAYLIST = 1;
+    private static final int SIMI_KIND_ARTIST = 2;
+
+    private static final int SIMI_STYLE_UNKNOWN = 0;
+    private static final int SIMI_STYLE_BODY = 1;
+    private static final int SIMI_STYLE_QUERY = 2;
+
+    /**
+     * simi 系列（相似歌曲/歌单/歌手）在当前网络下该把 id 放哪：
+     * 0 未知 / 1 请求体 / 2 URL。
+     *
+     * <p><b>为什么需要这个</b>：这三个接口对「参数放哪」挑得很怪 —— 同一个账号，
+     * 从 PC 出口只认 query（{@code ?songid=}／{@code ?artistid=}），从手表的网络出口
+     * 用 query 会<b>一直挂着不返回</b>（15s 读超时），换成请求体才正常
+     * （2026-10-03 两个出口各测数轮，稳定复现）。</p>
+     *
+     * <p><b>为什么记下来</b>：试错代价不对称 —— 请求体不被接受时上游秒回
+     * {@code 参数错误}，而 query 不被接受时会挂满 15s。所以①未知时先试请求体
+     * （试错便宜），②一旦确认哪种可用就只发那一种，不让用户每次白等一次超时。</p>
+     */
+    private static volatile int simiParamStyle = SIMI_STYLE_UNKNOWN;
+
+    /** 这个 kind 的响应里放数组的字段名。 */
+    private static String simiArrayKey(int kind) {
+        switch (kind) {
+            case SIMI_KIND_PLAYLIST:
+                return "playlists";
+            case SIMI_KIND_ARTIST:
+                return "artists";
+            case SIMI_KIND_SONG:
+            default:
+                return "songs";
+        }
+    }
+
+    /** id 放请求体（不同接口的字段名不一样，相似歌手要字符串型的 {@code id}）。 */
+    private static JSONArray simiViaBody(int kind, long id, String cookie) {
+        try {
+            JSONObject data = new JSONObject();
+            switch (kind) {
+                case SIMI_KIND_PLAYLIST:
+                    data.put("songid", id);
+                    data.put("limit", 10);
+                    data.put("offset", 0);
+                    break;
+                case SIMI_KIND_ARTIST:
+                    data.put("id", String.valueOf(id));
+                    break;
+                case SIMI_KIND_SONG:
+                default:
+                    data.put("songid", id);
+                    data.put("limit", 30);
+                    data.put("offset", 0);
+                    break;
+            }
+            data.put("csrf_token", extractCsrfToken(cookie));
+            String response = weapiPost(simiPath(kind, false, id), data.toString(), cookie);
+            return new JSONObject(response).optJSONArray(simiArrayKey(kind));
+        } catch (Exception e) {
+            MusicLog.w(TAG, "相似内容(请求体传参)失败 kind=" + kind + " id=" + id, e);
+            return null;
+        }
+    }
+
+    /** id 放 URL。 */
+    private static JSONArray simiViaQuery(int kind, long id, String cookie) {
+        try {
+            JSONObject data = new JSONObject();
+            data.put("csrf_token", extractCsrfToken(cookie));
+            String response = weapiPost(simiPath(kind, true, id), data.toString(), cookie);
+            return new JSONObject(response).optJSONArray(simiArrayKey(kind));
+        } catch (Exception e) {
+            MusicLog.w(TAG, "相似内容(query 传参)失败 kind=" + kind + " id=" + id, e);
+            return null;
+        }
+    }
+
+    /** 路径拼装；{@code withQuery} 决定 id 是拼在 URL 上还是留给请求体。 */
+    private static String simiPath(int kind, boolean withQuery, long id) {
+        switch (kind) {
+            case SIMI_KIND_PLAYLIST:
+                return withQuery
+                        ? "/api/discovery/simiPlaylist?songid=" + id
+                        : "/api/discovery/simiPlaylist";
+            case SIMI_KIND_ARTIST:
+                return withQuery
+                        ? "/api/discovery/simiArtist?artistid=" + id
+                        : "/api/discovery/simiArtist";
+            case SIMI_KIND_SONG:
+            default:
+                return withQuery
+                        ? "/api/v1/discovery/simiSong?songid=" + id
+                        : "/api/v1/discovery/simiSong";
+        }
+    }
+
+    /**
+     * 按 {@link #simiParamStyle} 的记忆拉一次；未知（或记住的那种这次也没成）时
+     * 请求体、URL 各试一遍。都失败返回 null（不写记忆，下次重新试）。
+     */
+    private static JSONArray fetchSimiRaw(int kind, long id, String cookie) {
+        final int style = simiParamStyle;
+        if (style == SIMI_STYLE_BODY) {
+            JSONArray a = simiViaBody(kind, id, cookie);
+            if (a != null) {
+                return a;
+            }
+        } else if (style == SIMI_STYLE_QUERY) {
+            JSONArray a = simiViaQuery(kind, id, cookie);
+            if (a != null) {
+                return a;
+            }
+        }
+        JSONArray viaBody = simiViaBody(kind, id, cookie);
+        if (viaBody != null) {
+            simiParamStyle = SIMI_STYLE_BODY;
+            return viaBody;
+        }
+        JSONArray viaQuery = simiViaQuery(kind, id, cookie);
+        if (viaQuery != null) {
+            simiParamStyle = SIMI_STYLE_QUERY;
+            return viaQuery;
+        }
+        return null;
+    }
+
     /**
      * Get similar songs via /api/v1/discovery/simiSong.
      * Returns JSONArray of song objects with id, name, artists[], album{}, duration, etc.
@@ -2877,20 +3113,28 @@ public class MusicApiHelper {
     public static void getSimiSong(long songId, String cookie, SimiSongCallback callback) {
         executor.execute(() -> {
             try {
-                MusicLog.op(TAG, "获取相似歌曲", "songId=" + songId);
-                JSONObject data = new JSONObject();
-                data.put("songid", songId);
-                data.put("limit", 10);
-                data.put("offset", 0);
-                String csrfToken = extractCsrfToken(cookie);
-                data.put("csrf_token", csrfToken);
-                String response = weapiPost("/api/v1/discovery/simiSong", data.toString(), cookie);
-                JSONObject json = new JSONObject(response);
-                JSONArray songs = json.optJSONArray("songs");
-                mainHandler.post(() -> callback.onResult(songs != null ? songs : new JSONArray()));
+                MusicLog.op(TAG, "获取相似歌曲", "songId=" + songId + " style=" + simiParamStyle);
+                JSONArray songs = fetchSimiRaw(SIMI_KIND_SONG, songId, cookie);
+                final JSONArray out = songs != null ? songs : new JSONArray();
+                mainHandler.post(() -> callback.onResult(out));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取相似歌曲失败: " + songId, e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /** 相似歌曲（weapi），直接给可播放的 Song 列表。 */
+    public static void getSimiSongList(long songId, String cookie, SongListCallback callback) {
+        getSimiSong(songId, cookie, new SimiSongCallback() {
+            @Override
+            public void onResult(JSONArray songs) {
+                callback.onResult(parseSongArray(songs));
+            }
+
+            @Override
+            public void onError(String message) {
+                callback.onError(message);
             }
         });
     }
@@ -2903,18 +3147,82 @@ public class MusicApiHelper {
         executor.execute(() -> {
             try {
                 MusicLog.op(TAG, "获取相似歌单", "songId=" + songId);
-                JSONObject data = new JSONObject();
-                data.put("songid", songId);
-                data.put("limit", 10);
-                data.put("offset", 0);
-                String csrfToken = extractCsrfToken(cookie);
-                data.put("csrf_token", csrfToken);
-                String response = weapiPost("/api/discovery/simiPlaylist", data.toString(), cookie);
-                JSONObject json = new JSONObject(response);
-                JSONArray playlists = json.optJSONArray("playlists");
-                mainHandler.post(() -> callback.onResult(playlists != null ? playlists : new JSONArray()));
+                JSONArray playlists = fetchSimiRaw(SIMI_KIND_PLAYLIST, songId, cookie);
+                final JSONArray out = playlists != null ? playlists : new JSONArray();
+                mainHandler.post(() -> callback.onResult(out));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取相似歌单失败: " + songId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /** 相似歌手条目。 */
+    public static class ArtistBrief {
+        public long id;
+        public String name = "";
+        public String picUrl = "";
+        /** 别名，多个用 " / " 连接；没有则为空。 */
+        public String alias = "";
+        public int musicSize;
+        public int albumSize;
+    }
+
+    public interface SimiArtistCallback {
+        void onResult(List<ArtistBrief> artists);
+
+        void onError(String message);
+    }
+
+    /**
+     * 相似歌手（weapi /api/discovery/simiArtist）。
+     *
+     * <p>参数位置同样两种都试 —— 详见 {@link #fetchSimiRaw}。URL 形式用全小写的
+     * {@code ?artistid=}（用 {@code id} / {@code artistId} 会回参数错误）。</p>
+     */
+    public static void getSimiArtistList(long artistId, String cookie, SimiArtistCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取相似歌手", "artistId=" + artistId + " style=" + simiParamStyle);
+                JSONArray arr = fetchSimiRaw(SIMI_KIND_ARTIST, artistId, cookie);
+                List<ArtistBrief> out = new ArrayList<>();
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject a = arr.optJSONObject(i);
+                        if (a == null) {
+                            continue;
+                        }
+                        long id = a.optLong("id", 0);
+                        if (id <= 0) {
+                            continue;
+                        }
+                        ArtistBrief brief = new ArtistBrief();
+                        brief.id = id;
+                        brief.name = a.optString("name", "");
+                        brief.picUrl = a.optString("picUrl", "");
+                        brief.musicSize = a.optInt("musicSize", 0);
+                        brief.albumSize = a.optInt("albumSize", 0);
+                        JSONArray aliasArr = a.optJSONArray("alias");
+                        if (aliasArr != null && aliasArr.length() > 0) {
+                            StringBuilder sb = new StringBuilder();
+                            for (int j = 0; j < aliasArr.length(); j++) {
+                                String one = aliasArr.optString(j, "");
+                                if (one.isEmpty()) {
+                                    continue;
+                                }
+                                if (sb.length() > 0) {
+                                    sb.append(" / ");
+                                }
+                                sb.append(one);
+                            }
+                            brief.alias = sb.toString();
+                        }
+                        out.add(brief);
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(out));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取相似歌手失败: " + artistId, e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
@@ -4288,6 +4596,182 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(finalAlbumName, finalCoverUrl, songs));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取专辑详情失败: " + albumId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== 专辑收藏 ====================
+
+    /** {@link #isAlbumSubscribed} 最多翻多少页收藏专辑列表。 */
+    private static final int ALBUM_SUB_SCAN_PAGES = 5;
+
+    /** 收藏专辑列表里的专辑条目。 */
+    public static class AlbumBrief {
+        public long id;
+        public String name = "";
+        public String picUrl = "";
+        /** 歌手名，多个用 " / " 连接。 */
+        public String artist = "";
+        /** 专辑曲目数。 */
+        public int size;
+        public long subTime;
+    }
+
+    public interface AlbumSubCallback {
+        void onResult(boolean subscribed);
+
+        void onError(String message);
+    }
+
+    /**
+     * 收藏 / 取消收藏专辑（weapi /api/album/sub 与 /api/album/unsub）。
+     *
+     * <p>两个坑（2026-10-03 实测）：① 收藏与取消是<strong>两个不同路径</strong>，
+     * 不是靠 {@code t} 参数区分；② {@code id} 必须放在 <strong>URL</strong> 上，
+     * 放进请求体上游只回 {@code {"msg":"参数错误","code":400}}。</p>
+     */
+    public static void subAlbum(long albumId, boolean subscribe, String cookie,
+                                AlbumSubCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, subscribe ? "收藏专辑" : "取消收藏专辑", "albumId=" + albumId);
+                JSONObject data = new JSONObject();
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String path = (subscribe ? "/api/album/sub?id=" : "/api/album/unsub?id=") + albumId;
+                String response = weapiPost(path, data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", 200);
+                if (code != 200) {
+                    String msg = json.optString("message", "操作失败");
+                    mainHandler.post(() -> callback.onError(msg));
+                    return;
+                }
+                mainHandler.post(() -> callback.onResult(subscribe));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "收藏专辑失败: " + albumId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public interface AlbumSubStateCallback {
+        void onResult(boolean subscribed);
+
+        void onError(String message);
+    }
+
+    /**
+     * 判断某张专辑是否已收藏 —— 用「收藏专辑列表」逐页找，而不是
+     * {@code /api/album/detail/dynamic}。
+     *
+     * <p>原因：实机上网关对 {@code album/detail/dynamic} 会一直不返回（连续两次都
+     * 15s 读超时），而 {@code album/sublist} 稳定 ~0.7s 返回（2026-10-03 实测）。
+     * 同一个接口在 PC 上却正常，所以这不是参数问题，换成稳定的那条路更划算。</p>
+     *
+     * <p>最多翻 {@value #ALBUM_SUB_SCAN_PAGES} 页（每页 100），够覆盖一般账号。</p>
+     */
+    public static void isAlbumSubscribed(long albumId, String cookie,
+                                         AlbumSubStateCallback callback) {
+        executor.execute(() -> {
+            final int pageSize = 100;
+            for (int page = 0; page < ALBUM_SUB_SCAN_PAGES; page++) {
+                try {
+                    JSONObject data = new JSONObject();
+                    data.put("limit", pageSize);
+                    data.put("offset", page * pageSize);
+                    data.put("total", true);
+                    data.put("csrf_token", extractCsrfToken(cookie));
+                    String response = weapiPost("/api/album/sublist", data.toString(), cookie);
+                    JSONObject json = new JSONObject(response);
+                    JSONArray arr = json.optJSONArray("data");
+                    if (arr == null) {
+                        arr = json.optJSONArray("albums");
+                    }
+                    int count = arr == null ? 0 : arr.length();
+                    for (int i = 0; i < count; i++) {
+                        JSONObject a = arr.optJSONObject(i);
+                        if (a != null && a.optLong("id", 0) == albumId) {
+                            mainHandler.post(() -> callback.onResult(true));
+                            return;
+                        }
+                    }
+                    boolean hasMore = json.optBoolean("hasMore", false);
+                    if (!hasMore || count < pageSize) {
+                        mainHandler.post(() -> callback.onResult(false));
+                        return;
+                    }
+                } catch (Exception e) {
+                    MusicLog.w(TAG, "查询专辑收藏状态失败: " + albumId, e);
+                    final String msg = e.getMessage() != null ? e.getMessage() : "未知错误";
+                    mainHandler.post(() -> callback.onError(msg));
+                    return;
+                }
+            }
+            // 翻到上限仍没找到，按「未收藏」处理（按钮点下去上游会纠正）
+            mainHandler.post(() -> callback.onResult(false));
+        });
+    }
+
+    public interface SubscribedAlbumsCallback {
+        /**
+         * @param total   收藏专辑总数
+         * @param hasMore 是否还有下一页
+         * @param albums  本页专辑
+         */
+        void onResult(int total, boolean hasMore, List<AlbumBrief> albums);
+
+        void onError(String message);
+    }
+
+    /**
+     * 已收藏专辑列表（weapi /api/album/sublist）。
+     *
+     * <p>注意数组键是 {@code data}，不是 {@code albums} —— 老实现按 {@code albums}
+     * 取会永远得到空列表（2026-10-03 实测）。</p>
+     */
+    public static void getSubscribedAlbums(int limit, int offset, String cookie,
+                                           SubscribedAlbumsCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "获取收藏专辑列表", "limit=" + limit + " offset=" + offset);
+                JSONObject data = new JSONObject();
+                data.put("limit", limit);
+                data.put("offset", offset);
+                data.put("total", true);
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String response = weapiPost("/api/album/sublist", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray arr = json.optJSONArray("data");
+                if (arr == null) {
+                    arr = json.optJSONArray("albums");
+                }
+                List<AlbumBrief> out = new ArrayList<>();
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject a = arr.optJSONObject(i);
+                        if (a == null) {
+                            continue;
+                        }
+                        long id = a.optLong("id", 0);
+                        if (id <= 0) {
+                            continue;
+                        }
+                        AlbumBrief brief = new AlbumBrief();
+                        brief.id = id;
+                        brief.name = a.optString("name", "");
+                        brief.picUrl = a.optString("picUrl", "");
+                        brief.size = a.optInt("size", 0);
+                        brief.subTime = a.optLong("subTime", 0L);
+                        brief.artist = joinArtistNames(a.optJSONArray("artists"));
+                        out.add(brief);
+                    }
+                }
+                final int total = json.optInt("count", out.size());
+                final boolean hasMore = json.optBoolean("hasMore", false);
+                mainHandler.post(() -> callback.onResult(total, hasMore, out));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取收藏专辑列表失败", e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
