@@ -57,13 +57,6 @@ public class SearchActivity extends BaseWatchActivity {
     private ArrayAdapter<MvInfo> mvAdapter;
     private ArrayAdapter<String> historyAdapter;
 
-    // 搜索联想：复用同一个列表控件显示建议（零布局改动）
-    private boolean showingSuggestions = false;
-    private final java.util.List<String> suggestList = new java.util.ArrayList<>();
-    private ArrayAdapter<String> suggestAdapter;
-    private final android.os.Handler suggestHandler =
-            new android.os.Handler(android.os.Looper.getMainLooper());
-    private Runnable pendingSuggest;
     private android.widget.AdapterView.OnItemClickListener historyClickListener;
     private android.widget.AdapterView.OnItemLongClickListener historyLongClickListener;
     private final List<Song> songList = new ArrayList<>();
@@ -248,9 +241,8 @@ public class SearchActivity extends BaseWatchActivity {
     }
 
     private void initListeners(TextView btnSearch) {
-        // 点击：建议模式下点建议词（直接搜），否则点历史词
         historyClickListener = (parent, view, position, id) -> {
-            String keyword = showingSuggestions ? suggestList.get(position) : historyList.get(position);
+            String keyword = historyList.get(position);
             etSearch.setText(keyword);
             etSearch.setSelection(keyword.length());
             doSearch();
@@ -258,9 +250,6 @@ public class SearchActivity extends BaseWatchActivity {
         lvHistory.setOnItemClickListener(historyClickListener);
 
         historyLongClickListener = (parent, view, position, id) -> {
-            if (showingSuggestions) {
-                return true;   // 建议项不支持删除
-            }
             String keyword = historyList.get(position);
             showConfirmDialog("确认删除", "确定删除搜索记录「" + keyword + "」？", () -> {
                 historyList.remove(position);
@@ -271,31 +260,6 @@ public class SearchActivity extends BaseWatchActivity {
             return true;
         };
         lvHistory.setOnItemLongClickListener(historyLongClickListener);
-
-        // 输入联想：防抖 280ms 后拉建议词（手表打字难，靠联想补全）
-        etSearch.addTextChangedListener(new android.text.TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-            }
-
-            @Override
-            public void afterTextChanged(android.text.Editable s) {
-                if (pendingSuggest != null) {
-                    suggestHandler.removeCallbacks(pendingSuggest);
-                }
-                final String keyword = s == null ? "" : s.toString().trim();
-                if (keyword.isEmpty()) {
-                    exitSuggestionMode();
-                    return;
-                }
-                pendingSuggest = () -> requestSuggestions(keyword);
-                suggestHandler.postDelayed(pendingSuggest, 280);
-            }
-        });
 
         btnSearch.setOnClickListener(v -> doSearch());
         tabSongs.setOnClickListener(v -> switchTab(TAB_SONGS));
@@ -403,51 +367,6 @@ public class SearchActivity extends BaseWatchActivity {
         lvSongs.setVisibility(currentTab == TAB_SONGS && !songList.isEmpty() ? View.VISIBLE : View.GONE);
         lvPlaylists.setVisibility(currentTab == TAB_PLAYLISTS && !playlistList.isEmpty() ? View.VISIBLE : View.GONE);
         lvMvs.setVisibility(currentTab == TAB_MVS && !mvList.isEmpty() ? View.VISIBLE : View.GONE);
-    }
-
-    /** 拉取搜索建议并复用历史列表控件展示。 */
-    private void requestSuggestions(final String keyword) {
-        MusicApiHelper.suggestKeywords(keyword, playerManager.getCookie(),
-                new MusicApiHelper.KeywordSuggestCallback() {
-                    @Override
-                    public void onResult(java.util.List<String> keywords) {
-                        if (isFinishing() || keywords == null || keywords.isEmpty()) {
-                            return;
-                        }
-                        suggestList.clear();
-                        suggestList.addAll(keywords);
-                        if (suggestAdapter == null) {
-                            suggestAdapter = new ArrayAdapter<>(SearchActivity.this,
-                                    R.layout.item_history, R.id.tv_history_text, suggestList);
-                        } else {
-                            suggestAdapter.notifyDataSetChanged();
-                        }
-                        showingSuggestions = true;
-                        lvHistory.setAdapter(suggestAdapter);
-                        lvSongs.setVisibility(View.GONE);
-                        lvPlaylists.setVisibility(View.GONE);
-                        lvMvs.setVisibility(View.GONE);
-                        llSearchTabs.setVisibility(View.GONE);
-                        lvHistory.setVisibility(View.VISIBLE);
-                    }
-
-                    @Override
-                    public void onError(String message) {
-                        // 联想失败静默处理，不打扰输入
-                    }
-                });
-    }
-
-    /** 退出联想模式，恢复搜索历史列表。 */
-    private void exitSuggestionMode() {
-        if (!showingSuggestions) {
-            return;
-        }
-        showingSuggestions = false;
-        lvHistory.setAdapter(historyAdapter);
-        lvHistory.setOnItemClickListener(historyClickListener);
-        lvHistory.setOnItemLongClickListener(historyLongClickListener);
-        updateHistoryVisibility();
     }
 
     private void doSearch() {

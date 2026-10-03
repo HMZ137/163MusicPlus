@@ -1203,49 +1203,6 @@ public class MusicApiHelper {
         });
     }
 
-    // ==================== 搜索建议 ====================
-
-    public interface KeywordSuggestCallback {
-        void onResult(java.util.List<String> keywords);
-
-        void onError(String message);
-    }
-
-    /** 搜索联想词（weapi /api/search/suggest/keyword）：手表上打字难，用联想补全。 */
-    public static void suggestKeywords(String keyword, String cookie,
-                                       KeywordSuggestCallback callback) {
-        executor.execute(() -> {
-            try {
-                JSONObject data = new JSONObject();
-                data.put("s", keyword);
-                String response = weapiPost("/api/search/suggest/keyword", data.toString(), cookie);
-                JSONObject json = new JSONObject(response);
-                java.util.List<String> out = new java.util.ArrayList<>();
-                JSONObject result = json.optJSONObject("result");
-                if (result != null) {
-                    JSONArray allMatch = result.optJSONArray("allMatch");
-                    if (allMatch != null) {
-                        for (int i = 0; i < allMatch.length(); i++) {
-                            JSONObject item = allMatch.optJSONObject(i);
-                            if (item == null) {
-                                continue;
-                            }
-                            String kw = item.optString("keyword", "");
-                            if (!kw.isEmpty()) {
-                                out.add(kw);
-                            }
-                        }
-                    }
-                }
-                mainHandler.post(() -> callback.onResult(out));
-            } catch (Exception e) {
-                MusicLog.w(TAG, "搜索建议失败: " + keyword, e);
-                mainHandler.post(() -> callback.onError(
-                        e.getMessage() != null ? e.getMessage() : "未知错误"));
-            }
-        });
-    }
-
     public interface DefaultKeywordCallback {
         void onResult(String keyword);
 
