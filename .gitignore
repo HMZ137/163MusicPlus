@@ -15,4 +15,7 @@ local.properties
 *.class
 *.keystore
 *.jks
+# 例外：项目自带的统一调试签名（让任何机器构建的 debug 包签名一致）。
+# 它是 debug 密钥（口令公开为 android），不是发布密钥，仅供侧载/自用。
+!keystore/*.keystore
 javac.*.args

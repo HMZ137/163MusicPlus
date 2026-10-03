@@ -11,8 +11,8 @@ android {
         applicationId "com.qinghe.music163pro"
         minSdk 23
         targetSdk 27 
-        versionCode 40
-        versionName "20260918"
+        versionCode 41
+        versionName "20261003"
     }
 
     signingConfigs {
@@ -25,9 +25,28 @@ android {
                 keyPassword System.getenv("KEY_PASSWORD")
             }
         }
+        // 项目自带的统一调试签名。
+        // 默认的 debug 签名取自「当前机器」的 ~/.android/debug.keystore，换一台机器就是另一把密钥，
+        // 于是设备上已装的包无法被覆盖安装（INSTALL_FAILED_UPDATE_INCOMPATIBLE），只能卸载重装、
+        // 丢设置与登录态。把调试密钥固定放进仓库，任何机器构建出来的 debug 包签名都一致。
+        debugLocal {
+            def localKeystore = file("${rootProject.projectDir}/keystore/163musicpro-debug.keystore")
+            if (localKeystore.exists()) {
+                storeFile localKeystore
+                storePassword "android"
+                keyAlias "androiddebugkey"
+                keyPassword "android"
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            // 存在统一调试签名就用它，否则回退到系统默认的 debug 签名
+            if (signingConfigs.debugLocal.storeFile != null) {
+                signingConfig signingConfigs.debugLocal
+            }
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

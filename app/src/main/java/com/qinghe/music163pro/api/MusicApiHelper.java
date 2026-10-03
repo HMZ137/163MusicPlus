@@ -1014,13 +1014,24 @@ public class MusicApiHelper {
 
     // ==================== 打卡 / 听歌排行 / 心动模式 ====================
 
-    /** 听歌打卡（weapi /api/scrobble）：让账号里的听歌记录、排行与手表同步。 */
+    /** 听歌打卡的重试次数。慢网下单次偶发读超时，不重试就会丢一次记录。 */
+    private static final int SCROBBLE_MAX_ATTEMPTS = 2;
+
+    /**
+     * 听歌打卡（weapi {@code /api/feedback/weblog}）：让账号里的听歌记录、排行与手表同步。
+     *
+     * <p>网易的「听歌打卡」实际走 {@code /api/feedback/weblog}，数据体是 logs 数组 +
+     * action/json（与 NeteaseCloudMusicApi 的 scrobble 一致）；早先用 {@code /api/scrobble}
+     * 会返回 404「接口未找到」。</p>
+     *
+     * <p><b>为什么会重试</b>：实测手表网络 RTT 可到 ~800ms，单次请求偶发读超时
+     * （{@code java.net.SocketException: Socket closed}），而打卡是「每曲一次」的，
+     * 失败就永久丢一条。这里失败后隔 1.2s 重试一次，尽量把记录补上。</p>
+     */
     public static void scrobble(long songId, long sourceId, String cookie) {
         executor.execute(() -> {
+            final String body;
             try {
-                // 网易的"听歌打卡"实际走 /api/feedback/weblog（weapi），
-                // 数据体是 logs 数组 + action/json（与 NeteaseCloudMusicApi 的 scrobble 一致）。
-                // 早先用 /api/scrobble 会返回 404「接口未找到」。
                 JSONObject inner = new JSONObject();
                 inner.put("download", 0);
                 inner.put("end", "playend");
@@ -1041,12 +1052,34 @@ public class MusicApiHelper {
                 JSONObject data = new JSONObject();
                 data.put("logs", logs.toString());
                 data.put("csrf_token", extractCsrfToken(cookie));
-
-                String response = weapiPost("/api/feedback/weblog", data.toString(), cookie);
-                android.util.Log.i("Scrobble", "服务端响应: " + response);
+                body = data.toString();
             } catch (Exception e) {
-                MusicLog.w(TAG, "听歌打卡失败: " + songId, e);
+                MusicLog.w(TAG, "听歌打卡参数构造失败: " + songId, e);
+                return;
             }
+
+            for (int attempt = 1; attempt <= SCROBBLE_MAX_ATTEMPTS; attempt++) {
+                try {
+                    String response = weapiPost("/api/feedback/weblog", body, cookie);
+                    android.util.Log.i("Scrobble",
+                            "服务端响应(第" + attempt + "次): " + response);
+                    if (response != null && response.contains("\"code\":200")) {
+                        return;
+                    }
+                } catch (Exception e) {
+                    MusicLog.w(TAG, "听歌打卡失败(第" + attempt + "/" + SCROBBLE_MAX_ATTEMPTS
+                            + "次): " + songId, e);
+                }
+                if (attempt < SCROBBLE_MAX_ATTEMPTS) {
+                    try {
+                        Thread.sleep(1200);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+            MusicLog.w(TAG, "听歌打卡最终失败: " + songId);
         });
     }
 
