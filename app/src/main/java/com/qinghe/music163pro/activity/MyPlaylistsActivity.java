@@ -60,8 +60,12 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     private TextView tvStatus;
     private long currentUserId = -1;
 
-    /** 顶部「听歌排行」入口行（歌单卡片样式，固定显示在列表上方）。 */
-    private View rankRowView;
+    /**
+     * 「听歌排行」入口的伪歌单 id。它作为 {@link #displayList} 的第一个条目，
+     * 与歌单条目同款外观、**随列表一起滚动**（不是固定行）；真实歌单 id 为正值或 -1，
+     * 故用 -1001 区分。它不参与排序，也不进 A-Z 字母分组。
+     */
+    private static final long RANK_ENTRY_ID = -1001L;
     /** 排行入口副标题的缓存键（本页与 ListeningRankActivity 共同读写）。 */
     private static final String KEY_RANK_NICK = "rank_entry_nickname";
     private static final String KEY_RANK_COUNT = "rank_entry_count";
@@ -232,21 +236,6 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         tvStatus.setPadding(0, px(4), 0, px(4));
         root.addView(tvStatus);
 
-        // ---- 听歌排行入口：做成与歌单条目完全一致的圆角卡片行，紧贴列表上方（固定，不随列表滚动）----
-        //   在线 Tab → 「我的听歌排行」（服务端 /api/v1/play/record，与账号同步）
-        //   本地 Tab → 「本地听歌排行」（本机播放统计 PlaybackStatsActivity）
-        //   副标题格式与歌单条目一致：「N首 · 昵称」。
-        rankRowView = getLayoutInflater().inflate(R.layout.item_my_playlist, root, false);
-        {
-            ImageView rIcon = rankRowView.findViewById(R.id.iv_playlist_icon);
-            rIcon.setImageResource(R.drawable.ic_music_note);
-            rIcon.setColorFilter(0xFFBB86FC);
-            rankRowView.setClickable(true);
-            rankRowView.setFocusable(true);
-            rankRowView.setOnClickListener(v -> openRankPage());
-        }
-        root.addView(rankRowView);
-
         lvPlaylists = new ListView(this);
         lvPlaylists.setDividerHeight(1);
         lvPlaylists.setDivider(getResources().getDrawable(android.R.color.transparent));
@@ -267,6 +256,26 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
                     view = getLayoutInflater().inflate(R.layout.item_my_playlist, parent, false);
                 }
                 PlaylistInfo pl = getItem(position);
+                if (isRankEntry(pl)) {
+                    // 排行入口行：与「本地歌单」条目同样式（音符图标 + 主色），文案格式也一致。
+                    ImageView rIcon = view.findViewById(R.id.iv_playlist_icon);
+                    rIcon.clearColorFilter();
+                    rIcon.setImageResource(R.drawable.ic_music_note);
+                    rIcon.setColorFilter(0xFFBB86FC);
+                    TextView rName = view.findViewById(R.id.tv_name);
+                    rName.setText(pl.getName());
+                    rName.setTextColor(0xFFFFFFFF);
+                    rName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
+                    String d = pl.getTrackCount() + "首";
+                    if (pl.getCreator() != null && !pl.getCreator().isEmpty()) {
+                        d += " · " + pl.getCreator();
+                    }
+                    TextView rDetail = view.findViewById(R.id.tv_detail);
+                    rDetail.setText(d);
+                    rDetail.setTextColor(0xB3FFFFFF);
+                    rDetail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+                    return view;
+                }
                 if (pl != null) {
                     ImageView icon = view.findViewById(R.id.iv_playlist_icon);
                     TextView tvName = view.findViewById(R.id.tv_name);
@@ -313,6 +322,10 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
         lvPlaylists.setOnItemClickListener((parent, view, position, id) -> {
             PlaylistInfo pl = displayList.get(position);
+            if (isRankEntry(pl)) {
+                openRankPage();
+                return;
+            }
             if (activeTab == TAB_LOCAL) {
                 Intent intent = new Intent(this, LocalPlaylistDetailActivity.class);
                 intent.putExtra("playlist_name", pl.getName());
@@ -331,6 +344,9 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
         lvPlaylists.setOnItemLongClickListener((parent, view, position, id) -> {
             PlaylistInfo pl = displayList.get(position);
+            if (isRankEntry(pl)) {
+                return true; // 入口行无长按菜单
+            }
             if (activeTab == TAB_LOCAL) {
                 showLocalPlaylistOptions(pl);
                 return true;
@@ -404,30 +420,44 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         refreshRankRow(local);
     }
 
-    /** 刷新顶部「听歌排行」入口行的文案与副标题（按当前 Tab）。 */
-    private void refreshRankRow(boolean local) {
-        if (rankRowView == null) return;
-        TextView tvName = rankRowView.findViewById(R.id.tv_name);
-        TextView tvDetail = rankRowView.findViewById(R.id.tv_detail);
-        tvName.setText(local ? "本地听歌排行" : "我的听歌排行");
-        tvName.setTextColor(0xFFFFFFFF);
-        tvName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        String detail;
+    /** 造一个「听歌排行」伪歌单（承载入口行的文案与副标题，外观交给通用 getView）。 */
+    private PlaylistInfo createRankEntry(boolean local) {
+        int count;
         if (local) {
             // 本地排行：直接用本机统计的曲目数（无需联网）。
-            int count = com.qinghe.music163pro.util.PlaybackStats.getSummary(this).trackedSongCount;
-            detail = count + "首";
+            count = com.qinghe.music163pro.util.PlaybackStats.getSummary(this).trackedSongCount;
         } else {
             // 在线排行：用缓存条数（由 ListeningRankActivity 加载后写入；未打开过则为 0）。
-            detail = rankPrefs().getInt(KEY_RANK_COUNT, 0) + "首";
+            count = rankPrefs().getInt(KEY_RANK_COUNT, 0);
         }
         String nick = rankPrefs().getString(KEY_RANK_NICK, null);
-        if (nick != null && !nick.isEmpty()) {
-            detail += " · " + nick;
+        PlaylistInfo entry = new PlaylistInfo(RANK_ENTRY_ID,
+                local ? "本地听歌排行" : "我的听歌排行", count,
+                nick != null && !nick.isEmpty() ? nick : "");
+        entry.setUserId(-1);
+        return entry;
+    }
+
+    private boolean isRankEntry(PlaylistInfo pl) {
+        return pl != null && pl.getId() == RANK_ENTRY_ID;
+    }
+
+    /** 把入口行放到列表首位（已存在则替换，保持位置不变）。须在 {@link #sortAndIndex()} 之前调用。 */
+    private void insertRankEntry(boolean local) {
+        PlaylistInfo entry = createRankEntry(local);
+        if (!displayList.isEmpty() && isRankEntry(displayList.get(0))) {
+            displayList.set(0, entry);
+        } else {
+            displayList.add(0, entry);
         }
-        tvDetail.setText(detail);
-        tvDetail.setTextColor(0xB3FFFFFF);
-        tvDetail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+    }
+
+    /** 刷新入口行的副标题（从排行页返回、或昵称取到后调用）。 */
+    private void refreshRankRow(boolean local) {
+        if (!displayList.isEmpty() && isRankEntry(displayList.get(0))) {
+            displayList.set(0, createRankEntry(local));
+            adapter.notifyDataSetChanged();
+        }
     }
 
     /** 入口行点击：在线 Tab → 服务端听歌排行；本地 Tab → 本机播放统计。 */
@@ -450,7 +480,12 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     private void ensureRankNicknameCached() {
         String nick = rankPrefs().getString(KEY_RANK_NICK, null);
         if (nick != null && !nick.isEmpty()) return;
-        MusicApiHelper.getUserAccount(MusicPlayerManager.getInstance().getCookie(),
+        String cookie = MusicPlayerManager.getInstance().getCookie();
+        if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
+            // 未登录不取账号信息（避免无意义请求）
+            return;
+        }
+        MusicApiHelper.getUserAccount(cookie,
                 new MusicApiHelper.AccountCallback() {
                     @Override
                     public void onResult(org.json.JSONObject accountJson) {
@@ -473,6 +508,8 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         super.onResume();
         // Refresh list when returning from detail (e.g. after delete/unsub)
         loadPlaylists();
+        // 从「听歌排行」页返回时，副标题的「N首」可能已被刷新 → 同步更新入口行
+        refreshRankRow(activeTab == TAB_LOCAL);
     }
 
     /** 按当前 Tab 分发加载。 */
@@ -500,6 +537,8 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
             public void onResult(List<PlaylistInfo> playlists) {
                 displayList.clear();
                 displayList.addAll(playlists);
+                // 排行入口固定为列表首个条目（不参与排序 / A-Z 分组）
+                insertRankEntry(false);
                 // 按拼音首字母排序并建立首字母分组，供「A-Z」跳转使用
                 sortAndIndex();
                 // Detect current user ID from the first playlist's creator (if it's their "liked" playlist)
@@ -542,6 +581,7 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
             pl.setCoverUrl(null);
             displayList.add(pl);
         }
+        insertRankEntry(true); // 排行入口固定为列表首个条目（不参与排序 / A-Z 分组）
         sortAndIndex(); // 按歌单名排序 + 建立首字母分组（A-Z 跳转可复用）
         adapter.notifyDataSetChanged();
         if (names.isEmpty()) {
@@ -561,18 +601,22 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
      */
     private void sortAndIndex() {
         final Collator collator = Collator.getInstance(Locale.CHINA);
-        Collections.sort(displayList, (left, right) -> {
-            char leftInitial = PinyinUtils.initialOfWord(left.getName());
-            char rightInitial = PinyinUtils.initialOfWord(right.getName());
-            if (leftInitial != rightInitial) {
-                // '#'（数字 / 符号 / 非汉字）永远排在最后
-                if (leftInitial == PinyinUtils.OTHER) return 1;
-                if (rightInitial == PinyinUtils.OTHER) return -1;
-                return Character.compare(leftInitial, rightInitial);
-            }
-            int byName = collator.compare(left.getName(), right.getName());
-            return byName;
-        });
+        // 首个条目若是「听歌排行」入口，则不参与排序（保持钉在首位）
+        final int from = (!displayList.isEmpty() && isRankEntry(displayList.get(0))) ? 1 : 0;
+        if (displayList.size() - from > 1) {
+            Collections.sort(displayList.subList(from, displayList.size()), (left, right) -> {
+                char leftInitial = PinyinUtils.initialOfWord(left.getName());
+                char rightInitial = PinyinUtils.initialOfWord(right.getName());
+                if (leftInitial != rightInitial) {
+                    // '#'（数字 / 符号 / 非汉字）永远排在最后
+                    if (leftInitial == PinyinUtils.OTHER) return 1;
+                    if (rightInitial == PinyinUtils.OTHER) return -1;
+                    return Character.compare(leftInitial, rightInitial);
+                }
+                int byName = collator.compare(left.getName(), right.getName());
+                return byName;
+            });
+        }
         buildLetterGroups();
     }
 
@@ -580,7 +624,9 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     private void buildLetterGroups() {
         java.util.LinkedHashMap<Character, Integer> firstIndex = new java.util.LinkedHashMap<>();
         java.util.LinkedHashMap<Character, Integer> counts = new java.util.LinkedHashMap<>();
-        for (int i = 0; i < displayList.size(); i++) {
+        // 跳过首位的「听歌排行」入口行（它不是歌单，不该出现在 A-Z 分组里）
+        int from = (!displayList.isEmpty() && isRankEntry(displayList.get(0))) ? 1 : 0;
+        for (int i = from; i < displayList.size(); i++) {
             char initial = PinyinUtils.initialOfWord(displayList.get(i).getName());
             if (!firstIndex.containsKey(initial)) {
                 firstIndex.put(initial, i);
