@@ -75,7 +75,11 @@ public class DownloadListActivity extends BaseWatchActivity {
         // 与本地音乐页同理：占位加在**整个标题栏**上。若只加给上面的动作行，那一行会被撑到
         // 返回按钮的高度，再叠一行标题，头部会白吃掉几十像素的列表空间。
         View titleBar = findViewById(R.id.layout_downloads_title_bar);
-        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar);
+        // 只有「动作行 + 标题」避让左上角的返回按钮；标题栏里的「下载 / 本地」标签行
+        // 要占满整行宽度（用户明确要求），所以走 applyTitleBarInset 的变体。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar,
+                findViewById(R.id.layout_downloads_action_row),
+                findViewById(R.id.tv_downloads_title));
         // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
         // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
         com.qinghe.music163pro.util.WatchBackButton.addTitleBarExtraHeight(

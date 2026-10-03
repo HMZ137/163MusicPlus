@@ -154,11 +154,15 @@ public class LocalMusicActivity extends BaseWatchActivity {
         //     整个头部吃掉近 150px，列表只剩两行半；
         //   · 加给外层 → 外层本来就是返回按钮的占地高度，两行内容正好填进去，
         //     头部回到「一个返回按钮」的量级，列表多出约一行空间。
-        WatchBackButton.applyTitleBarInset(this, findViewById(R.id.layout_local_music_title_bar));
+        View titleBar = findViewById(R.id.layout_local_music_title_bar);
+        // 只有「动作行 + 标题」避让左上角的返回按钮；标题栏里的「下载 / 本地」标签行
+        // 要占满整行宽度（用户明确要求），所以走 applyTitleBarInset 的变体。
+        WatchBackButton.applyTitleBarInset(this, titleBar,
+                findViewById(R.id.layout_local_music_action_row),
+                findViewById(R.id.tv_local_music_title));
         // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
         // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
-        WatchBackButton.addTitleBarExtraHeight(this,
-                findViewById(R.id.layout_local_music_title_bar),
+        WatchBackButton.addTitleBarExtraHeight(this, titleBar,
                 UiKit.dp(this, UiKit.DP_TAB_ROW_HEIGHT + 4));
 
         // 动作行只留最常用的两个 + 「更多」；五个操作（搜索/排序/A-Z/随机/局域网传歌）全在「更多」里

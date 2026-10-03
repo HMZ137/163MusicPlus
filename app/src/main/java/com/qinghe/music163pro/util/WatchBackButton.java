@@ -92,7 +92,28 @@ public final class WatchBackButton {
      *
      * @param titleBar 页面自绘的标题行。null 或拿不到 LayoutParams 时静默返回。
      */
+    /**
+     * 标题栏占位：把整行撑到「返回按钮占地」的高度，并让**整行**横向避开返回按钮与圆角。
+     *
+     * @see #applyTitleBarInset(Activity, View, View[])
+     */
     public static void applyTitleBarInset(Activity activity, View titleBar) {
+        applyTitleBarInset(activity, titleBar, new View[0]);
+    }
+
+    /**
+     * 标题栏占位，<b>只让指定的那几行横向避让</b>，其余子视图（例如页内标签行）仍占满整行宽度。
+     *
+     * <p><b>为什么需要这个变体</b>：避让是靠给标题栏加左内边距实现的，而内边距会作用到
+     * <b>所有</b>子视图。标题栏里一旦挂了页内标签行，那行标签也会被推窄 —— 实机上「下载 /
+     * 本地」两个标签只占了中间 222px（106~328），而不是整行，用户明确要求「标签不要做
+     * 返回键避让」。所以这里把避让改成：<b>容器只保留高度占位、横向内边距清零</b>，
+     * 再把同样的左/右留白以 margin 的形式只加给 {@code insetChildren}（通常是「动作行」与
+     * 「标题」—— 这两行确实会被左上角的返回按钮压到）。</p>
+     *
+     * <p>不传 {@code insetChildren} 时行为与原来完全一致（整行避让），其余 17 个页面不受影响。</p>
+     */
+    public static void applyTitleBarInset(Activity activity, View titleBar, View... insetChildren) {
         if (activity == null || titleBar == null) {
             return;
         }
@@ -130,6 +151,29 @@ public final class WatchBackButton {
                     titleBar.getPaddingTop(),
                     Math.max(padEnd, inset),
                     titleBar.getPaddingBottom());
+        }
+
+        // 只让指定的几行避让：把上面那层横向内边距搬到这些子视图的 margin 上，
+        // 标题栏里其余子视图（页内标签行）就能占满整行宽度。
+        if (insetChildren != null && insetChildren.length > 0) {
+            int start = titleBar.getPaddingStart();
+            int end = titleBar.getPaddingEnd();
+            if (start > 0 || end > 0) {
+                titleBar.setPaddingRelative(0, titleBar.getPaddingTop(), 0, titleBar.getPaddingBottom());
+                for (View child : insetChildren) {
+                    if (child == null) {
+                        continue;
+                    }
+                    ViewGroup.LayoutParams raw = child.getLayoutParams();
+                    if (!(raw instanceof ViewGroup.MarginLayoutParams)) {
+                        continue;
+                    }
+                    ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
+                    lp.leftMargin = start;
+                    lp.rightMargin = end;
+                    child.setLayoutParams(lp);
+                }
+            }
         }
 
         // 标题栏里的文字一律压成单行 + 结尾截断。
