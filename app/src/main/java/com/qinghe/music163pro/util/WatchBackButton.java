@@ -77,6 +77,17 @@ public final class WatchBackButton {
     }
 
     /**
+     * 浮动返回键自身的边长（不含外边距）。
+     *
+     * <p>给「只需避开按键本体、不必连外边距一起让」的场景用 —— 比如标题字号变大后
+     * 往左伸到按键上了，这时给标题加一个按键宽度的左外边距，让它在
+     * 「按键右缘 ↔ 右侧动作按钮左缘」之间居中。</p>
+     */
+    public static int getBackButtonSize(Activity activity) {
+        return activity == null ? 0 : buttonSize(activity);
+    }
+
+    /**
      * 只做**竖直**避让时，标题行该占的高度（横向不避让）。
      *
      * <p>有些页面的标题是居中的、下面的标签行又要占满整行宽度（「收藏」「我的歌单」），
@@ -105,6 +116,19 @@ public final class WatchBackButton {
      * 因为那会让标题偏右、也会把标签行推窄 —— 用户明确要求这两页「取消避让」。</p>
      */
     public static void applyTitleBarTopInset(Activity activity, View titleBar) {
+        applyTitleBarTopInset(activity, titleBar, 0);
+    }
+
+    /**
+     * 同 {@link #applyTitleBarTopInset(Activity, View)}，但允许在此基础上**再压缩**。
+     *
+     * @param shrinkPx 额外压缩的像素。
+     *        <p><b>调用前必须确认</b>：标题文字与下方标签/按钮的文字都落在返回键的
+     *        <b>横向范围之外</b>（返回键只占 x≤86）。像「我的歌单」只有两个等宽标签、
+     *        「在线歌单」的中心在 x≈98，压根碰不到按键，才敢再压；
+     *        「收藏」有三个窄标签、首个标签中心在 x≈71（正在按键范围内），就不能压。</p>
+     */
+    public static void applyTitleBarTopInset(Activity activity, View titleBar, int shrinkPx) {
         if (activity == null || titleBar == null) {
             return;
         }
@@ -112,7 +136,9 @@ public final class WatchBackButton {
         if (params == null) {
             return;
         }
-        int reserved = getReservedTopHeight(activity);
+        // 下限留够一行标题的高度，再压就压到字上去了
+        int reserved = Math.max(dp(activity, 26),
+                getReservedTopHeight(activity) - Math.max(0, shrinkPx));
         // 只在该撑高时撑高（match_parent / 已更高的固定高度都不动）
         if (params.height == ViewGroup.LayoutParams.WRAP_CONTENT
                 || (params.height > 0 && params.height < reserved)) {

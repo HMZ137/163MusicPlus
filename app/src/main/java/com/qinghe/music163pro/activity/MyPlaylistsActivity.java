@@ -118,7 +118,12 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         TextView tvTitle = new TextView(this);
         tvTitle.setText("我的歌单");
         tvTitle.setTextColor(0xFFFFFFFF);
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        // 字号直接取全局标题资源（@dimen/watch_title_text_size = 16sp），与「收藏」
+        // 「下载」「本地音乐」等 XML 页面的标题完全一致。
+        // 早先这里写的是 px(15) —— px() 按屏宽比例缩放（320px 基准 → 本机 ×1.18），
+        // 实际只有约 18px，比其它页面小了一档，看着偏小（用户反馈）。
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_title_text_size));
         tvTitle.setGravity(Gravity.CENTER);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         // 只留很小的左右内边距：返回按钮的占位已由 applyTitleBarInset 加到标题行（titleRow）的
@@ -180,12 +185,19 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
         // 标题在 A-Z 左侧收尾，不再与标题文字重叠。
         titleParams.addRule(android.widget.RelativeLayout.LEFT_OF, idAZ);
+        // 标题字号换成全局 16sp 后变宽，居中时会往左伸到浮动返回键上（实机截图：「我」压住 X）。
+        // 这里只给**标题这一行**加一个按键宽度的左外边距，让它在「返回键右缘 ↔ A-Z 左缘」
+        // 之间居中；标题行整体与下面的标签行仍然不避让（标签行保持满宽）。
+        titleParams.leftMargin =
+                com.qinghe.music163pro.util.WatchBackButton.getBackButtonSize(this);
 
         root.addView(titleRow);
         // 标题行只做**竖直**避让：撑到浮动返回键底边之下（否则 X 按钮会探进标题行 /
         // 压在第一个标签上），横向不加内边距 —— 本页标题居中、标签行要占满整行宽度，
         // 整行横向避让会让标题偏右、标签被推窄（用户明确要求「取消避让」）。
-        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarTopInset(this, titleRow);
+        // 额外压 px(8)：本页只有两个等宽标签，「在线歌单」中心在 x≈98，横向压根碰不到
+        // 返回键（它只占 x≤86），所以标签行整体上移一点是安全的（详见方法注释）。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarTopInset(this, titleRow, px(8));
 
         // ---- 二级界面切换（在线 / 本地），等宽平分 ----
         // 样式统一走 UiKit.tab()：纯文字、无底衬、仅颜色区分选中（与「收藏」页一致）。
@@ -203,33 +215,40 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         }
         root.addView(tabRow);
 
-        // ---- 「导入歌单」按钮：本地 Tab 专用，把外部 json 歌单文件读进来。 ----
+        // ---- 「N 个歌单」+「导入歌单」同一行 ----
+        // 早先是两个独立行：导入按钮自己占一行、状态文案再占一行，白白吃掉两行高度。
+        // 现在合成一行：文案占满剩余宽度（在线 Tab 下就是整行），按钮贴右（仅本地 Tab 显示）。
         TextView btnImport = new TextView(this);
         btnImport.setText("导入歌单");
         btnImport.setTextColor(0xFFBB86FC);
-        btnImport.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        btnImport.setPadding(px(18), px(8), px(18), px(8));
+        btnImport.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
+        btnImport.setPadding(px(14), px(4), px(14), px(4));
         btnImport.setBackgroundResource(R.drawable.bg_letter_cell);
         btnImport.setClickable(true);
         btnImport.setFocusable(true);
         btnImport.setOnClickListener(v -> onImportClicked());
-        LinearLayout ieRow = new LinearLayout(this);
-        ieRow.setOrientation(LinearLayout.HORIZONTAL);
-        ieRow.setGravity(Gravity.CENTER);
-        ieRow.setPadding(0, 0, 0, px(2));
-        ieRow.addView(btnImport);
-        ieRow.setVisibility(View.GONE);
-        importRow = ieRow;
-        root.addView(ieRow);
+        btnImport.setVisibility(View.GONE);
 
-        // Status text
+        LinearLayout statusRow = new LinearLayout(this);
+        statusRow.setOrientation(LinearLayout.HORIZONTAL);
+        statusRow.setGravity(Gravity.CENTER_VERTICAL);
+        statusRow.setPadding(0, px(1), 0, px(1));
+
+        // Status text：左对齐当分节标题用（在线 Tab 整行只有它，字号与内边距都收窄了）
         tvStatus = new TextView(this);
         tvStatus.setText("正在加载...");
         tvStatus.setTextColor(0x80FFFFFF);
-        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
-        tvStatus.setGravity(Gravity.CENTER);
-        tvStatus.setPadding(0, px(4), 0, px(4));
-        root.addView(tvStatus);
+        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
+        tvStatus.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        tvStatus.setSingleLine(true);
+        tvStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tvStatus.setPadding(px(2), 0, px(2), 0);
+        statusRow.addView(tvStatus, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        statusRow.addView(btnImport);
+        root.addView(statusRow);
+        // importRow 现在只指**按钮**本身：切换 Tab 时只收起按钮，这一行始终在
+        importRow = btnImport;
 
         lvPlaylists = new ListView(this);
         lvPlaylists.setDividerHeight(1);
