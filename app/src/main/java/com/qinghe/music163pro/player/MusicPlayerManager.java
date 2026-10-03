@@ -98,6 +98,24 @@ public class MusicPlayerManager {
      * 后者保证顺序播放在队列放完之后能自然接回「原本的下一首」。</p>
      */
     private final List<Song> playNextQueue = new ArrayList<>();
+
+    // ---- 心动模式（末尾续播） ----
+    /**
+     * 心动模式：<b>不替换</b>当前队列，而是把推荐曲<b>追加到队尾</b>；原歌单播完后接着往下听。
+     *
+     * <p>为什么是「追加」而不是「换一批」：换一批会把用户正在听的歌顶掉、把歌单上下文整个丢掉，
+     * 用过一次就不想再用（实测反馈）。而模式的意义本来就该是「不打扰地持续生效」——
+     * 用户听自己的歌单，听到末尾自动续上口味相近的下一批，才是网易云心动模式本来的行为。</p>
+     *
+     * <p>联动关系：与 {@link #personalFmMode} 同一套机制 —— 队列走到尽头时取下一批、
+     * {@link #appendUniqueSongs} 去重追加、然后继续推进。差别只在种子：
+     * 私人漫游用固定模式，心动模式用<b>队列最后一首</b>当种子，所以会「越听越对味」。</p>
+     *
+     * <p>已插入的曲目 id 记在 {@link #heartbeatIds}，供界面标记与一键清除。</p>
+     */
+    private final java.util.Set<Long> heartbeatIds = new java.util.LinkedHashSet<>();
+    private boolean heartbeatMode = false;
+    private boolean heartbeatLoading = false;
     private boolean isPlaying = false;
     private PlayerCallback callback;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -175,6 +193,8 @@ public class MusicPlayerManager {
         clearSourcePlaylistInfo();
         personalFmMode = false;
         personalFmLoading = false;
+        // 队列被整体换掉，此前追加的心动曲目与标记都不再成立
+        resetHeartbeat();
         invalidateShuffleOrder();
         savePlaybackState();
     }
@@ -199,6 +219,8 @@ public class MusicPlayerManager {
         sourcePlaylistIsLiked = isLiked;
         personalFmMode = false;
         personalFmLoading = false;
+        // 队列被整体换掉，此前追加的心动曲目与标记都不再成立
+        resetHeartbeat();
         invalidateShuffleOrder();
         savePlaybackState();
     }
@@ -216,6 +238,8 @@ public class MusicPlayerManager {
         clearSourcePlaylistInfo();
         personalFmMode = true;
         personalFmLoading = false;
+        // 私人漫游是另一套续播机制，心动模式不与之并存
+        resetHeartbeat();
         personalFmModeStr = (mode != null && !mode.isEmpty()) ? mode : "DEFAULT";
         personalFmSubModeStr = (subMode != null) ? subMode : "";
         invalidateShuffleOrder();
@@ -2012,8 +2036,190 @@ public class MusicPlayerManager {
             loadMorePersonalFmAndAdvance();
             return;
         }
+        // 心动模式：连最后追加的那几首都听完了 → 再取一批接着放。
+        // 取不到就照常循环回歌单开头，绝不因为心动模式卡住播放。
+        if (heartbeatMode && currentIndex == playlist.size() - 1) {
+            if (loadMoreHeartbeatAndAdvance()) {
+                return;
+            }
+        }
         currentIndex = (currentIndex + 1) % playlist.size();
         playCurrent();
+    }
+
+    // ==================== 心动模式 ====================
+
+    /** 心动模式是否开启。 */
+    public boolean isHeartbeatMode() {
+        return heartbeatMode;
+    }
+
+    /** 只关掉心动模式、保留已追加的曲目（首批没取到时用：没有曲目可留，等于直接关）。 */
+    public void setHeartbeatModeOff() {
+        heartbeatMode = false;
+    }
+
+    /** 队列里已追加的心动曲目数。 */
+    public int getHeartbeatCount() {
+        return heartbeatIds.size();
+    }
+
+    /** 这首歌是不是心动模式追加进来的（界面据此打标记）。 */
+    public boolean isHeartbeatSong(Song song) {
+        return song != null && song.getId() > 0 && heartbeatIds.contains(song.getId());
+    }
+
+    /**
+     * 开启心动模式：<b>不动当前队列、不打断正在播放的这首</b>，
+     * 先补一批推荐到队尾，之后每播完一批自动续下一批。
+     *
+     * @param seed 首批推荐的种子（一般是当前正在播的这首）
+     * @param onResult 回调给界面用：已追加首数；失败时 message 非空
+     */
+    public void startHeartbeat(Song seed, HeartbeatCallback onResult) {
+        if (seed == null || seed.getId() <= 0) {
+            notifyHeartbeat(onResult, 0, "这首歌无法作为起点");
+            return;
+        }
+        heartbeatMode = true;
+        fetchHeartbeatBatch(seed, false, onResult);
+    }
+
+    /**
+     * 关闭心动模式并把追加过的心动曲目从队列里移除（「一键清」）。
+     *
+     * <p>正在播放的那首如果本身就是心动曲目，会先被移出，此时接着播当前位置的新曲目；
+     * 队列被清空则停止。</p>
+     *
+     * @return 被移除的曲目数
+     */
+    public int exitHeartbeat() {
+        int removed = clearHeartbeatSongs();
+        heartbeatMode = false;
+        return removed;
+    }
+
+    /** 只清掉已追加的心动曲目（不改开关状态）。 */
+    public int clearHeartbeatSongs() {
+        if (heartbeatIds.isEmpty()) {
+            return 0;
+        }
+        boolean removedCurrent = false;
+        int removed = 0;
+        Song current = getCurrentSong();
+        java.util.Iterator<Song> it = playlist.iterator();
+        while (it.hasNext()) {
+            Song s = it.next();
+            if (s != null && heartbeatIds.contains(s.getId())) {
+                if (current != null && s.getId() == current.getId()) {
+                    removedCurrent = true;
+                }
+                it.remove();
+                removed++;
+            }
+        }
+        heartbeatIds.clear();
+        invalidateShuffleOrder();
+        if (playlist.isEmpty()) {
+            currentIndex = -1;
+            stop();
+            return removed;
+        }
+        // 正在播的那首被清掉了：接着播同一位置的新曲目（末位则回退一首）
+        if (removedCurrent) {
+            currentIndex = Math.max(0, Math.min(currentIndex, playlist.size() - 1));
+            playCurrent();
+        } else if (currentIndex >= playlist.size()) {
+            currentIndex = playlist.size() - 1;
+        }
+        savePlaybackState();
+        return removed;
+    }
+
+    private void resetHeartbeat() {
+        heartbeatMode = false;
+        heartbeatLoading = false;
+        heartbeatIds.clear();
+    }
+
+    /**
+     * 取一批心动曲并追加到队尾。
+     *
+     * @param advance 取到之后是否立刻推进播放（队列到头自动续播时为 true）
+     * @return true 表示已推进（调用方据此决定要不要 return）
+     */
+    private boolean loadMoreHeartbeatAndAdvance() {
+        Song last = playlist.isEmpty() ? getCurrentSong()
+                : playlist.get(playlist.size() - 1);
+        if (last == null || heartbeatLoading) {
+            return false;
+        }
+        fetchHeartbeatBatch(last, true, null);
+        return true;
+    }
+
+    private void fetchHeartbeatBatch(Song seed, boolean advance, HeartbeatCallback onResult) {
+        if (heartbeatLoading) {
+            return;
+        }
+        heartbeatLoading = true;
+        MusicApiHelper.getIntelligenceList(seed.getId(), getSourcePlaylistId(), getCookie(),
+                new MusicApiHelper.SongListCallback() {
+                    @Override
+                    public void onResult(List<Song> songs) {
+                        heartbeatLoading = false;
+                        int added = 0;
+                        if (songs != null) {
+                            for (Song s : songs) {
+                                if (s == null || s.getId() <= 0) {
+                                    continue;
+                                }
+                                heartbeatIds.add(s.getId());
+                            }
+                            added = appendUniqueSongs(songs);
+                        }
+                        final int addedFinal = added;
+                        // 打点：确认「只追加、不替换、不打断」——队列长度变化 + 当前播放不变
+                        android.util.Log.i("Heartbeat", "追加心动曲 " + addedFinal + " 首，队列 "
+                                + (playlist.size() - addedFinal) + " -> " + playlist.size()
+                                + "，当前仍播放: "
+                                + (getCurrentSong() == null ? "-" : getCurrentSong().getName()));
+                        mainHandler.post(() -> {
+                            if (addedFinal > 0) {
+                                savePlaybackState();
+                                if (onResult != null) {
+                                    onResult.onAdded(addedFinal);
+                                }
+                            } else if (onResult != null) {
+                                onResult.onAdded(0);
+                            }
+                            if (advance && addedFinal > 0) {
+                                currentIndex = (currentIndex + 1) % playlist.size();
+                                playCurrent();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        heartbeatLoading = false;
+                        if (onResult != null) {
+                            onResult.onAdded(0);
+                        }
+                    }
+                });
+    }
+
+    private void notifyHeartbeat(HeartbeatCallback cb, int added, String message) {
+        if (cb != null) {
+            mainHandler.post(() -> cb.onAdded(added));
+        }
+    }
+
+    /** 心动模式开启/续播的结果回调。 */
+    public interface HeartbeatCallback {
+        /** 已追加到队尾的首数；0 表示没取到。 */
+        void onAdded(int count);
     }
 
     private void loadMorePersonalFmAndAdvance() {

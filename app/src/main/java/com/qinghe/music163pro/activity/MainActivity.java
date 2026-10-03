@@ -917,7 +917,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 && playerManager.hasSourcePlaylist()
                 && playerManager.getSourcePlaylistId() > 0;
         if (canHeartbeat) {
-            row5.addView(createFuncItem(R.drawable.ic_favorite, "心动模式",
+            // 开启后入口变成「退出心动模式」——它是个模式，不该只能进不能出
+            row5.addView(createFuncItem(R.drawable.ic_favorite,
+                    playerManager.isHeartbeatMode() ? "退出心动模式" : "心动模式",
                     v -> onFuncHeartbeatMode(song)));
         }
         contentLayout.addView(row5);
@@ -3079,6 +3081,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         renderPlaylistItems();
 
         contentLayout.addView(scrollView);
+
+        // 心动模式开启时，底部给一行状态 + 一键退出。
+        // 为什么放底部而不是塞进标题栏：标题栏已经有「排序」「A-Z」两个按钮，
+        // 再加第三个会把它们挤到点不中；底部这行只在心动开启时出现，平时不占空间。
+        if (playerManager.isHeartbeatMode()) {
+            contentLayout.addView(buildHeartbeatStatusRow());
+        }
         overlayContainer.addView(contentLayout);
 
         // Scroll to current song（按「显示位置」定位，而非真实队列下标）
@@ -3093,6 +3102,49 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         rootView.addView(overlayContainer);
+    }
+
+    /**
+     * 心动模式状态行：「已续 N 首 · 歌单播完后自动接着放　[退出]」。
+     * 点「退出」清掉已追加的心动曲目、队列回到原歌单。
+     */
+    private LinearLayout buildHeartbeatStatusRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(6), dp(8), dp(6));
+        row.setBackgroundColor(0xFF26262B);
+
+        TextView tv = new TextView(this);
+        tv.setText("心动续播中 · 已续 " + playerManager.getHeartbeatCount() + " 首");
+        tv.setTextColor(0xFFBB86FC);
+        tv.setTextSize(11);
+        tv.setSingleLine(true);
+        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tvLp.setMarginEnd(dp(6));
+        tv.setLayoutParams(tvLp);
+        row.addView(tv);
+
+        TextView btnExit = new TextView(this);
+        btnExit.setText("退出");
+        btnExit.setTextColor(0xFFFFFFFF);
+        btnExit.setTextSize(12);
+        btnExit.setPadding(dp(12), dp(4), dp(12), dp(4));
+        btnExit.setBackgroundResource(R.drawable.bg_letter_cell);
+        btnExit.setClickable(true);
+        btnExit.setFocusable(true);
+        btnExit.setOnClickListener(v -> {
+            int removed = playerManager.exitHeartbeat();
+            Toast.makeText(this, "已退出心动模式"
+                    + (removed > 0 ? "，移除 " + removed + " 首" : ""),
+                    Toast.LENGTH_SHORT).show();
+            dismissOverlay();
+            showPlaylistOverlay();
+        });
+        row.addView(btnExit);
+        return row;
     }
 
     /**
@@ -3229,6 +3281,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             textLayout.addView(tvArtist);
 
             itemLayout.addView(textLayout);
+
+            // 心动模式追加进来的曲目打个标记，让用户知道「这些歌不在原歌单里」
+            if (playerManager.isHeartbeatSong(song)) {
+                TextView tag = new TextView(this);
+                tag.setText("心动");
+                tag.setTextColor(0xFF121212);
+                tag.setTextSize(9);
+                tag.setPadding(dp(5), dp(2), dp(5), dp(2));
+                tag.setBackgroundResource(R.drawable.bg_btn_accent);
+                LinearLayout.LayoutParams tagLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                tagLp.gravity = Gravity.CENTER_VERTICAL;
+                tag.setLayoutParams(tagLp);
+                itemLayout.addView(tag);
+            }
 
             // 「下一首播放」角标（按 Song 身份判定，与显示顺序无关）
             int queuedPos = playerManager.queuedNextPosition(song);
@@ -3427,37 +3495,31 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * 心动模式（智能续播）：以当前歌曲 + 所在歌单为种子生成一串相似曲目，直接接管播放队列。
      */
     private void startIntelligenceMode(Song seed) {
+        // 再次点击 = 退出：清掉已追加的心动曲目，歌单回到原来的样子
+        if (playerManager.isHeartbeatMode()) {
+            int removed = playerManager.exitHeartbeat();
+            Toast.makeText(this, "已退出心动模式" + (removed > 0 ? "，移除 " + removed + " 首" : ""),
+                    Toast.LENGTH_SHORT).show();
+            dismissOverlay();
+            return;
+        }
         if (seed == null || seed.getId() <= 0) {
             Toast.makeText(this, "这首歌无法作为起点", Toast.LENGTH_SHORT).show();
             return;
         }
-        final long playlistId = playerManager.getSourcePlaylistId();
-        Toast.makeText(this, "正在生成心动队列…", Toast.LENGTH_SHORT).show();
-        MusicApiHelper.getIntelligenceList(seed.getId(), playlistId, playerManager.getCookie(),
-                new MusicApiHelper.SongListCallback() {
-                    @Override
-                    public void onResult(java.util.List<Song> songs) {
-                        if (songs == null || songs.isEmpty()) {
-                            Toast.makeText(MainActivity.this, "没有拿到心动曲目",
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        String name = playerManager.getSourcePlaylistName();
-                        playerManager.setPlaylistFromSource(new java.util.ArrayList<>(songs), 0,
-                                playlistId,
-                                (name == null || name.isEmpty() ? "歌单" : name) + " · 心动",
-                                songs.size(),
-                                playerManager.getSourcePlaylistCreator(), 0, false);
-                        playerManager.playCurrent();
-                        dismissOverlay();
-                    }
-
-                    @Override
-                    public void onError(String message) {
-                        Toast.makeText(MainActivity.this, "心动模式失败：" + message,
-                                Toast.LENGTH_SHORT).show();
-                    }
-                });
+        // 不再替换队列、也不再抢播：正在听的这首照常播完，推荐曲安静地排到队尾
+        Toast.makeText(this, "正在准备心动曲目…", Toast.LENGTH_SHORT).show();
+        playerManager.startHeartbeat(seed, added -> {
+            dismissOverlay();
+            if (added > 0) {
+                Toast.makeText(MainActivity.this,
+                        "心动模式已开启 · 已续上 " + added + " 首，歌单播完后自动接着放",
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                playerManager.setHeartbeatModeOff();
+                Toast.makeText(MainActivity.this, "没有拿到心动曲目", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void showSpeedOptions() {
