@@ -66,8 +66,10 @@ public class FavoritesListActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_favorites_list);
-        // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
-        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+        // 标题行只做**竖直**避让：撑到浮动返回键底边之下（否则按钮会压住下面的标签行），
+        // 但横向不加内边距 —— 本页标题是居中的、标签行要占满整行宽度，
+        // 整行横向避让会让标题偏右、标签也被推窄（用户明确要求「取消避让」）。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarTopInset(
                 this, findViewById(R.id.tv_favorites_title));
 
         lvFavorites = findViewById(R.id.lv_favorites);

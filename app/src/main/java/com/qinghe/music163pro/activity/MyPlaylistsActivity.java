@@ -182,9 +182,10 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         titleParams.addRule(android.widget.RelativeLayout.LEFT_OF, idAZ);
 
         root.addView(titleRow);
-        // 标题栏撑到左上角浮动返回按钮（X）的占位：本页此前漏了这一句（其它 17 个页面都调了），
-        // 标题行高只有 20 多像素，X 按钮（58px）会探进标题行 / 压在第一条歌单上。
-        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleRow);
+        // 标题行只做**竖直**避让：撑到浮动返回键底边之下（否则 X 按钮会探进标题行 /
+        // 压在第一个标签上），横向不加内边距 —— 本页标题居中、标签行要占满整行宽度，
+        // 整行横向避让会让标题偏右、标签被推窄（用户明确要求「取消避让」）。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarTopInset(this, titleRow);
 
         // ---- 二级界面切换（在线 / 本地），等宽平分 ----
         // 样式统一走 UiKit.tab()：纯文字、无底衬、仅颜色区分选中（与「收藏」页一致）。

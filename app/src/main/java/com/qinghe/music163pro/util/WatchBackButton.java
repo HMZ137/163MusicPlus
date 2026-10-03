@@ -77,6 +77,53 @@ public final class WatchBackButton {
     }
 
     /**
+     * 只做**竖直**避让时，标题行该占的高度（横向不避让）。
+     *
+     * <p>有些页面的标题是居中的、下面的标签行又要占满整行宽度（「收藏」「我的歌单」），
+     * 让整行横向避开返回键既没必要、标题还会显得偏右。这时只要保证**标签行不被返回键压住**
+     * 就够了 —— 也就是标题行撑到返回键底边之下。</p>
+     *
+     * <p>减掉 {@code dp(6)} 是因为这两页的根布局有 6dp 上内边距，而返回键是贴在窗口上的，
+     * 不扣掉就会多留一截空白（实测标题行 94px → 74px）。</p>
+     *
+     * <p><b>为什么只能压到这儿</b>：再矮标签行就会顶进返回键的占位范围（按键 view 占
+     * y=8~86），标签行左上角那一小条会点不到。现在标签文字在 y≈100 以外，够不着按键；
+     * 真要再压，得先把按键挪走或缩小 —— 单靠调这个高度不安全。</p>
+     */
+    public static int getReservedTopHeight(Activity activity) {
+        if (activity == null) {
+            return 0;
+        }
+        return buttonSize(activity) + buttonMargin(activity) - dp(activity, 6);
+    }
+
+    /**
+     * 标题行**只做竖直避让**：撑到 {@link #getReservedTopHeight}，横向一点内边距都不加。
+     *
+     * <p>用于「标题居中 + 标签行占满整行」的页面（{@code FavoritesListActivity} /
+     * {@code MyPlaylistsActivity}）。它们不调用 {@link #applyTitleBarInset}，
+     * 因为那会让标题偏右、也会把标签行推窄 —— 用户明确要求这两页「取消避让」。</p>
+     */
+    public static void applyTitleBarTopInset(Activity activity, View titleBar) {
+        if (activity == null || titleBar == null) {
+            return;
+        }
+        ViewGroup.LayoutParams params = titleBar.getLayoutParams();
+        if (params == null) {
+            return;
+        }
+        int reserved = getReservedTopHeight(activity);
+        // 只在该撑高时撑高（match_parent / 已更高的固定高度都不动）
+        if (params.height == ViewGroup.LayoutParams.WRAP_CONTENT
+                || (params.height > 0 && params.height < reserved)) {
+            params.height = reserved;
+            titleBar.setLayoutParams(params);
+        }
+        // 横向不避让，但标题过长时仍要单行 + 省略（与 applyTitleBarInset 保持一致）
+        forceSingleLineTitles(titleBar);
+    }
+
+    /**
      * 把自绘标题栏撑到能容纳浮动返回按钮的高度。
      *
      * <p><b>为什么需要：</b>返回按钮是浮在内容之上的，页面自己的标题栏并不会自动让它。
