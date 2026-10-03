@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
@@ -30,6 +31,12 @@ public final class UiKit {
     public static final int COLOR_CARD = 0xFF1E1F24;
     public static final int COLOR_ACCENT = 0xFFBB86FC;
     public static final int COLOR_ON_ACCENT = 0xFF1D1D1D;
+
+    /** 页内二级标签的选中 / 未选中文字色（与「收藏」页一致）。 */
+    public static final int COLOR_TAB_ACTIVE = COLOR_ACCENT;
+    public static final int COLOR_TAB_INACTIVE = 0xB3FFFFFF;
+    /** 标签行高度（与「收藏」页一致）。 */
+    public static final int DP_TAB_ROW_HEIGHT = 32;
 
     public static final int DP_CARD_RADIUS = 0;
     public static final int DP_ROW_RADIUS = 0;
@@ -103,5 +110,64 @@ public final class UiKit {
     /** 统一的 dp 换算。 */
     public static int dp(Context c, int v) {
         return Math.round(v * c.getResources().getDisplayMetrics().density);
+    }
+
+    // ==================== 页内二级标签 ====================
+
+    /**
+     * 造一个页内二级标签：**纯文字、无底衬、等宽**，只靠文字颜色区分选中态。
+     *
+     * <p>这是「收藏」页（{@code activity_favorites_list.xml} 的 tab_fav_* ）定下的样式，
+     * 现在统一成全 App 的标签样式 —— 之前有的页面用圆角底衬胶囊（{@code bg_tab_selected}），
+     * 和收藏页两种观感并存，故收口到这里。改样式只改这一个方法 + 那个布局。</p>
+     *
+     * <p>宽度由调用方通过 {@link #tabRowParams} 给权重（等宽平分），或用 MATCH_PARENT 独占一行。</p>
+     */
+    public static TextView tab(Context c, CharSequence text) {
+        TextView tv = new TextView(c);
+        tv.setText(text);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        tv.setGravity(Gravity.CENTER);
+        tv.setTextColor(COLOR_TAB_INACTIVE);
+        tv.setClickable(true);
+        tv.setFocusable(true);
+        applySelectableItemBackground(c, tv);
+        return tv;
+    }
+
+    /** 标签行容器：高度 {@link #DP_TAB_ROW_HEIGHT}、下方留 4dp，横向排布。 */
+    public static LinearLayout tabRow(Context c) {
+        LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(c, DP_TAB_ROW_HEIGHT));
+        lp.bottomMargin = dp(c, 4);
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    /** 标签在 {@link #tabRow} 里的布局参数：等宽平分、撑满行高。 */
+    public static LinearLayout.LayoutParams tabRowParams() {
+        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+    }
+
+    /** 刷新标签选中态（只管颜色，不管底衬 —— 本来就没有底衬）。 */
+    public static void setTabSelected(TextView tab, boolean selected) {
+        if (tab == null) {
+            return;
+        }
+        tab.setTextColor(selected ? COLOR_TAB_ACTIVE : COLOR_TAB_INACTIVE);
+    }
+
+    /**
+     * 把 XML 里的 {@code ?attr/selectableItemBackground} 等效地应用到代码创建的视图上
+     * （纯文字标签没有底衬，仍需要按下涟漪作为反馈）。
+     */
+    private static void applySelectableItemBackground(Context c, View v) {
+        android.util.TypedValue out = new android.util.TypedValue();
+        if (c.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                && out.resourceId != 0) {
+            v.setBackgroundResource(out.resourceId);
+        }
     }
 }

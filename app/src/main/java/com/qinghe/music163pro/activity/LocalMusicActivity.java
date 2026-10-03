@@ -24,15 +24,18 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.BatchFavoriteHelper;
 import com.qinghe.music163pro.util.LocalLibraryCache;
 import com.qinghe.music163pro.util.LocalMetadata;
+import com.qinghe.music163pro.util.LocalMetadataIndex;
 import com.qinghe.music163pro.util.LocalMusicHides;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.LocalPlaylistManager;
 import com.qinghe.music163pro.util.MultiSelectController;
+import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.ScriptSort;
 import com.qinghe.music163pro.util.ScriptTranslit;
 import com.qinghe.music163pro.util.SongQuery;
 import com.qinghe.music163pro.util.PinyinUtils;
+import com.qinghe.music163pro.util.UiKit;
 import com.qinghe.music163pro.util.WatchBackButton;
 
 import java.io.File;
@@ -113,12 +116,24 @@ public class LocalMusicActivity extends BaseWatchActivity {
     private static final String PREF_SORT_MODE = "local_sort_mode";
     private int sortMode = SORT_NAME;
     private boolean scanning;
+    /**
+     * 本轮扫描里「没有元信息缓存、需要真读标签」的文件数（扫描线程写、主线程读）。
+     * 全是 0 时说明全走缓存，就不显示「读取歌曲信息中…」，免得看着像又卡了一次。
+     */
+    private int scanCacheMisses;
+    /** 本轮扫描里需要真读标签的文件路径（{@link #scanCacheMisses} 的具体名单）。 */
+    private final java.util.Set<String> scanMissPaths = new java.util.LinkedHashSet<>();
+    /** 本轮扫描实际找到的文件路径（{@link LocalMetadataIndex#retain} 用它给索引剪枝）。 */
+    private final java.util.Set<String> scanFoundPaths = new java.util.LinkedHashSet<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // 本地音乐库缓存：扫描结果落盘，供下次启动解析本地歌路径
         LocalLibraryCache.init(this);
+        // 元信息索引：曲名/曲师/封面读过一次就记下来，下次只给「变过」的文件重读标签。
+        // 这是「本地音乐」页秒开的关键 —— 详见 LocalMetadataIndex 的类注释。
+        LocalMetadataIndex.init(this);
         setContentView(R.layout.activity_local_music);
 
         tvTitle = findViewById(R.id.tv_local_music_title);
@@ -140,6 +155,11 @@ public class LocalMusicActivity extends BaseWatchActivity {
         //   · 加给外层 → 外层本来就是返回按钮的占地高度，两行内容正好填进去，
         //     头部回到「一个返回按钮」的量级，列表多出约一行空间。
         WatchBackButton.applyTitleBarInset(this, findViewById(R.id.layout_local_music_title_bar));
+        // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
+        // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
+        WatchBackButton.addTitleBarExtraHeight(this,
+                findViewById(R.id.layout_local_music_title_bar),
+                UiKit.dp(this, UiKit.DP_TAB_ROW_HEIGHT + 4));
 
         // 动作行只留最常用的两个 + 「更多」；五个操作（搜索/排序/A-Z/随机/局域网传歌）全在「更多」里
         View btnSort = findViewById(R.id.btn_local_sort);
@@ -149,6 +169,18 @@ public class LocalMusicActivity extends BaseWatchActivity {
         View btnMore = findViewById(R.id.btn_local_more);
         if (btnMore != null) {
             btnMore.setOnClickListener(v -> showMoreDialog());
+        }
+
+        // 页内标签：下载 / 本地（当前页）。样式与「收藏」页一致；「下载」切到下载管理页。
+        TextView tabDownloads = findViewById(R.id.tab_downloads);
+        TextView tabLocal = findViewById(R.id.tab_local_music);
+        UiKit.setTabSelected(tabDownloads, false);
+        UiKit.setTabSelected(tabLocal, true);
+        if (tabDownloads != null) {
+            tabDownloads.setOnClickListener(v -> openDownloadsTab());
+        }
+        if (tabLocal != null) {
+            tabLocal.setOnClickListener(v -> { /* 已经在本标签上，无需动作 */ });
         }
         // 记住上次选的排序方式（曲名 / 曲师 / 专辑）
         sortMode = getSharedPreferences("music163_settings", MODE_PRIVATE)
@@ -243,8 +275,38 @@ public class LocalMusicActivity extends BaseWatchActivity {
         updateStatusRow();
         updateEmptyState();
         new Thread(() -> {
+            // ① 先用元信息索引把列表铺出来：只读缓存 + 一次 stat，不开 MediaMetadataRetriever，
+            //    所以基本是立刻可见。放在后台线程做 —— 几百条 isFile() 也是磁盘 IO，
+            //    不该压在主线程上。
+            final long tStart = android.os.SystemClock.elapsedRealtime();
+            final List<Song> cachedSongs = buildSongsFromIndex();
+            final long tCached = android.os.SystemClock.elapsedRealtime();
+            if (!cachedSongs.isEmpty()) {
+                mainHandler.post(() -> {
+                    if (generation != scanGeneration) {
+                        return;
+                    }
+                    allSongs.clear();
+                    allSongs.addAll(cachedSongs);
+                    scanStatus = "已显示缓存 · 校验中…";
+                    updateStatusRow();
+                    applySearch(searchQuery);
+                    updateEmptyState();
+                });
+            }
+
+            // ② 再走一遍目录，拿到「此刻真实存在」的文件列表（增删在这里被发现）
             final List<Song> found = scanLocalAudio();
             final int total = found.size();
+            final int misses = scanCacheMisses;
+            // 索引与真实文件对齐：已被删掉/移走的条目剪掉，
+            // 下次进页面就不用再逐条 isFile() 去筛（那要 457 次 stat）。
+            // 但走查撞到 MAX_TRACKS 上限就说明这一轮**没走完**（库里超过 500 首时会发生，
+            // 走的是目录顺序的前 500），此时剪枝会误删掉没轮到的那部分 —— 这时宁可不剪。
+            if (scanFoundPaths.size() < MAX_TRACKS) {
+                LocalMetadataIndex.retain(scanFoundPaths);
+            }
+            final long tWalk = android.os.SystemClock.elapsedRealtime();
             mainHandler.post(() -> {
                 if (generation != scanGeneration) {
                     return;
@@ -260,7 +322,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
                 // 文件扫完、列表出来了，但曲名/封面还要逐首读标签（后台跑，可能十几秒）。
                 // 先把标题保持在「加载中」状态，否则用户看到「本地音乐 N首」、却半天歌名
                 // 还是文件名、列表也不再动，会以为卡死了。
-                if (total > 0) {
+                // 全部命中缓存时不显示这行 —— 那种情况下面这轮循环几乎瞬间跑完。
+                if (total > 0 && misses > 0) {
                     scanStatus = "读取歌曲信息中… 0/" + total;
                         updateStatusRow();
                 }
@@ -268,7 +331,72 @@ public class LocalMusicActivity extends BaseWatchActivity {
             });
             // 列表已经显示出来之后，再慢慢补元信息（不阻塞「先看到歌单」）
             readMetadata(found, generation, total);
+            // 耗时打点：缓存首屏 / 走目录 / 读标签各自多久 —— 用来验证缓存到底省了多少
+            // （只读标签是重活；全命中缓存时应当接近 0）
+            MusicLog.i("LocalMusic", "本地扫描耗时: 缓存首屏=" + (tCached - tStart)
+                    + "ms 走目录=" + (tWalk - tCached)
+                    + "ms 共" + total + "首 需读标签=" + misses + "首 收尾="
+                    + (android.os.SystemClock.elapsedRealtime() - tWalk) + "ms");
         }).start();
+    }
+
+    /**
+     * 用 {@link LocalMetadataIndex} 的上次扫描快照拼出歌曲列表（**不读标签、也不做 stat**）。
+     *
+     * <p>为了「秒开」，这里刻意<b>不逐条校验文件是否还在</b>：457 首就是 457 次 stat
+     * （实测约 1.8s，还有封面各自的 1 次），正好把秒开拖成两三秒。文件是否还在交给紧接着的
+     * 目录走查去对齐 —— 走完会用真实文件列表换掉这一份，并剪掉索引里已经不存在的条目
+     * （{@link LocalMetadataIndex#retain}）。中间这 3～4 秒里，最多也就是几首已删的歌还挂在
+     * 列表上，状态行会写着「校验中」，属于可接受的代价。</p>
+     *
+     * <p>唯一的例外是<b>卡没挂载</b>：那时铺出来整页都是打不开的文件，不如老老实实显示
+     * 「未找到本地音乐」。所以先看一眼存储状态。</p>
+     *
+     * <p><b>会有磁盘 IO</b>（只读索引），放在扫描线程上跑。</p>
+     */
+    private List<Song> buildSongsFromIndex() {
+        // 卡还没挂载好就别铺缓存：铺出来全是点不开的文件
+        if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+            return new ArrayList<>();
+        }
+        hiddenPaths.clear();
+        hiddenPaths.addAll(LocalMusicHides.getHidden(this));
+        List<Song> cached = new ArrayList<>();
+        for (LocalMetadataIndex.Entry e : LocalMetadataIndex.snapshot()) {
+            if (e == null || TextUtils.isEmpty(e.path) || hiddenPaths.contains(e.path)) {
+                continue;
+            }
+            File f = new File(e.path);
+            NameGuess guess = guessFromFileName(f);
+            Song song = new Song(LocalTracks.idForPath(e.path),
+                    LocalTracks.safeName(guess.name), guess.artist, "");
+            song.setUrl(e.path);
+            song.setForceLocalPlayback(true);
+            applyEntry(song, e, false);
+            cached.add(song);
+        }
+        return cached;
+    }
+
+    /**
+     * 把索引条目的标签 / 封面贴到 {@code song} 上。条目里的值就是上次读到的，直接用。
+     *
+     * @param verifyCover 是否确认封面缓存文件还在。首屏铺缓存时传 false（省一次 stat），
+     *                    走目录时传 true（这一份结果会长期留在列表上，得准）
+     */
+    private void applyEntry(Song song, LocalMetadataIndex.Entry e, boolean verifyCover) {
+        if (!TextUtils.isEmpty(e.title)) {
+            song.setName(LocalTracks.safeName(e.title));
+        }
+        if (!TextUtils.isEmpty(e.artist)) {
+            song.setArtist(e.artist);
+        }
+        if (e.hasCover) {
+            File cover = LocalMetadata.cachedCoverFile(this, e.path);
+            if (cover != null && (!verifyCover || cover.isFile())) {
+                song.setCoverUrl("file://" + cover.getAbsolutePath());
+            }
+        }
     }
 
     private List<Song> scanLocalAudio() {
@@ -276,6 +404,10 @@ public class LocalMusicActivity extends BaseWatchActivity {
         // 「从列表移除」的隐藏名单：每次扫描重新读，保证外部改动即时生效（只过滤展示，不删文件）
         hiddenPaths.clear();
         hiddenPaths.addAll(LocalMusicHides.getHidden(this));
+        // 这一轮有多少文件没有缓存（需要真去读标签）—— 决定要不要显示「读取歌曲信息中…」
+        scanCacheMisses = 0;
+        scanMissPaths.clear();
+        scanFoundPaths.clear();
         File external = Environment.getExternalStorageDirectory();
         for (File root : new File[]{
                 new File(external, "163Music"),
@@ -374,13 +506,40 @@ public class LocalMusicActivity extends BaseWatchActivity {
     private Song fileToSong(File file) {
         NameGuess guess = guessFromFileName(file);
         String path = file.getAbsolutePath();
+        scanFoundPaths.add(path);
         // 本地文件没有网易云 id，用路径哈希造一个稳定的负数 id
         // （负数本身就是「本地」标签，见 LocalTracks）
         Song song = new Song(LocalTracks.idForPath(path),
                 LocalTracks.safeName(guess.name), guess.artist, "");
         song.setUrl(path);
         song.setForceLocalPlayback(true);
+        // 命中元信息索引就直接把上次读到的曲名 / 曲师 / 封面贴上去 ——
+        // 这一步只有一次 stat + 一次查表，不开 MediaMetadataRetriever。
+        // 这样「走一遍目录」出来的结果本身就是带正确标签的，不会出现
+        // 「先显示文件名、过一会才一个个变过来」的跳变。
+        if (applyCachedMetadata(song, file)) {
+            return song;
+        }
+        // 记下「这一轮需要真读标签」的文件：readMetadata 只处理这些，
+        // 命中缓存的那些不用再查一次索引（每首 2 次 stat，几百首叠起来又是好几秒）。
+        scanMissPaths.add(path);
+        scanCacheMisses++;
         return song;
+    }
+
+    /**
+     * 把索引里仍然有效的标签贴到 {@code song} 上。
+     *
+     * @return true 表示命中缓存；false 表示这个文件需要真正读一次标签
+     */
+    private boolean applyCachedMetadata(Song song, File file) {
+        LocalMetadataIndex.Entry e = LocalMetadataIndex.get(this, file);
+        if (e == null) {
+            return false;
+        }
+        // 这一份结果会长期留在列表上，封面要确认还在
+        applyEntry(song, e, true);
+        return true;
     }
 
     /**
@@ -397,14 +556,27 @@ public class LocalMusicActivity extends BaseWatchActivity {
     private void readMetadata(List<Song> songs, int generation, int total) {
         boolean changed = false;
         int processed = 0;
+        int readFromDisk = 0;
         for (Song song : songs) {
             if (generation != scanGeneration || isFinishing() || isDestroyed()) {
                 // 已经重新扫描过一轮，或者页面已经关掉，这批结果作废，别再往下白跑
                 return;
             }
             processed++;
+            // 走目录时已经从索引贴好标签的，这里直接跳过：它们的数据本来就是索引里的，
+            // 再查一遍索引只是白做两次 stat（457 首实测约 3.7s）。
+            if (!scanMissPaths.contains(song.getUrl())) {
+                continue;
+            }
             File audio = new File(song.getUrl());
-            LocalMetadata.Info info = LocalMetadata.read(this, audio);
+            // 缓存命中就直接跳过 —— 这是「每次进来都要等十几秒」的主要省法：
+            // 只有新增 / 改过的文件才真的去开 MediaMetadataRetriever。
+            LocalMetadata.Info info = LocalMetadataIndex.infoFor(this, audio);
+            if (info == null) {
+                info = LocalMetadata.read(this, audio);
+                LocalMetadataIndex.put(this, audio, info);
+                readFromDisk++;
+            }
             NameGuess guess = guessFromFileName(audio);
 
             String name = info.hasTitle() ? info.title : guess.name;
@@ -428,13 +600,16 @@ public class LocalMusicActivity extends BaseWatchActivity {
             }
             // 边补边刷新：让用户看到名字一个个变正确，而不是一次性跳变；
             // 同时把进度写进标题，明确表示「还在加载」，避免被误判卡死。
+            // 进度只在**真的读了文件**时才显示 —— 全走缓存时几百次循环几乎瞬间跑完，
+            // 弹一下「读取歌曲信息中…」反而像卡了一下。
             if (processed % METADATA_NOTIFY_EVERY == 0 || processed == total) {
                 final int p = processed;
+                final boolean readingFromDisk = readFromDisk > 0;
                 mainHandler.post(() -> {
                     if (generation == scanGeneration && adapter != null) {
                         adapter.notifyDataSetChanged();
                     }
-                    if (generation == scanGeneration && total > 0) {
+                    if (generation == scanGeneration && total > 0 && readingFromDisk) {
                         scanStatus = "读取歌曲信息中… " + p + "/" + total;
                         updateStatusRow();
                     }
@@ -504,6 +679,10 @@ public class LocalMusicActivity extends BaseWatchActivity {
      * <p>为什么不全挤在标题栏：动作行扣掉返回按钮占位后只有约 220px，五个文字按钮要约 280px，
      * 硬塞必然被压扁或折行。所以最常用的「搜索 / 排序」留在外面，其余进菜单 ——
      * 但菜单里**五条都在**，功能一个不少。</p>
+     *
+     * <p>另有第六条「刷新本地缓存」：缓存按文件的 size/mtime 自动失效，正常用不着手动刷；
+     * 这条是给「改了标签但文件没变」（比如用电脑改完标签、又刻意保留了时间戳）这类
+     * 自动判定覆盖不到的情况留的后路。</p>
      */
     private void showMoreDialog() {
         final java.util.List<String> labels = new java.util.ArrayList<>();
@@ -517,6 +696,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
         if (withLanTransfer) {
             labels.add("局域网传歌");
         }
+        labels.add("刷新本地缓存（" + LocalMetadataIndex.size() + " 首已缓存）");
+        final int idxRefresh = labels.size() - 1;
         final String[] items = labels.toArray(new String[0]);
         com.qinghe.music163pro.util.WatchMenuDialog.show(this, getString(R.string.local_music), items, which -> {
                     switch (which) {
@@ -538,9 +719,48 @@ public class LocalMusicActivity extends BaseWatchActivity {
                             }
                             break;
                         default:
+                            if (which == idxRefresh) {
+                                confirmRefreshCache();
+                            }
                             break;
                     }
                 });
+    }
+
+    /** 「刷新本地缓存」的二次确认：全量重读标签是重活（本机 457 首实测约 21s），先说清代价。 */
+    private void confirmRefreshCache() {
+        final int cached = LocalMetadataIndex.size();
+        com.qinghe.music163pro.util.WatchConfirmDialog.show(this, "刷新本地缓存",
+                cached > 0
+                        ? "清掉已缓存的 " + cached + " 首，重新读取全部标签。文件多时约需 20 秒。"
+                        : "重新读取全部本地文件的标签，约需 20 秒。",
+                this::refreshLocalCache,
+                com.qinghe.music163pro.util.WatchConfirmDialog.Options.defaultOptions());
+    }
+
+    /**
+     * 清掉元信息索引并重新扫描。
+     *
+     * <p>不清封面缓存：封面文件是按路径存且在文件被改动时自动失效的，清掉只会让几百张封面
+     * 被重新抽取一遍，白白再慢一轮。真要连封面一起重建，走「设置 → 清理缓存」。</p>
+     *
+     * <p>{@code scanGeneration++} 是为了让**正在跑**的那一轮扫描作废 —— 否则它会在读完
+     * 旧数据后覆盖掉刚刷出来的结果。</p>
+     */
+    private void refreshLocalCache() {
+        LocalMetadataIndex.clear(this);
+        scanGeneration++;
+        scanning = false;
+        allSongs.clear();
+        localSongs.clear();
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+        scanStatus = null;
+        updateStatusRow();
+        updateEmptyState();
+        startScan();
+        Toast.makeText(this, "正在重新读取本地歌曲信息…", Toast.LENGTH_SHORT).show();
     }
 
     /** 选择排序方式：曲名 / 曲师 / 专辑（会记住）。 */
@@ -1062,5 +1282,18 @@ public class LocalMusicActivity extends BaseWatchActivity {
         if (empty) {
             tvEmpty.setText(searchQuery.isEmpty() ? "未找到本地音乐" : "没有匹配的曲目");
         }
+    }
+
+    /**
+     * 切到「下载」标签（下载管理页）。
+     *
+     * <p>与 {@code DownloadListActivity.openLocalMusicTab()} 对称：先开目标页再 finish 自己，
+     * 不往返回栈里叠页面、去掉切换动画，让它看着像页内切换而不是页面跳转。
+     * 详见那边的注释（为什么没把两个页面合成一个 Activity）。</p>
+     */
+    private void openDownloadsTab() {
+        startActivity(new Intent(this, DownloadListActivity.class));
+        overridePendingTransition(0, 0);
+        finish();
     }
 }

@@ -21,6 +21,8 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.util.MultiSelectController;
 import com.qinghe.music163pro.util.BatchFavoriteHelper;
+import com.qinghe.music163pro.util.PlaybackMode;
+import com.qinghe.music163pro.util.UiKit;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -72,8 +74,12 @@ public class DownloadListActivity extends BaseWatchActivity {
         // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
         // 与本地音乐页同理：占位加在**整个标题栏**上。若只加给上面的动作行，那一行会被撑到
         // 返回按钮的高度，再叠一行标题，头部会白吃掉几十像素的列表空间。
-        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
-                this, findViewById(R.id.layout_downloads_title_bar));
+        View titleBar = findViewById(R.id.layout_downloads_title_bar);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar);
+        // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
+        // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
+        com.qinghe.music163pro.util.WatchBackButton.addTitleBarExtraHeight(
+                this, titleBar, UiKit.dp(this, UiKit.DP_TAB_ROW_HEIGHT + 4));
 
         // Apply keep screen on setting
 
@@ -87,16 +93,23 @@ public class DownloadListActivity extends BaseWatchActivity {
             btnTidy.setOnClickListener(v -> confirmTidyFileNames());
         }
 
-        // 「本地」：去看卡里已有的、不属于本 App 下载的音乐
-        View btnLocalMusic = findViewById(R.id.btn_local_music);
-        if (btnLocalMusic != null) {
-            btnLocalMusic.setOnClickListener(v ->
-                    startActivity(new Intent(this, LocalMusicActivity.class)));
-            // 纯在线模式：本地入口收起。注意**下载管理本身保留**（用户总得有地方管已下到卡里的歌），
-            // 只是不再从这里进「本机音乐」。
-            if (com.qinghe.music163pro.util.PlaybackMode.isLocalEntryHidden(this)) {
-                btnLocalMusic.setVisibility(View.GONE);
-            }
+        // 页内标签：下载（当前页）/ 本地。
+        // 「本地」原先是动作行里的一个按钮，跳到本机音乐页；现在提成标签，样式与「收藏」页一致。
+        TextView tabDownloads = findViewById(R.id.tab_downloads);
+        TextView tabLocal = findViewById(R.id.tab_local_music);
+        View tabRow = findViewById(R.id.ll_download_tabs);
+        UiKit.setTabSelected(tabDownloads, true);
+        UiKit.setTabSelected(tabLocal, false);
+        if (tabDownloads != null) {
+            tabDownloads.setOnClickListener(v -> { /* 已经在下载标签上，无需动作 */ });
+        }
+        if (tabLocal != null) {
+            tabLocal.setOnClickListener(v -> openLocalMusicTab());
+        }
+        // 纯在线模式：「本地」入口收起（下载管理本身保留 —— 用户总得有地方管已下到卡里的歌）。
+        // 只剩一个「下载」标签没有意义，整行一起收掉。
+        if (PlaybackMode.isLocalEntryHidden(this) && tabRow != null) {
+            tabRow.setVisibility(View.GONE);
         }
 
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, downloadedSongs) {
@@ -452,6 +465,21 @@ public class DownloadListActivity extends BaseWatchActivity {
         song.setForceLocalPlayback(true);
         return song;
     }
+    /**
+     * 切到「本地」标签（本机音乐页）。
+     *
+     * <p>「本地音乐管理」现在是下载 / 本地两个标签，但两边的内容各自都是一个成熟页面
+     * （下载有进度刷新、整理、批量收藏；本地有扫描、排序、搜索、局域网传歌），
+     * 合成一个 Activity 要动两套列表与动作行，风险大于收益。所以标签仍然跨 Activity：
+     * 先开目标页再 finish 自己，**不往返回栈里叠页面**（按返回键应当回到进入本页之前的
+     * 位置，而不是在两个标签之间来回跳），并去掉切换动画，让它看着像页内切换。</p>
+     */
+    private void openLocalMusicTab() {
+        startActivity(new Intent(this, LocalMusicActivity.class));
+        overridePendingTransition(0, 0);
+        finish();
+    }
+
     /**
      * Show a confirmation dialog adapted for watch (360x320 px screen).
      */

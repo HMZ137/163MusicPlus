@@ -142,6 +142,29 @@ public final class WatchBackButton {
         forceSingleLineTitles(titleBar);
     }
 
+    /**
+     * 标题栏里除「动作行 + 标题」之外还叠了别的行（例如页内标签行）时，把占位高度补足。
+     *
+     * <p>{@link #applyTitleBarInset} 会把标题栏高度钉死成「返回按钮占地」（本机约 101px）——
+     * 那是按两行算的。再往里塞一行，标题就会被 LinearLayout 按剩余高度压缩，
+     * 实机表现为<b>标题文字的下半截被水平切掉</b>（本地音乐管理页实测）。
+     * 塞了额外行之后调用本方法把高度加上去即可。</p>
+     *
+     * @param extraPx 额外行的高度（含其 margin），px
+     */
+    public static void addTitleBarExtraHeight(Activity activity, View titleBar, int extraPx) {
+        if (activity == null || titleBar == null || extraPx <= 0) {
+            return;
+        }
+        ViewGroup.LayoutParams params = titleBar.getLayoutParams();
+        // 高度不是固定值（match_parent / wrap_content）说明这个顶栏不走占位那套，别动它
+        if (params == null || params.height <= 0) {
+            return;
+        }
+        params.height = params.height + extraPx;
+        titleBar.setLayoutParams(params);
+    }
+
     /** 把标题栏内的所有文字压成单行 + 结尾省略（含直接传入标题 TextView 的页面）。 */
     private static void forceSingleLineTitles(View root) {
         if (root == null) {

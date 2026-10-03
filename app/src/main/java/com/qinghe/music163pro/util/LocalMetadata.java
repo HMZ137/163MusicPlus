@@ -175,6 +175,23 @@ public final class LocalMetadata {
         }
     }
 
+    /**
+     * 只清某一个文件的封面缓存与「无封面」标记。
+     *
+     * <p>文件被替换 / 改过标签后调用（{@link LocalMetadataIndex} 判定 size 或 mtime 变了就会调它），
+     * 否则改了标签的文件会继续显示旧封面。不动其它文件 —— 整份 {@link #clearCache} 代价太大，
+     * 几百首要重新抽一遍。</p>
+     */
+    public static void invalidateCoverCache(Context context, String audioPath) {
+        if (context == null || TextUtils.isEmpty(audioPath)) {
+            return;
+        }
+        //noinspection ResultOfMethodCallIgnored
+        cachedCoverFile(context, audioPath).delete();
+        //noinspection ResultOfMethodCallIgnored
+        markerFile(context, audioPath).delete();
+    }
+
     private static File coverCacheDir(Context context) {
         File dir = new File(context.getCacheDir(), COVER_DIR);
         if (!dir.isDirectory()) {

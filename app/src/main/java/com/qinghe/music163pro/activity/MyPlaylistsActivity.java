@@ -25,6 +25,7 @@ import com.qinghe.music163pro.util.LocalPlaylistManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.PinyinUtils;
 import com.qinghe.music163pro.util.PlaybackMode;
+import com.qinghe.music163pro.util.UiKit;
 
 import java.io.File;
 import java.text.Collator;
@@ -186,25 +187,18 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleRow);
 
         // ---- 二级界面切换（在线 / 本地），等宽平分 ----
-        LinearLayout tabRow = new LinearLayout(this);
-        tabRow.setOrientation(LinearLayout.HORIZONTAL);
-        tabRow.setPadding(0, px(4), 0, px(4));
-        LinearLayout.LayoutParams tabLpOnline = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        tabLpOnline.setMarginEnd(px(3));
-        LinearLayout.LayoutParams tabLpLocal = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        tabLpLocal.setMarginStart(px(3));
+        // 样式统一走 UiKit.tab()：纯文字、无底衬、仅颜色区分选中（与「收藏」页一致）。
+        LinearLayout tabRow = UiKit.tabRow(this);
         // 纯本地播放模式下不添加在线 Tab（tabOnline 保持 null，updateTabUi 会跳过其样式设置），
         // 「本地歌单」占满整行。
         if (!localOnlyMode) {
             tabOnline = makeTab("在线歌单", TAB_ONLINE);
-            tabRow.addView(tabOnline, tabLpOnline);
+            tabRow.addView(tabOnline, UiKit.tabRowParams());
         }
         // 纯在线模式反之：不添加「本地歌单」Tab，只留在线
         if (!onlineOnlyMode) {
             tabLocal = makeTab("本地歌单", TAB_LOCAL);
-            tabRow.addView(tabLocal, tabLpLocal);
+            tabRow.addView(tabLocal, UiKit.tabRowParams());
         }
         root.addView(tabRow);
 
@@ -375,17 +369,9 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         ensureRankNicknameCached();
     }
 
-    /** 造一个二级 Tab 视图（统一字号 / 内边距 / 点击切页）。 */
+    /** 造一个二级 Tab 视图（统一样式见 {@link UiKit#tab}）。 */
     private TextView makeTab(String text, int tab) {
-        TextView t = new TextView(this);
-        t.setText(text);
-        t.setTextColor(0x99FFFFFF);
-        t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
-        t.setGravity(Gravity.CENTER);
-        t.setPadding(px(6), px(7), px(6), px(7));
-        t.setBackgroundResource(R.drawable.bg_tab_normal);
-        t.setClickable(true);
-        t.setFocusable(true);
+        TextView t = UiKit.tab(this, text);
         t.setOnClickListener(v -> switchTab(tab));
         return t;
     }
@@ -406,14 +392,8 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     /** 按 activeTab 刷新 Tab 样式与「导入歌单」行可见性。 */
     private void updateTabUi() {
         boolean local = activeTab == TAB_LOCAL;
-        if (tabOnline != null) {
-            tabOnline.setBackgroundResource(local ? R.drawable.bg_tab_normal : R.drawable.bg_tab_selected);
-            tabOnline.setTextColor(local ? 0x99FFFFFF : 0xFFBB86FC);
-        }
-        if (tabLocal != null) {
-            tabLocal.setBackgroundResource(local ? R.drawable.bg_tab_selected : R.drawable.bg_tab_normal);
-            tabLocal.setTextColor(local ? 0xFFBB86FC : 0x99FFFFFF);
-        }
+        UiKit.setTabSelected(tabOnline, !local);
+        UiKit.setTabSelected(tabLocal, local);
         if (importRow != null) {
             importRow.setVisibility(local ? View.VISIBLE : View.GONE);
         }

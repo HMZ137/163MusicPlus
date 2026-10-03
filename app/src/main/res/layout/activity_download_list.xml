@@ -8,12 +8,15 @@
 
     <!--
       标题栏改成两行：
-        第 1 行 = 右侧动作按钮（「本地」「整理」）。这一行由 WatchBackButton.applyTitleBarInset()
+        第 1 行 = 右侧动作按钮（「整理」）。这一行由 WatchBackButton.applyTitleBarInset()
                   撑到返回按钮的占位高度、并留出左侧内边距，所以浮动返回按钮（X）不会压到按钮。
         第 2 行 = 标题，占满整行宽度。
-      为什么必须拆行：原先标题与两个按钮挤在同一行，扣除返回按钮占位（本机约 100px）与两个
-      按钮（各约 86px）之后，留给标题的宽度只剩约 50px —— 六个字「本地音乐管理」在 16sp 下
-      需要约 220px，于是被折成竖排/两行。拆行后标题能拿到整行宽度，单行完整显示。
+      为什么必须拆行：原先标题与按钮挤在同一行，扣除返回按钮占位（本机约 100px）与按钮宽度之后，
+      留给标题的宽度只剩约 50px —— 六个字「本地音乐管理」在 16sp 下需要约 220px，于是被折成竖排。
+      拆行后标题能拿到整行宽度，单行完整显示。
+
+      「本地」原先是这里的第三个按钮，现已上提为标题下方的页内标签（与「收藏」页同款样式），
+      所以动作行只剩「整理」。
     -->
     <LinearLayout
         android:id="@+id/layout_downloads_title_bar"
@@ -26,22 +29,6 @@
             android:id="@+id/layout_downloads_action_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
-
-            <TextView
-                android:id="@+id/btn_local_music"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_toStartOf="@id/btn_tidy_downloads"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingStart="8dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
-                android:text="@string/local_music_entry"
-                android:textColor="@color/colorPrimary"
-                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/btn_tidy_downloads"
@@ -73,6 +60,46 @@
             android:textColor="@color/text_primary"
             android:textSize="@dimen/watch_title_text_size"
             android:textStyle="bold" />
+
+        <!--
+          页内二级标签：下载 / 本地。样式与「收藏」页一致（纯文字、无底衬、等宽、仅颜色区分选中）。
+          必须放在**标题栏里面**：标题栏高度被 applyTitleBarInset() 钉成「返回按钮占地」，
+          只够「动作行 + 标题」两行；把标签放在外面时标题会被挤掉下半截（实机确认）。
+          放进来的代价由 WatchBackButton.addTitleBarExtraHeight() 补足高度，头部总高不变。
+        -->
+        <LinearLayout
+            android:id="@+id/ll_download_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_marginBottom="4dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tab_downloads"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="下载"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tab_local_music"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/local_music_entry"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <ListView

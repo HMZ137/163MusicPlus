@@ -95,6 +95,46 @@
             android:textColor="@color/text_primary"
             android:textSize="@dimen/watch_title_text_size"
             android:textStyle="bold" />
+
+        <!--
+          页内二级标签：下载 / 本地。样式与「收藏」页一致（纯文字、无底衬、等宽、仅颜色区分选中）。
+          必须放在**标题栏里面**：标题栏高度被 applyTitleBarInset() 钉成「返回按钮占地」，
+          只够「动作行 + 标题」两行；把标签放在外面时标题会被挤掉下半截（实机确认）。
+          放进来的代价由 WatchBackButton.addTitleBarExtraHeight() 补足高度，头部总高不变。
+        -->
+        <LinearLayout
+            android:id="@+id/ll_local_music_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_marginBottom="4dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tab_downloads"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="下载"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tab_local_music"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="@string/local_music_entry"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!--
