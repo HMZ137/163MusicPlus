@@ -60,6 +60,12 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     private TextView tvStatus;
     private long currentUserId = -1;
 
+    /** 顶部「听歌排行」入口行（歌单卡片样式，固定显示在列表上方）。 */
+    private View rankRowView;
+    /** 排行入口副标题的缓存键（本页与 ListeningRankActivity 共同读写）。 */
+    private static final String KEY_RANK_NICK = "rank_entry_nickname";
+    private static final String KEY_RANK_COUNT = "rank_entry_count";
+
     /** 当前选中的二级界面（默认见下方 onCreate 内的判定）。 */
     private int activeTab = TAB_ONLINE;
     private TextView tabOnline;
@@ -198,33 +204,6 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         }
         root.addView(tabRow);
 
-        // 听歌排行入口：与上面的「本地/在线歌单」同一形式 —— 一个在线、一个本地并排。
-        //   在线听歌排行 = 服务端数据（/api/v1/play/record，与账号同步）
-        //   本地听歌排行 = 本机播放统计（PlaybackStatsActivity）
-        LinearLayout rankRow = new LinearLayout(this);
-        rankRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams rankLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rankLp.setMargins(px(8), px(4), px(8), px(4));
-        rankRow.setLayoutParams(rankLp);
-
-        TextView btnOnlineRank = buildRankEntry("在线听歌排行");
-        btnOnlineRank.setOnClickListener(v ->
-                startActivity(new Intent(this, ListeningRankActivity.class)));
-        TextView btnLocalRank = buildRankEntry("本地听歌排行");
-        btnLocalRank.setOnClickListener(v ->
-                startActivity(new Intent(this, PlaybackStatsActivity.class)));
-
-        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        leftLp.setMarginEnd(px(4));
-        rankRow.addView(btnOnlineRank, leftLp);
-        LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        rightLp.setMarginStart(px(4));
-        rankRow.addView(btnLocalRank, rightLp);
-        root.addView(rankRow);
-
         // ---- 「导入歌单」按钮：本地 Tab 专用，把外部 json 歌单文件读进来。 ----
         TextView btnImport = new TextView(this);
         btnImport.setText("导入歌单");
@@ -252,6 +231,21 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         tvStatus.setGravity(Gravity.CENTER);
         tvStatus.setPadding(0, px(4), 0, px(4));
         root.addView(tvStatus);
+
+        // ---- 听歌排行入口：做成与歌单条目完全一致的圆角卡片行，紧贴列表上方（固定，不随列表滚动）----
+        //   在线 Tab → 「我的听歌排行」（服务端 /api/v1/play/record，与账号同步）
+        //   本地 Tab → 「本地听歌排行」（本机播放统计 PlaybackStatsActivity）
+        //   副标题格式与歌单条目一致：「N首 · 昵称」。
+        rankRowView = getLayoutInflater().inflate(R.layout.item_my_playlist, root, false);
+        {
+            ImageView rIcon = rankRowView.findViewById(R.id.iv_playlist_icon);
+            rIcon.setImageResource(R.drawable.ic_music_note);
+            rIcon.setColorFilter(0xFFBB86FC);
+            rankRowView.setClickable(true);
+            rankRowView.setFocusable(true);
+            rankRowView.setOnClickListener(v -> openRankPage());
+        }
+        root.addView(rankRowView);
 
         lvPlaylists = new ListView(this);
         lvPlaylists.setDividerHeight(1);
@@ -362,6 +356,7 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
         updateTabUi();
         loadPlaylists();
+        ensureRankNicknameCached();
     }
 
     /** 造一个二级 Tab 视图（统一字号 / 内边距 / 点击切页）。 */
@@ -406,6 +401,71 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         if (importRow != null) {
             importRow.setVisibility(local ? View.VISIBLE : View.GONE);
         }
+        refreshRankRow(local);
+    }
+
+    /** 刷新顶部「听歌排行」入口行的文案与副标题（按当前 Tab）。 */
+    private void refreshRankRow(boolean local) {
+        if (rankRowView == null) return;
+        TextView tvName = rankRowView.findViewById(R.id.tv_name);
+        TextView tvDetail = rankRowView.findViewById(R.id.tv_detail);
+        tvName.setText(local ? "本地听歌排行" : "我的听歌排行");
+        tvName.setTextColor(0xFFFFFFFF);
+        tvName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
+        String detail;
+        if (local) {
+            // 本地排行：直接用本机统计的曲目数（无需联网）。
+            int count = com.qinghe.music163pro.util.PlaybackStats.getSummary(this).trackedSongCount;
+            detail = count + "首";
+        } else {
+            // 在线排行：用缓存条数（由 ListeningRankActivity 加载后写入；未打开过则为 0）。
+            detail = rankPrefs().getInt(KEY_RANK_COUNT, 0) + "首";
+        }
+        String nick = rankPrefs().getString(KEY_RANK_NICK, null);
+        if (nick != null && !nick.isEmpty()) {
+            detail += " · " + nick;
+        }
+        tvDetail.setText(detail);
+        tvDetail.setTextColor(0xB3FFFFFF);
+        tvDetail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+    }
+
+    /** 入口行点击：在线 Tab → 服务端听歌排行；本地 Tab → 本机播放统计。 */
+    private void openRankPage() {
+        if (activeTab == TAB_LOCAL) {
+            startActivity(new Intent(this, PlaybackStatsActivity.class));
+        } else {
+            startActivity(new Intent(this, ListeningRankActivity.class));
+        }
+    }
+
+    private SharedPreferences rankPrefs() {
+        return getSharedPreferences("music163_settings", MODE_PRIVATE);
+    }
+
+    /**
+     * 副标题的「昵称」来源：优先用缓存（由听歌排行页写入）；首次未缓存时取一次账号信息
+     * （轻量）并缓存，取到后刷新入口行。
+     */
+    private void ensureRankNicknameCached() {
+        String nick = rankPrefs().getString(KEY_RANK_NICK, null);
+        if (nick != null && !nick.isEmpty()) return;
+        MusicApiHelper.getUserAccount(MusicPlayerManager.getInstance().getCookie(),
+                new MusicApiHelper.AccountCallback() {
+                    @Override
+                    public void onResult(org.json.JSONObject accountJson) {
+                        org.json.JSONObject profile = accountJson.optJSONObject("profile");
+                        String n = profile != null ? profile.optString("nickname", null) : null;
+                        if (n != null && !n.isEmpty()) {
+                            rankPrefs().edit().putString(KEY_RANK_NICK, n).apply();
+                            refreshRankRow(activeTab == TAB_LOCAL);
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                    }
+                });
     }
 
     @Override
@@ -698,20 +758,6 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     }
 
     /** 顶栏「+」：按当前 Tab 语义创建（在线建云歌单 / 本地建本地歌单）。 */
-    /** 排行入口磁贴：与歌单条目同样的圆角卡片样式。 */
-    private TextView buildRankEntry(String text) {
-        TextView tv = new TextView(this);
-        tv.setText(text);
-        tv.setTextColor(0xFFFFFFFF);
-        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
-        tv.setGravity(android.view.Gravity.CENTER);
-        tv.setPadding(px(6), px(9), px(6), px(9));
-        tv.setBackgroundResource(R.drawable.bg_card_tile);
-        tv.setClickable(true);
-        tv.setFocusable(true);
-        return tv;
-    }
-
     private void showCreatePlaylistDialog() {
         if (activeTab == TAB_LOCAL) {
             showCreateLocalPlaylistDialog();

@@ -136,6 +136,12 @@ public class ListeningRankActivity extends BaseWatchActivity {
                 JSONObject profile = accountJson.optJSONObject("profile");
                 if (profile != null) {
                     uid = profile.optLong("userId", -1L);
+                    // 缓存昵称：供「我的歌单」页排行入口行的副标题（「N首 · 昵称」）使用。
+                    String nick = profile.optString("nickname", null);
+                    if (nick != null && !nick.isEmpty()) {
+                        getSharedPreferences("music163_settings", MODE_PRIVATE)
+                                .edit().putString("rank_entry_nickname", nick).apply();
+                    }
                 }
                 if (uid <= 0) {
                     JSONObject account = accountJson.optJSONObject("account");
@@ -181,6 +187,9 @@ public class ListeningRankActivity extends BaseWatchActivity {
                         if (result != null) {
                             items.addAll(result);
                         }
+                        // 缓存条数：供「我的歌单」页排行入口行的「N首」使用。
+                        getSharedPreferences("music163_settings", MODE_PRIVATE)
+                                .edit().putInt("rank_entry_count", items.size()).apply();
                         adapter.notifyDataSetChanged();
                         if (items.isEmpty()) {
                             showEmpty(type == 1 ? "本周还没有听歌记录" : "还没有听歌记录");
