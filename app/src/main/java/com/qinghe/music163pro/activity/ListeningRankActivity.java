@@ -60,48 +60,43 @@ public class ListeningRankActivity extends BaseWatchActivity {
         root.setPadding(px(8), px(6), px(8), px(6));
         setContentView(root);
 
-        // 顶栏：返回占位 + 标题 + 周/全部切换
+        // 顶栏：只有标题。「本周 / 全部」原来做成了标题行里的一对胶囊按钮，挤在标题右侧 ——
+        // 实机上两个胶囊直接压在「听歌排行」上面（标题只能靠 setMargins(0,0,92,0) 往左躲）。
+        // 现在改成标题下方的页内标签行（与「收藏」「我的歌单」同一套样式），
+        // 标题得以真正居中，标题行也能压到最小高度。
         android.widget.RelativeLayout titleBar = new android.widget.RelativeLayout(this);
         titleBar.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        WatchBackButton.applyTitleBarInset(this, titleBar);
+        // 只做竖直避让 + 压到最小：标题居中、横向范围（x≈119 起）本就避开返回键（x≤86）；
+        // 下方两个等宽标签的首个标签中心在 x≈98，也在按键横向范围之外 —— 可以放心压。
+        WatchBackButton.applyTitleBarTopInset(this, titleBar, px(22));
 
         TextView title = new TextView(this);
         title.setText("听歌排行");
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        // 与全站标题一致（16sp）。原先写 px(15) —— px() 按屏宽比例缩放，实际只有约 18px，
+        // 比别的页面小一档。
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_title_text_size));
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
         android.widget.RelativeLayout.LayoutParams titleLp =
                 new android.widget.RelativeLayout.LayoutParams(
                         android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                         android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
         titleLp.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
-        titleLp.setMargins(0, 0, px(92), 0);
         title.setLayoutParams(titleLp);
         titleBar.addView(title);
-
-        LinearLayout switchRow = new LinearLayout(this);
-        switchRow.setOrientation(LinearLayout.HORIZONTAL);
-        switchRow.setGravity(Gravity.CENTER_VERTICAL);
-        android.widget.RelativeLayout.LayoutParams switchLp =
-                new android.widget.RelativeLayout.LayoutParams(
-                        android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
-                        android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        switchLp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
-        switchLp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
-        switchLp.setMarginEnd(px(6));
-        switchRow.setLayoutParams(switchLp);
-
-        btnWeek = buildSwitchButton("本周");
-        btnAll = buildSwitchButton("全部");
-        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        btnLp.setMarginEnd(px(4));
-        switchRow.addView(btnWeek, btnLp);
-        switchRow.addView(btnAll);
-        titleBar.addView(switchRow);
         root.addView(titleBar);
+
+        // ---- 页内标签：本周 / 全部（等宽平分、纯文字、仅颜色区分选中） ----
+        LinearLayout switchRow = UiKit.tabRow(this);
+        btnWeek = UiKit.tab(this, "本周");
+        btnAll = UiKit.tab(this, "全部");
+        switchRow.addView(btnWeek, UiKit.tabRowParams());
+        switchRow.addView(btnAll, UiKit.tabRowParams());
+        root.addView(switchRow);
 
         btnWeek.setOnClickListener(v -> switchType(1));
         btnAll.setOnClickListener(v -> switchType(0));
@@ -229,30 +224,10 @@ public class ListeningRankActivity extends BaseWatchActivity {
 
     // ==================== 构件 ====================
 
-    private TextView buildSwitchButton(String text) {
-        TextView btn = new TextView(this);
-        btn.setText(text);
-        btn.setTextSize(12);
-        btn.setGravity(Gravity.CENTER);
-        btn.setPadding(px(8), px(2), px(8), px(2));
-        btn.setClickable(true);
-        btn.setFocusable(true);
-        return btn;
-    }
-
+    /** 刷新两个标签的选中态（纯文字，仅颜色区分 —— 与其它页面的页内标签一致）。 */
     private void updateSwitchStyle() {
-        applySwitchStyle(btnWeek, type == 1);
-        applySwitchStyle(btnAll, type == 0);
-    }
-
-    private void applySwitchStyle(TextView btn, boolean on) {
-        if (on) {
-            btn.setBackgroundResource(R.drawable.bg_btn_accent);
-            btn.setTextColor(UiKit.COLOR_ON_ACCENT);
-        } else {
-            btn.setBackgroundResource(R.drawable.bg_btn_outline);
-            btn.setTextColor(UiKit.COLOR_ACCENT);
-        }
+        UiKit.setTabSelected(btnWeek, type == 1);
+        UiKit.setTabSelected(btnAll, type == 0);
     }
 
     /** 排行列表：复用 item_song，并把「播放 N 次」放在第三行。 */
