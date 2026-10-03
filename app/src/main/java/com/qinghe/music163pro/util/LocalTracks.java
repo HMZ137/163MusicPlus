@@ -74,4 +74,32 @@ public final class LocalTracks {
     public static String safeName(String name) {
         return TextUtils.isEmpty(name) ? "未知曲目" : name;
     }
+
+    /**
+     * 把一首曲目规范化成「可以直接写进本地收藏库」的条目。
+     *
+     * <p>本地收藏是按 {@link #idForPath(String)} 生成的负数 id 存键、把 {@code url} 指向本地文件、
+     * 并标记 {@code forceLocalPlayback} 来播的。单曲收藏（{@code MainActivity.onFuncFavoriteLocal}）
+     * 一直是这么构造条目的；多选 / 批量收藏如果直接把列表里的原始对象塞进收藏库，就会出现
+     * 「存进去点开播不了」的问题 —— 两条路径共用本方法，口径就不会再分叉。</p>
+     *
+     * @return 规范化后的新条目；拿不到本地路径时返回 {@code null}（调用方应跳过）
+     */
+    public static Song asLocalFavoriteEntry(Song song) {
+        if (song == null) {
+            return null;
+        }
+        String path = song.getUrl();
+        if (TextUtils.isEmpty(path)) {
+            return null;
+        }
+        long localId = idForPath(path);
+        if (localId == 0) {
+            return null;
+        }
+        Song entry = new Song(localId, song.getName(), song.getArtist(), song.getAlbum());
+        entry.setUrl(path);
+        entry.setForceLocalPlayback(true);
+        return entry;
+    }
 }

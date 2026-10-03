@@ -44,6 +44,11 @@ public class LyricsActivity extends BaseWatchActivity {
     private static final String PREFS_NAME = "music163_settings";
     private static final Pattern LRC_PATTERN = Pattern.compile("\\[(\\d{1,3}):(\\d{2})\\.?(\\d{0,3})\\](.*)");
 
+    /** 沉浸式歌词字号：常态 15sp，当前行 17sp，译文 12sp。 */
+    private static final float LYRIC_FONT_NORMAL = 15f;
+    private static final float LYRIC_FONT_HIGHLIGHT = 17f;
+    private static final float LYRIC_FONT_TRANSLATION = 12f;
+
     private static final int LYRIC_MODE_FOLLOW = 0;
     private static final int LYRIC_MODE_BLOCK  = 1;
 
@@ -52,6 +57,14 @@ public class LyricsActivity extends BaseWatchActivity {
     private TextView tvSongName;
     private TextView tvTime;
     private MusicPlayerManager playerManager;
+
+    // AI 歌词（高级歌词翻译）：全屏页跟主播放页用同一套着色/缓存
+    private TextView btnAiToggle;
+    private com.qinghe.music163pro.model.AiLyricResult aiLyricResult;
+    private boolean aiLyricActive;
+    private boolean aiLyricLoading;
+    private boolean aiPrepared;
+    private String aiLyricSongKey;
 
     private final List<LyricLine> lyricLines = new ArrayList<>();
     private final List<TextView> lyricViews = new ArrayList<>();
@@ -74,6 +87,8 @@ public class LyricsActivity extends BaseWatchActivity {
     private static class LyricLine {
         long timeMs;
         String text;
+        /** 官方译文（沉浸页也显示译文；没有则为空）。 */
+        String translation;
 
         LyricLine(long timeMs, String text) {
             this.timeMs = timeMs;
@@ -103,6 +118,13 @@ public class LyricsActivity extends BaseWatchActivity {
         svLyrics = findViewById(R.id.sv_lyrics);
         llContainer = findViewById(R.id.ll_lyrics_container);
         tvSongName = findViewById(R.id.tv_lyrics_song_name);
+        btnAiToggle = findViewById(R.id.btn_ai_toggle);
+        btnAiToggle.setOnClickListener(v -> onAiToggleClicked());
+        // 长按 = 丢掉本曲缓存并重新分析（与主播放页歌词层一致）
+        btnAiToggle.setOnLongClickListener(v -> {
+            reanalyzeCurrentSong();
+            return true;
+        });
         tvTime = findViewById(R.id.tv_lyrics_time);
 
         tvSongName.setSelected(true); // enable marquee
@@ -117,7 +139,7 @@ public class LyricsActivity extends BaseWatchActivity {
             return;
         }
 
-        tvSongName.setText(song.getName() + " - " + song.getArtist());
+        tvSongName.setText(song.getDisplayName() + " - " + song.getArtist());
 
         if (lyricScrollMode == LYRIC_MODE_BLOCK) {
             setupBlockingModeDetection();
@@ -261,14 +283,16 @@ public class LyricsActivity extends BaseWatchActivity {
         }
 
         String cookie = playerManager.getCookie();
-        MusicApiHelper.getLyrics(song.getId(), cookie, new MusicApiHelper.LyricsCallback() {
+        MusicApiHelper.getLyricsWithTranslation(song.getId(), cookie,
+                new MusicApiHelper.LyricsFullCallback() {
             @Override
-            public void onResult(String lrcText) {
+            public void onResult(String lrcText, String tlyricText, String romalrcText) {
                 if (lrcText == null || lrcText.isEmpty()) {
                     showNoLyrics();
                     return;
                 }
                 parseLrc(lrcText);
+                parseTranslationLrc(tlyricText);
                 displayLyrics();
                 startScrollSync();
             }
@@ -382,6 +406,40 @@ public class LyricsActivity extends BaseWatchActivity {
         }
     }
 
+    /** 把翻译歌词按时间戳贴到对应行上（沉浸页也显示译文）。 */
+    private void parseTranslationLrc(String tlyricText) {
+        if (tlyricText == null || tlyricText.isEmpty()) {
+            return;
+        }
+        java.util.Map<Long, String> map = new java.util.HashMap<>();
+        for (String raw : tlyricText.split("\r?\n")) {
+            java.util.regex.Matcher matcher = LRC_PATTERN.matcher(raw.trim());
+            if (!matcher.find()) {
+                continue;
+            }
+            try {
+                long minutes = Long.parseLong(matcher.group(1));
+                long seconds = Long.parseLong(matcher.group(2));
+                String frac = matcher.group(3);
+                long ms = minutes * 60_000 + seconds * 1000;
+                if (frac != null && !frac.isEmpty()) {
+                    ms += (long) (Double.parseDouble("0." + frac) * 1000);
+                }
+                String text = matcher.group(4) == null ? "" : matcher.group(4).trim();
+                if (!text.isEmpty()) {
+                    map.put(ms, text);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        for (LyricLine line : lyricLines) {
+            String translated = map.get(line.timeMs);
+            if (translated != null) {
+                line.translation = translated;
+            }
+        }
+    }
+
     private void displayLyrics() {
         llContainer.removeAllViews();
         lyricViews.clear();
@@ -396,21 +454,57 @@ public class LyricsActivity extends BaseWatchActivity {
         final int backdropPadding = backdropEnabled ? dp(8) : 0;
 
         for (LyricLine line : lyricLines) {
-            TextView tv = new TextView(this);
-            tv.setText(line.text);
-            tv.setTextColor(0xB3FFFFFF);
-            tv.setTextSize(13);
-            tv.setGravity(android.view.Gravity.CENTER);
-            // 底衬打开时左右留出内边距，否则文字会贴着色块边缘
-            tv.setPadding(backdropPadding, dp(6), backdropPadding, dp(6));
+            // 沉浸式大字：每行 = 原文（大字）+ 译文（小字、更淡），底衬打在整个行容器上
+            LinearLayout lineBox = new LinearLayout(this);
+            lineBox.setOrientation(LinearLayout.VERTICAL);
+            lineBox.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+            lineBox.setPadding(backdropPadding, dp(6), backdropPadding, dp(6));
             if (backdropEnabled) {
-                tv.setBackground(buildLyricBackdrop());
+                lineBox.setBackground(buildLyricBackdrop());
             }
+
+            com.qinghe.music163pro.model.AiLyricResult.Line aiLine =
+                    (aiLyricActive && aiLyricResult != null)
+                            ? aiLyricResult.lineAt(lyricViews.size()) : null;
+
+            TextView tv = new TextView(this);
+            tv.setTextColor(0xB3FFFFFF);
+            tv.setTextSize(LYRIC_FONT_NORMAL);
+            tv.setGravity(android.view.Gravity.CENTER);
+            if (aiLine != null) {
+                tv.setText(com.qinghe.music163pro.util.LyricRichText.buildOriginal(
+                        line.text, aiLine, 0xB3FFFFFF, LYRIC_FONT_NORMAL, this));
+            } else {
+                tv.setText(line.text);
+            }
+            lineBox.addView(tv);
+
+            // 译文：官方优先；AI 开启且官方没有时用 AI 译文
+            String effective = line.translation;
+            if ((effective == null || effective.isEmpty()) && aiLine != null) {
+                effective = aiLine.translation;
+            }
+            if (effective != null && !effective.isEmpty()) {
+                TextView tvTrans = new TextView(this);
+                tvTrans.setTextSize(LYRIC_FONT_TRANSLATION);
+                tvTrans.setTextColor(0x8AFFFFFF);
+                tvTrans.setGravity(android.view.Gravity.CENTER);
+                tvTrans.setPadding(0, dp(2), 0, 0);
+                if (aiLine != null) {
+                    tvTrans.setText(com.qinghe.music163pro.util.LyricRichText.buildTranslation(
+                            effective, aiLine, 0x8AFFFFFF, LYRIC_FONT_TRANSLATION, this));
+                } else {
+                    tvTrans.setText(effective);
+                }
+                lineBox.addView(tvTrans);
+            }
+
             // No per-TextView touch listeners: double-tap and scroll detection
             // are handled at the ScrollView level in setupBlockingModeDetection().
-            llContainer.addView(tv);
+            llContainer.addView(lineBox);
             lyricViews.add(tv);
         }
+        ensureAiPrepared();
     }
 
     /**
@@ -419,11 +513,232 @@ public class LyricsActivity extends BaseWatchActivity {
      * <p>这个页面每行就是一个独立的 TextView（不像播放页那样有外层容器），
      * 所以底衬直接打在 TextView 上。</p>
      */
+    // ==================== AI 歌词（高级歌词翻译） ====================
+
+    /** 歌词显示完成后准备 AI 数据：总开关开→分析（缓存优先）；关→只读缓存，绝不发请求。 */
+    private void ensureAiPrepared() {
+        if (aiPrepared || lyricLines.isEmpty()) {
+            return;
+        }
+        aiPrepared = true;
+        Song song = playerManager != null ? playerManager.getCurrentSong() : null;
+        if (song == null) {
+            return;
+        }
+        aiLyricSongKey = aiLyricSongKeyOf(song);
+        // 先把按钮摆出来（默认「AI」灰字），缓存命中/分析完成后会更新状态；
+        // 之前只在缓存命中时才刷状态，没缓存时按钮一直是 GONE，用户点不到。
+        updateAiButton();
+        final String lyricsKey = com.qinghe.music163pro.util.AiLyricAnalyzer.joinLyrics(
+                aiPlainLyricLines());
+
+        if (com.qinghe.music163pro.util.AiLyricSettings.isEnabled(this)) {
+            aiLyricLoading = true;
+            updateAiButton();
+            runAiAnalysis(true);
+            return;
+        }
+        new Thread(() -> {
+            final com.qinghe.music163pro.model.AiLyricResult cached =
+                    com.qinghe.music163pro.model.AiLyricResult.fromJson(
+                            com.qinghe.music163pro.util.AiLyricCache.read(aiLyricSongKey, lyricsKey));
+            if (cached != null) {
+                runOnUiThread(() -> {
+                    aiLyricResult = cached;
+                    updateAiButton();
+                });
+            }
+        }, "ai-lyric-cache-full").start();
+    }
+
+    private void runAiAnalysis(final boolean autoActivate) {
+        Song song = playerManager != null ? playerManager.getCurrentSong() : null;
+        if (song == null) {
+            aiLyricLoading = false;
+            updateAiButton();
+            return;
+        }
+        com.qinghe.music163pro.util.AiLyricAnalyzer.analyze(this, aiLyricSongKey,
+                song.getName(), song.getArtist(), song.getAlbum(),
+                aiPlainLyricLines(), aiOfficialTranslations(),
+                new com.qinghe.music163pro.util.AiLyricAnalyzer.Callback() {
+                    @Override
+                    public void onResult(com.qinghe.music163pro.model.AiLyricResult result,
+                                         boolean fromCache) {
+                        aiLyricLoading = false;
+                        aiLyricResult = result;
+                        if (autoActivate) {
+                            aiLyricActive = true;
+                        }
+                        updateAiButton();
+                        if (aiLyricActive) {
+                            redrawWithAi();
+                        }
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        aiLyricLoading = false;
+                        updateAiButton();
+                        if (autoActivate && com.qinghe.music163pro.util.AiLyricSettings.isEnabled(LyricsActivity.this)) {
+                            Toast.makeText(LyricsActivity.this, "AI 歌词失败：" + message,
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+    }
+
+    /** 长按 AI：删除本曲缓存并重新分析。 */
+    private void reanalyzeCurrentSong() {
+        if (aiLyricLoading) {
+            Toast.makeText(this, "AI 正在分析…", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
+            Toast.makeText(this, "请先填写 DeepSeek API Key", Toast.LENGTH_SHORT).show();
+            startActivity(new android.content.Intent(this, LanguageLearningActivity.class));
+            return;
+        }
+        aiLyricActive = false;
+        aiLyricResult = null;
+        if (aiLyricSongKey != null && !lyricLines.isEmpty()) {
+            java.io.File cache = com.qinghe.music163pro.util.AiLyricCache.fileFor(
+                    aiLyricSongKey,
+                    com.qinghe.music163pro.util.AiLyricAnalyzer.joinLyrics(aiPlainLyricLines()));
+            if (cache != null && cache.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                cache.delete();
+            }
+        }
+        aiLyricLoading = true;
+        updateAiButton();
+        runAiAnalysis(true);
+        Toast.makeText(this, "已清除本曲缓存，正在重新分析…", Toast.LENGTH_SHORT).show();
+    }
+
+    private void onAiToggleClicked() {
+        if (aiLyricLoading) {
+            Toast.makeText(this, "AI 正在分析…", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (aiLyricActive) {
+            aiLyricActive = false;
+            updateAiButton();
+            redrawWithAi();
+            return;
+        }
+        if (aiLyricResult != null) {
+            aiLyricActive = true;
+            updateAiButton();
+            redrawWithAi();
+            Toast.makeText(this, "已启用 AI 歌词", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
+            Toast.makeText(this, "请先填写 DeepSeek API Key", Toast.LENGTH_SHORT).show();
+            startActivity(new android.content.Intent(this, LanguageLearningActivity.class));
+            return;
+        }
+        aiLyricLoading = true;
+        updateAiButton();
+        runAiAnalysis(true);
+    }
+
+    /** 重绘歌词并恢复当前行高亮。 */
+    private void redrawWithAi() {
+        int highlight = currentHighlightIndex;
+        displayLyrics();
+        if (highlight >= 0 && highlight < lyricViews.size()) {
+            TextView view = lyricViews.get(highlight);
+            view.setTextColor(0xFFFFFFFF);
+            view.setTextSize(LYRIC_FONT_HIGHLIGHT);
+            rebuildAiLineText(view, highlight, true);
+            currentHighlightIndex = highlight;
+        }
+    }
+
+    private void updateAiButton() {
+        if (btnAiToggle == null) {
+            return;
+        }
+        if (lyricLines.isEmpty()) {
+            btnAiToggle.setVisibility(android.view.View.GONE);
+            return;
+        }
+        btnAiToggle.setVisibility(android.view.View.VISIBLE);
+        btnAiToggle.setTextSize(12);
+        btnAiToggle.setPadding(dp(6), dp(4), dp(6), dp(4));
+        if (aiLyricLoading) {
+            applyAiButtonStyle("AI…", false);
+        } else if (aiLyricActive) {
+            applyAiButtonStyle("AI✓", true);
+        } else {
+            applyAiButtonStyle("AI", false);
+        }
+    }
+
+    /** 与主播放页歌词层一致：纯文字按钮，只用颜色区分开关态。 */
+    private void applyAiButtonStyle(String text, boolean on) {
+        if (btnAiToggle == null) {
+            return;
+        }
+        btnAiToggle.setText(text);
+        btnAiToggle.setBackground(null);
+        btnAiToggle.setTextColor(on ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0x80FFFFFF);
+    }
+
+    /** 高亮切换时重建该行词块（字号 13/14 变化，span 内的字号必须跟着重建）。 */
+    private void rebuildAiLineText(TextView view, int lineIndex, boolean highlighted) {
+        if (!aiLyricActive || aiLyricResult == null || view == null
+                || lineIndex < 0 || lineIndex >= lyricLines.size()) {
+            return;
+        }
+        com.qinghe.music163pro.model.AiLyricResult.Line aiLine = aiLyricResult.lineAt(lineIndex);
+        if (aiLine == null) {
+            return;
+        }
+        view.setText(com.qinghe.music163pro.util.LyricRichText.buildOriginal(
+                lyricLines.get(lineIndex).text, aiLine,
+                highlighted ? 0xFFFFFFFF : 0xB3FFFFFF,
+                highlighted ? LYRIC_FONT_HIGHLIGHT : LYRIC_FONT_NORMAL, this));
+    }
+
+    private String aiLyricSongKeyOf(Song song) {
+        if (song == null) {
+            return "unknown";
+        }
+        if (song.isBilibili() && song.getBvid() != null && !song.getBvid().isEmpty()) {
+            return "bili_" + song.getBvid();
+        }
+        if (song.getId() > 0) {
+            return String.valueOf(song.getId());
+        }
+        String url = song.getUrl();
+        return "local_" + com.qinghe.music163pro.util.AiLyricCache.shortHash(
+                url == null ? song.getName() : url);
+    }
+
+    private java.util.List<String> aiPlainLyricLines() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (LyricLine line : lyricLines) {
+            out.add(line.text == null ? "" : line.text);
+        }
+        return out;
+    }
+
+    /**
+     * 全屏歌词页的 LyricLine 不带官方翻译（本页只显示原文），
+     * 因此不向 AI 提供官方译文参考，返回 null 即可。
+     */
+    private java.util.List<String> aiOfficialTranslations() {
+        return null;
+    }
+
     private android.graphics.drawable.Drawable buildLyricBackdrop() {
         android.graphics.drawable.GradientDrawable background =
                 new android.graphics.drawable.GradientDrawable();
         background.setColor(LyricSettings.getBackdropColor());
-        background.setCornerRadius(dp(6));
+        background.setCornerRadius(0);
         return background;
     }
 
@@ -466,7 +781,8 @@ public class LyricsActivity extends BaseWatchActivity {
                         if (currentHighlightIndex < lyricViews.size()) {
                             TextView currentView = lyricViews.get(currentHighlightIndex);
                             currentView.setTextColor(0xFFFFFFFF);
-                            currentView.setTextSize(14);
+                            currentView.setTextSize(LYRIC_FONT_HIGHLIGHT);
+                            rebuildAiLineText(currentView, newIndex, true);
 
                             // Auto-scroll: always in follow mode; only when not blocked in block mode
                             if (lyricScrollMode == LYRIC_MODE_FOLLOW || !userScrolled) {
@@ -516,7 +832,8 @@ public class LyricsActivity extends BaseWatchActivity {
         if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
             TextView currentView = lyricViews.get(currentHighlightIndex);
             currentView.setTextColor(0xB3FFFFFF);
-            currentView.setTextSize(13);
+            currentView.setTextSize(LYRIC_FONT_NORMAL);
+            rebuildAiLineText(currentView, currentHighlightIndex, false);
         }
         currentHighlightIndex = -1;
     }

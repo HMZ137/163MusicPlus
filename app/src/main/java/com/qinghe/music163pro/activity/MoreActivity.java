@@ -80,6 +80,7 @@ public class MoreActivity extends BaseWatchActivity {
         btnRingtones = findViewById(R.id.btn_menu_ringtones);
         btnTopList = findViewById(R.id.btn_menu_toplist);
         btnHistory = findViewById(R.id.btn_menu_history);
+
         btnProfile = findViewById(R.id.btn_menu_profile);
         btnPersonalFM = findViewById(R.id.btn_menu_personal_fm);
         btnLogin = findViewById(R.id.btn_menu_login);
@@ -191,7 +192,15 @@ public class MoreActivity extends BaseWatchActivity {
                     PlaybackMode.isLocalOnly(this) ? View.VISIBLE : View.GONE);
         }
         applyVisibility(btnFavorites, MoreMenuPreferences.KEY_FAVORITES, false);
-        applyVisibility(btnMyPlaylists, MoreMenuPreferences.KEY_MY_PLAYLISTS, true);
+        // 「我的歌单」：页内已分「在线歌单 / 本地歌单」两个二级界面。纯本地播放模式下这页退化为
+        // 纯本地入口（只留本地那一栏），属于离线可用功能 —— 因此放行：既不按云端功能隐藏，
+        // 也不要求登录。云音乐模式下仍沿用原来的「需登录」规则，行为与改动前完全一致。
+        boolean localOnlyMode = PlaybackMode.isLocalOnly(this);
+        boolean myPlaylistsEnabled = MoreMenuPreferences.isEnabled(prefs, MoreMenuPreferences.KEY_MY_PLAYLISTS);
+        boolean myPlaylistsVisible = localOnlyMode
+                ? myPlaylistsEnabled
+                : (myPlaylistsEnabled && Boolean.TRUE.equals(btnMyPlaylists.getTag()));
+        btnMyPlaylists.setVisibility(myPlaylistsVisible ? View.VISIBLE : View.GONE);
         applyVisibility(btnDailyRecommend, MoreMenuPreferences.KEY_DAILY_RECOMMEND, true);
         applyVisibility(btnRadarPlaylist, MoreMenuPreferences.KEY_RADAR_PLAYLIST, true);
         applyVisibility(btnMusicCloud, MoreMenuPreferences.KEY_MUSIC_CLOUD, true);
@@ -299,4 +308,6 @@ public class MoreActivity extends BaseWatchActivity {
             }
         });
     }
+
+
 }

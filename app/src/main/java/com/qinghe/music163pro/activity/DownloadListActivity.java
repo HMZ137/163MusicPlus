@@ -70,6 +70,8 @@ public class DownloadListActivity extends BaseWatchActivity {
         setContentView(R.layout.activity_download_list);
 
         // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
+        // 与本地音乐页同理：占位加在**整个标题栏**上。若只加给上面的动作行，那一行会被撑到
+        // 返回按钮的高度，再叠一行标题，头部会白吃掉几十像素的列表空间。
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
                 this, findViewById(R.id.layout_downloads_title_bar));
 
@@ -90,6 +92,11 @@ public class DownloadListActivity extends BaseWatchActivity {
         if (btnLocalMusic != null) {
             btnLocalMusic.setOnClickListener(v ->
                     startActivity(new Intent(this, LocalMusicActivity.class)));
+            // 纯在线模式：本地入口收起。注意**下载管理本身保留**（用户总得有地方管已下到卡里的歌），
+            // 只是不再从这里进「本机音乐」。
+            if (com.qinghe.music163pro.util.PlaybackMode.isLocalEntryHidden(this)) {
+                btnLocalMusic.setVisibility(View.GONE);
+            }
         }
 
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, downloadedSongs) {
@@ -101,7 +108,7 @@ public class DownloadListActivity extends BaseWatchActivity {
                     TextView tvName = view.findViewById(R.id.tv_item_name);
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getName());
+                    tvName.setText(song.getDisplayName());
                     tvArtist.setText(song.getArtist());
                     if (ivCover != null) {
                         // coverUrl may be local file:// path or remote URL

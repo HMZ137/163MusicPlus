@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <!-- 标题栏：留出左上角浮动返回按钮（X）的占位高度，否则会压住第一行 -->
+    <RelativeLayout
+        android:id="@+id/layout_local_playlist_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/tv_local_playlist_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@id/btn_local_playlist_more"
+            android:layout_centerVertical="true"
+            android:text="本地歌单"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/watch_title_text_size"
+            android:textStyle="bold"
+            android:letterSpacing="0.05"
+            android:gravity="center" />
+
+        <!-- 更多：搜索歌曲 / 排序方式（本页操作不多，收进一个二级菜单即可） -->
+        <TextView
+            android:id="@+id/btn_local_playlist_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="6dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="4dp"
+            android:text="@string/local_music_more"
+            android:textColor="@color/colorPrimary"
+            android:textSize="11sp" />
+    </RelativeLayout>
+
+    <!-- 状态行：搜索时显示命中数（点按清除搜索），平时不占高度 -->
+    <TextView
+        android:id="@+id/tv_status_row"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:ellipsize="end"
+        android:focusable="true"
+        android:gravity="center"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/lv_local_playlist"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp" />
+
+    <TextView
+        android:id="@+id/tv_local_playlist_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="歌单为空"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:visibility="gone" />
+</LinearLayout>

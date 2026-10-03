@@ -46,6 +46,9 @@ public class SettingsActivity extends BaseWatchActivity {
 
         View btnToggle = findViewById(R.id.btn_settings_toggle);
         View btnEditMore = findViewById(R.id.btn_settings_edit_more);
+        // 高级歌词翻译：与「开关选项」同级的独立设置页（AI 词性着色 / 翻译）
+        findViewById(R.id.btn_settings_advanced_lyrics).setOnClickListener(v ->
+                startActivity(new android.content.Intent(this, LanguageLearningActivity.class)));
         View btnCheckUpdate = findViewById(R.id.btn_settings_check_update);
         View btnHelp = findViewById(R.id.btn_settings_help);
         View btnAbout = findViewById(R.id.btn_settings_about);

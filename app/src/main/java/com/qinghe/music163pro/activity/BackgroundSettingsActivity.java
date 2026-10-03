@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import com.qinghe.music163pro.util.UiKit;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -92,7 +93,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         btn.setFocusable(true);
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setColor(0xFF2D2D2D);
-        bg.setCornerRadius(px(6));
+        bg.setCornerRadius(UiKit.dp(this, UiKit.DP_BUTTON_RADIUS));
         btn.setBackground(bg);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);

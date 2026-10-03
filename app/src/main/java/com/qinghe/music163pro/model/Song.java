@@ -24,6 +24,8 @@ public class Song implements Serializable {
     private String coverUrl;
     /** Album ID (al.id from NetEase API). 0 if unknown. */
     private long albumId;
+    /** 歌名译名（网易云 tns 字段，首个非空项）。空表示没有译名。 */
+    private String transName;
 
     public Song() {}
 
@@ -39,6 +41,25 @@ public class Song implements Serializable {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getTransName() { return transName; }
+    public void setTransName(String transName) { this.transName = transName; }
+
+    /**
+     * 列表 / 标题统一使用的显示名：有译名时用「原名（译名）」。
+     *
+     * <p>译名与原名相同（网易云偶尔把译名填成原名）时不重复显示。
+     * 各页面展示歌名一律走这里，不要在 UI 层再拼字符串。</p>
+     */
+    public String getDisplayName() {
+        if (name == null) {
+            return "";
+        }
+        if (transName == null || transName.isEmpty() || transName.equals(name)) {
+            return name;
+        }
+        return name + "（" + transName + "）";
+    }
 
     public String getArtist() { return artist; }
     public void setArtist(String artist) { this.artist = artist; }

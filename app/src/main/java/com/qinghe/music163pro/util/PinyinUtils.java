@@ -102,7 +102,10 @@ public final class PinyinUtils {
      * 取一个词的首字母。
      *
      * <p>跳过前导的非字母数字字符（例如「《xxx》」「[MV]」这种前缀），
-     * 否则整首歌都会被归到 {@code #}。全都认不出才返回 {@link #OTHER}。</p>
+     * 否则整首歌都会被归到 {@code #}。</p>
+     *
+     * <p>汉字与拉丁字母都认不出时，再用 {@link ScriptTranslit} 试一次**假名 / 西里尔的拉丁转写** ——
+     * 这样「かがやき」归到 K、「Служить России」归到 S，日文/俄文曲名在 A–Z 索引里也能正常分组。</p>
      */
     public static char initialOfWord(String text) {
         if (text == null) {
@@ -118,7 +121,8 @@ public final class PinyinUtils {
                 return initial;
             }
         }
-        return OTHER;
+        char latin = ScriptTranslit.latinInitialOf(text);
+        return latin != 0 ? latin : OTHER;
     }
 
     /** 分组标题的展示文本：{@link #OTHER} 显示为 {@code #}。 */

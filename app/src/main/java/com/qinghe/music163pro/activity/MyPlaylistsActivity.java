@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,9 +21,12 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.player.MusicPlayerManager;
+import com.qinghe.music163pro.util.LocalPlaylistManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.PinyinUtils;
+import com.qinghe.music163pro.util.PlaybackMode;
 
+import java.io.File;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,18 +34,38 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Shows the user's playlists (created + subscribed) from the cloud.
- * Top-right "+" button to create a new playlist.
- * Clicking a playlist opens PlaylistDetailActivity with full ownership info.
- * Designed for watch screen (320x360 dpi).
+ * 「我的歌单」页：内部分两个二级界面（Tab）——「在线歌单」与「本地歌单」。
+ *
+ * <p>在线歌单走网易云接口（创建 / 改名 / 删除 / 取消收藏，点开进 {@link PlaylistDetailActivity}）；
+ * 本地歌单走 {@link LocalPlaylistManager}（创建 / 改名 / 删除 / 导入 / 导出，点开进
+ * {@link LocalPlaylistDetailActivity}）。两个 Tab 始终并存，互不替换 —— 在线功能在任何模式下
+ * 都不隐藏，本地功能在纯本地场景下也能直接用到。</p>
+ *
+ * <p>默认落在哪个 Tab：若当前「不走云端收藏」（本地播放模式，或用户选了本地收藏），默认开本地
+ * Tab；否则默认在线 Tab。用户可随时手动切换。</p>
+ *
+ * <p>顶栏右侧「+」按当前 Tab 语义创建；「A-Z」首字母跳转与两套列表通用；「导入歌单」按钮仅在
+ * 本地 Tab 出现。设计尺寸针对手表屏（约 320×360）。</p>
  */
 public class MyPlaylistsActivity extends BaseWatchActivity {
+
+    /** 二级界面：在线歌单。 */
+    private static final int TAB_ONLINE = 0;
+    /** 二级界面：本地歌单。 */
+    private static final int TAB_LOCAL = 1;
 
     private ListView lvPlaylists;
     private final List<PlaylistInfo> displayList = new ArrayList<>();
     private ArrayAdapter<PlaylistInfo> adapter;
     private TextView tvStatus;
     private long currentUserId = -1;
+
+    /** 当前选中的二级界面（默认见下方 onCreate 内的判定）。 */
+    private int activeTab = TAB_ONLINE;
+    private TextView tabOnline;
+    private TextView tabLocal;
+    /** 「导入歌单」按钮所在的整行，仅本地 Tab 显示。 */
+    private View importRow;
 
     /** 打开字母选择页的请求码。 */
     private static final int REQUEST_LETTER_PICKER = 0x52;
@@ -61,12 +85,21 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
+        // 纯本地播放模式：页内只保留「本地歌单」一个二级界面 —— 在线歌单必然依赖账号与网络，
+        // 在这种模式下即便显示也只会是「请先登录」，索性不出现，避免误导。
+        boolean localOnlyMode = PlaybackMode.isLocalOnly(this);
+        // 纯在线模式：本地入口整体收起 → 只保留「在线歌单」这一栏
+        final boolean onlineOnlyMode = PlaybackMode.isOnlineOnly(this);
+        // 默认 Tab：不走云端收藏（本地播放模式 / 本地收藏）时默认本地，否则默认在线。
+        activeTab = onlineOnlyMode ? TAB_ONLINE
+                : ((!localOnlyMode && PlaybackMode.isCloudFavoriteEnabled(this)) ? TAB_ONLINE : TAB_LOCAL);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF121212);
         root.setPadding(px(6), px(6), px(6), px(6));
 
-        // Title row with "+" button
+        // ---- 标题行：标题（固定「我的歌单」）+ A-Z + 新建 ----
         android.widget.RelativeLayout titleRow = new android.widget.RelativeLayout(this);
         titleRow.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -77,7 +110,12 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
         tvTitle.setGravity(Gravity.CENTER);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvTitle.setPadding(px(28), 0, px(28), px(4));
+        // 只留很小的左右内边距：返回按钮的占位已由 applyTitleBarInset 加到标题行（titleRow）的
+        // paddingStart 上，这里再叠 28px 就是「双重预留」—— 全局缩放后可用宽度被压到 100px 上下，
+        // 「我的歌单」四个字放不下就被挤成竖排。单行 + 截断兜底，保证任何宽度下都不会竖排。
+        tvTitle.setSingleLine(true);
+        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tvTitle.setPadding(px(4), 0, px(4), px(4));
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
                 android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
@@ -104,7 +142,7 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         titleRow.addView(btnCreate);
 
         // 「A-Z」首字母跳转：复用 LetterPickerActivity + PinyinUtils（与本地音乐页同一套）。
-        // 放在「+」左侧，并让标题用 LEFT_OF 让位，避免「我的歌单」文字压住 A-Z。
+        // 放在「+」左侧，并让标题用 LEFT_OF 让位，避免标题文字压住 A-Z。
         // 放大字号 + 加大热区 + 卡片底，表盘上能稳定点中。
         TextView btnAZ = new TextView(this);
         btnAZ.setText("A-Z");
@@ -129,13 +167,82 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         btnAZ.setOnClickListener(v -> openLetterPicker());
         titleRow.addView(btnAZ);
 
-        // 标题在 A-Z 左侧收尾，不再与「我的歌单」重叠。
+        // 标题在 A-Z 左侧收尾，不再与标题文字重叠。
         titleParams.addRule(android.widget.RelativeLayout.LEFT_OF, idAZ);
 
         root.addView(titleRow);
         // 标题栏撑到左上角浮动返回按钮（X）的占位：本页此前漏了这一句（其它 17 个页面都调了），
         // 标题行高只有 20 多像素，X 按钮（58px）会探进标题行 / 压在第一条歌单上。
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleRow);
+
+        // ---- 二级界面切换（在线 / 本地），等宽平分 ----
+        LinearLayout tabRow = new LinearLayout(this);
+        tabRow.setOrientation(LinearLayout.HORIZONTAL);
+        tabRow.setPadding(0, px(4), 0, px(4));
+        LinearLayout.LayoutParams tabLpOnline = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tabLpOnline.setMarginEnd(px(3));
+        LinearLayout.LayoutParams tabLpLocal = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tabLpLocal.setMarginStart(px(3));
+        // 纯本地播放模式下不添加在线 Tab（tabOnline 保持 null，updateTabUi 会跳过其样式设置），
+        // 「本地歌单」占满整行。
+        if (!localOnlyMode) {
+            tabOnline = makeTab("在线歌单", TAB_ONLINE);
+            tabRow.addView(tabOnline, tabLpOnline);
+        }
+        // 纯在线模式反之：不添加「本地歌单」Tab，只留在线
+        if (!onlineOnlyMode) {
+            tabLocal = makeTab("本地歌单", TAB_LOCAL);
+            tabRow.addView(tabLocal, tabLpLocal);
+        }
+        root.addView(tabRow);
+
+        // 听歌排行入口：与上面的「本地/在线歌单」同一形式 —— 一个在线、一个本地并排。
+        //   在线听歌排行 = 服务端数据（/api/v1/play/record，与账号同步）
+        //   本地听歌排行 = 本机播放统计（PlaybackStatsActivity）
+        LinearLayout rankRow = new LinearLayout(this);
+        rankRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rankLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rankLp.setMargins(px(8), px(4), px(8), px(4));
+        rankRow.setLayoutParams(rankLp);
+
+        TextView btnOnlineRank = buildRankEntry("在线听歌排行");
+        btnOnlineRank.setOnClickListener(v ->
+                startActivity(new Intent(this, ListeningRankActivity.class)));
+        TextView btnLocalRank = buildRankEntry("本地听歌排行");
+        btnLocalRank.setOnClickListener(v ->
+                startActivity(new Intent(this, PlaybackStatsActivity.class)));
+
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        leftLp.setMarginEnd(px(4));
+        rankRow.addView(btnOnlineRank, leftLp);
+        LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        rightLp.setMarginStart(px(4));
+        rankRow.addView(btnLocalRank, rightLp);
+        root.addView(rankRow);
+
+        // ---- 「导入歌单」按钮：本地 Tab 专用，把外部 json 歌单文件读进来。 ----
+        TextView btnImport = new TextView(this);
+        btnImport.setText("导入歌单");
+        btnImport.setTextColor(0xFFBB86FC);
+        btnImport.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
+        btnImport.setPadding(px(18), px(8), px(18), px(8));
+        btnImport.setBackgroundResource(R.drawable.bg_letter_cell);
+        btnImport.setClickable(true);
+        btnImport.setFocusable(true);
+        btnImport.setOnClickListener(v -> onImportClicked());
+        LinearLayout ieRow = new LinearLayout(this);
+        ieRow.setOrientation(LinearLayout.HORIZONTAL);
+        ieRow.setGravity(Gravity.CENTER);
+        ieRow.setPadding(0, 0, 0, px(2));
+        ieRow.addView(btnImport);
+        ieRow.setVisibility(View.GONE);
+        importRow = ieRow;
+        root.addView(ieRow);
 
         // Status text
         tvStatus = new TextView(this);
@@ -172,7 +279,11 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
                     TextView tvDetail = view.findViewById(R.id.tv_detail);
 
                     // Load playlist cover image; fall back to static drawable if no cover URL
-                    if (pl.getCoverUrl() != null && !pl.getCoverUrl().isEmpty()) {
+                    if (activeTab == TAB_LOCAL) {
+                        // 本地歌单统一用音符图标，不区分归属。
+                        icon.setImageResource(R.drawable.ic_music_note);
+                        icon.setColorFilter(0xFFBB86FC);
+                    } else if (pl.getCoverUrl() != null && !pl.getCoverUrl().isEmpty()) {
                         icon.clearColorFilter();
                         NetworkImageLoader.load(icon, pl.getCoverUrl());
                     } else if (pl.isLikedPlaylist()) {
@@ -208,6 +319,12 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
         lvPlaylists.setOnItemClickListener((parent, view, position, id) -> {
             PlaylistInfo pl = displayList.get(position);
+            if (activeTab == TAB_LOCAL) {
+                Intent intent = new Intent(this, LocalPlaylistDetailActivity.class);
+                intent.putExtra("playlist_name", pl.getName());
+                startActivity(intent);
+                return;
+            }
             Intent intent = new Intent(this, PlaylistDetailActivity.class);
             intent.putExtra("playlist_id", pl.getId());
             intent.putExtra("playlist_name", pl.getName());
@@ -220,6 +337,10 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
 
         lvPlaylists.setOnItemLongClickListener((parent, view, position, id) -> {
             PlaylistInfo pl = displayList.get(position);
+            if (activeTab == TAB_LOCAL) {
+                showLocalPlaylistOptions(pl);
+                return true;
+            }
             if (pl.isLikedPlaylist()) {
                 // "我喜欢的音乐" – no actions
                 return true;
@@ -239,7 +360,52 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
             return true;
         });
 
+        updateTabUi();
         loadPlaylists();
+    }
+
+    /** 造一个二级 Tab 视图（统一字号 / 内边距 / 点击切页）。 */
+    private TextView makeTab(String text, int tab) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(0x99FFFFFF);
+        t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(px(6), px(7), px(6), px(7));
+        t.setBackgroundResource(R.drawable.bg_tab_normal);
+        t.setClickable(true);
+        t.setFocusable(true);
+        t.setOnClickListener(v -> switchTab(tab));
+        return t;
+    }
+
+    /** 切换二级界面：重设样式 + 按新 Tab 重新加载。 */
+    private void switchTab(int tab) {
+        if (activeTab == tab) {
+            return;
+        }
+        activeTab = tab;
+        pendingScrollTo = -1;
+        updateTabUi();
+        displayList.clear();
+        adapter.notifyDataSetChanged();
+        loadPlaylists();
+    }
+
+    /** 按 activeTab 刷新 Tab 样式与「导入歌单」行可见性。 */
+    private void updateTabUi() {
+        boolean local = activeTab == TAB_LOCAL;
+        if (tabOnline != null) {
+            tabOnline.setBackgroundResource(local ? R.drawable.bg_tab_normal : R.drawable.bg_tab_selected);
+            tabOnline.setTextColor(local ? 0x99FFFFFF : 0xFFBB86FC);
+        }
+        if (tabLocal != null) {
+            tabLocal.setBackgroundResource(local ? R.drawable.bg_tab_selected : R.drawable.bg_tab_normal);
+            tabLocal.setTextColor(local ? 0xFFBB86FC : 0x99FFFFFF);
+        }
+        if (importRow != null) {
+            importRow.setVisibility(local ? View.VISIBLE : View.GONE);
+        }
     }
 
     @Override
@@ -249,9 +415,22 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         loadPlaylists();
     }
 
+    /** 按当前 Tab 分发加载。 */
     private void loadPlaylists() {
+        if (activeTab == TAB_LOCAL) {
+            loadLocalPlaylists();
+        } else {
+            loadCloudPlaylists();
+        }
+    }
+
+    /** 在线歌单：从网易云拉取「我的歌单」（创建 + 收藏）。 */
+    private void loadCloudPlaylists() {
         String cookie = MusicPlayerManager.getInstance().getCookie();
         if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
+            displayList.clear();
+            adapter.notifyDataSetChanged();
+            lvPlaylists.setVisibility(View.GONE);
             tvStatus.setText("请先登录");
             return;
         }
@@ -289,6 +468,29 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
                 tvStatus.setText("加载失败: " + message);
             }
         });
+    }
+
+    /** 本地歌单：把 /sdcard/163Music/Playlists 下的本地歌单列出来。 */
+    private void loadLocalPlaylists() {
+        List<String> names = LocalPlaylistManager.listPlaylistNames();
+        displayList.clear();
+        for (String name : names) {
+            // 用 PlaylistInfo 承载，userId 设为 -1 使其在本页图标逻辑里被当成「自己的歌单」。
+            PlaylistInfo pl = new PlaylistInfo(-1, name,
+                    LocalPlaylistManager.getPlaylistSongCount(name), "本地");
+            pl.setUserId(-1);
+            pl.setCoverUrl(null);
+            displayList.add(pl);
+        }
+        sortAndIndex(); // 按歌单名排序 + 建立首字母分组（A-Z 跳转可复用）
+        adapter.notifyDataSetChanged();
+        if (names.isEmpty()) {
+            tvStatus.setText("暂无本地歌单，点「导入歌单」或「+」新建");
+            lvPlaylists.setVisibility(View.GONE);
+        } else {
+            tvStatus.setText(names.size() + " 个本地歌单");
+            lvPlaylists.setVisibility(View.VISIBLE);
+        }
     }
 
     // ==================== 首字母索引（复用 PinyinUtils + LetterPickerActivity） ====================
@@ -373,18 +575,19 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         lvPlaylists.setSelection(pendingScrollTo);
     }
 
+    // ==================== 在线歌单：改名 / 删除 / 取消收藏 / 创建 ====================
+
     private void showOwnPlaylistOptions(PlaylistInfo pl, String cookie) {
-        new AlertDialog.Builder(this)
-                .setTitle(pl.getName())
-                .setItems(new String[]{"改名", "删除"}, (dialog, which) -> {
+        // 统一菜单弹层：第 1 项（删除）为危险项，红色显示
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, pl.getName(),
+                new String[]{"改名", "删除"}, com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 1,
+                which -> {
                     if (which == 0) {
                         showRenamePlaylistDialog(pl, cookie);
                     } else {
                         showDeletePlaylistDialog(pl, cookie);
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     private void showRenamePlaylistDialog(PlaylistInfo pl, String cookie) {
@@ -494,7 +697,26 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
                 .show();
     }
 
+    /** 顶栏「+」：按当前 Tab 语义创建（在线建云歌单 / 本地建本地歌单）。 */
+    /** 排行入口磁贴：与歌单条目同样的圆角卡片样式。 */
+    private TextView buildRankEntry(String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(0xFFFFFFFF);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
+        tv.setGravity(android.view.Gravity.CENTER);
+        tv.setPadding(px(6), px(9), px(6), px(9));
+        tv.setBackgroundResource(R.drawable.bg_card_tile);
+        tv.setClickable(true);
+        tv.setFocusable(true);
+        return tv;
+    }
+
     private void showCreatePlaylistDialog() {
+        if (activeTab == TAB_LOCAL) {
+            showCreateLocalPlaylistDialog();
+            return;
+        }
         String cookie = MusicPlayerManager.getInstance().getCookie();
         if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
             Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
@@ -551,5 +773,150 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     protected void onDestroy() {
         super.onDestroy();
         NetworkImageLoader.cancelAll();
+    }
+
+    // ==================== 本地歌单：创建 / 改名 / 删除 / 导入 / 导出 ====================
+
+    private void showCreateLocalPlaylistDialog() {
+        EditText input = new EditText(this);
+        input.setHint("输入歌单名称");
+        input.setTextColor(0xFFFFFFFF);
+        input.setHintTextColor(0xFF888888);
+        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
+        input.setPadding(px(8), px(4), px(8), px(4));
+        input.setBackgroundColor(0xFF333333);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setPadding(px(12), px(8), px(12), px(4));
+        container.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle("新建本地歌单")
+                .setView(container)
+                .setPositiveButton("创建", (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, "请输入歌单名称", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (LocalPlaylistManager.playlistExists(name)) {
+                        Toast.makeText(this, "歌单已存在", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (LocalPlaylistManager.createPlaylist(name)) {
+                        Toast.makeText(this, "已创建「" + name + "」", Toast.LENGTH_SHORT).show();
+                        loadLocalPlaylists();
+                    } else {
+                        Toast.makeText(this, "创建失败", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showLocalPlaylistOptions(PlaylistInfo pl) {
+        // 统一菜单弹层：第 2 项（删除）为危险项
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, pl.getName(),
+                new String[]{"改名", "导出", "删除"}, com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 2,
+                which -> {
+                    if (which == 0) {
+                        showRenameLocalDialog(pl);
+                    } else if (which == 1) {
+                        exportLocalPlaylist(pl);
+                    } else {
+                        showDeleteLocalDialog(pl);
+                    }
+                });
+    }
+
+    private void showRenameLocalDialog(PlaylistInfo pl) {
+        EditText input = new EditText(this);
+        input.setText(pl.getName());
+        input.setTextColor(0xFFFFFFFF);
+        input.setHintTextColor(0xFF888888);
+        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
+        input.setPadding(px(8), px(4), px(8), px(4));
+        input.setBackgroundColor(0xFF333333);
+        input.setSelectAllOnFocus(true);
+
+        LinearLayout container = new LinearLayout(this);
+        container.setPadding(px(12), px(8), px(12), px(4));
+        container.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle("改名")
+                .setView(container)
+                .setPositiveButton("确认", (d, w) -> {
+                    String newName = input.getText().toString().trim();
+                    if (newName.isEmpty()) {
+                        Toast.makeText(this, "名称不能为空", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (newName.equals(pl.getName())) return;
+                    if (LocalPlaylistManager.playlistExists(newName)) {
+                        Toast.makeText(this, "歌单名已存在", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (LocalPlaylistManager.renamePlaylist(pl.getName(), newName)) {
+                        Toast.makeText(this, "已重命名", Toast.LENGTH_SHORT).show();
+                        loadLocalPlaylists();
+                    } else {
+                        Toast.makeText(this, "改名失败", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showDeleteLocalDialog(PlaylistInfo pl) {
+        new AlertDialog.Builder(this)
+                .setTitle("删除歌单")
+                .setMessage("确定删除「" + pl.getName() + "」？此操作不可撤销。")
+                .setPositiveButton("删除", (d, w) -> {
+                    if (LocalPlaylistManager.deletePlaylist(pl.getName())) {
+                        Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
+                        loadLocalPlaylists();
+                    } else {
+                        Toast.makeText(this, "删除失败", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /** 导出：把本地歌单复制一份到 /sdcard/Download/<歌单名>.json，方便拷到电脑。 */
+    private void exportLocalPlaylist(PlaylistInfo pl) {
+        String safe = pl.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
+        File dest = new File(Environment.getExternalStorageDirectory(), "Download/" + safe + ".json");
+        if (LocalPlaylistManager.exportToFile(pl.getName(), dest)) {
+            Toast.makeText(this, "已导出到 " + dest.getAbsolutePath(), Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "导出失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** 导入：扫描常见目录里符合格式的 json 歌单文件，让用户挑一个读进来。 */
+    private void onImportClicked() {
+        List<File> candidates = LocalPlaylistManager.findImportCandidates();
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, "未找到可导入的歌单文件（请先把 json 放到 Music / Download 目录）",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] names = new String[candidates.size()];
+        for (int i = 0; i < candidates.size(); i++) {
+            names[i] = candidates.get(i).getName();
+        }
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, "导入歌单", names, which -> {
+                    File src = candidates.get(which);
+                    if (LocalPlaylistManager.importFromFile(src, null)) {
+                        Toast.makeText(this, "已导入「" + names[which] + "」", Toast.LENGTH_SHORT).show();
+                        loadLocalPlaylists();
+                    } else {
+                        Toast.makeText(this, "导入失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 }

@@ -191,10 +191,12 @@ public class FavoritesManager {
      * <p>与逐首调用 {@link #addFavorite(Song)} 的区别是只读写一次 prefs / favorites.json /
      * favorite-ids.json，避免在手表上对一个几十首的列表反复做整表序列化。</p>
      *
-     * <p>已收藏的歌曲、以及没有有效歌曲 ID 的条目（例如老版本遗留的纯本地 mp3，
-     * id 为 0）会被自动跳过。</p>
+     * <p>已收藏（id 相同）的歌曲会被跳过。**本地曲目的负数 id 会被正常收下**，只是不写进
+     * favorite-ids.json（那个文件是给云端同步/查重用的）。</p>
      *
-     * @param songs 待收藏歌曲，允许为 null / 空
+     * @param songs 待收藏歌曲，允许为 null / 空。本地曲目请先经
+     *              {@link com.qinghe.music163pro.util.LocalTracks#asLocalFavoriteEntry}
+     *              规范化（补上负数 id / url / forceLocalPlayback），否则存进去点开播不了
      * @return 实际新增到收藏的数量
      */
     public int addFavorites(List<Song> songs) {
@@ -208,7 +210,9 @@ public class FavoritesManager {
 
         List<Song> added = new ArrayList<>();
         for (Song song : songs) {
-            if (song == null || song.getId() <= 0) continue;
+            if (song == null) continue;
+            // 注意：本地曲目用的是「路径派生的负数 id」，**不能**按 id <= 0 丢掉 ——
+            // 那正是「本地音乐里多选收藏点了没反应」的原因。要不要写进 id 索引见下方。
             if (existing.add(song.getId())) added.add(song);
         }
         if (added.isEmpty()) return 0;
@@ -217,11 +221,14 @@ public class FavoritesManager {
         list.addAll(0, added);
         saveFavorites(list);
 
-        // 同步 id 索引文件，同样一次性写完。
+        // 同步 id 索引文件：只写云端曲目 id。本地曲目的负数 id 写进去会污染云同步与
+        // 快速查重 —— 与单曲 addFavorite 的处理保持一致。
         try {
             JSONArray arr = loadIdArray();
             JSONArray newArr = new JSONArray();
-            for (Song s : added) newArr.put(s.getId());
+            for (Song s : added) {
+                if (s.getId() > 0) newArr.put(s.getId());
+            }
             for (int i = 0; i < arr.length(); i++) {
                 long id = arr.getLong(i);
                 boolean duplicated = false;

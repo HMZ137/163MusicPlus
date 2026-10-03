@@ -41,6 +41,18 @@ public final class BatchFavoriteHelper {
 
         /** 云端模式下没有登录态，无法批量收藏。 */
         void onNeedLogin();
+
+        /**
+         * 需要登录才能收藏云端曲目，但本次选中的**本地曲目已经先按本地收藏处理好了**。
+         *
+         * <p>默认实现直接转给 {@link #onNeedLogin()}，既有调用方不用改；想给出更准确提示
+         * （“本地 N 首已收藏，云端需登录”）的页面可以覆盖它。</p>
+         *
+         * @param addedLocal 已经加入本地收藏的数量
+         */
+        default void onNeedLogin(int addedLocal) {
+            onNeedLogin();
+        }
     }
 
     private BatchFavoriteHelper() {
@@ -66,58 +78,79 @@ public final class BatchFavoriteHelper {
             return;
         }
 
-        if (isCloudFavoriteMode(activity)) {
-            String cookie = MusicPlayerManager.getInstance().getCookie();
-            if (cookie == null || cookie.isEmpty()) {
-                callback.onNeedLogin();
-                return;
+        final int total = songs.size();
+
+        // 本地曲目（路径派生的负数 id）无论当前是哪种收藏模式，都只能进本地收藏库 ——
+        // 云端接口认不了它，本地库才是它真正的家。这与播放页单曲收藏的口径一致
+        // （本地歌走 onFuncFavoriteLocal）。先规范化成「本地收藏条目」，否则存进去点开播不了。
+        List<Song> localTargets = new ArrayList<>();
+        List<Song> cloudTargets = new ArrayList<>();
+        for (Song song : songs) {
+            if (song == null) {
+                continue;
             }
-            // 没有有效歌曲 ID 的条目（例如老版本遗留的纯本地 mp3）云端无法处理。
-            int skipped = 0;
-            List<Song> valid = new ArrayList<>();
-            for (Song song : songs) {
-                if (song == null || song.getId() <= 0) {
-                    skipped++;
-                } else {
-                    valid.add(song);
+            if (LocalTracks.isLocalOnly(song)) {
+                Song entry = LocalTracks.asLocalFavoriteEntry(song);
+                if (entry != null) {
+                    localTargets.add(entry);
                 }
+            } else {
+                cloudTargets.add(song);
             }
-            likeSequentially(valid, cookie, 0, skipped, 0, songs.size(), callback);
-            return;
         }
 
         FavoritesManager manager = new FavoritesManager(activity);
-        int added = manager.addFavorites(songs);
-        callback.onFinished(added, songs.size() - added, 0, songs.size());
+        int addedLocal = localTargets.isEmpty() ? 0 : manager.addFavorites(localTargets);
+
+        if (!isCloudFavoriteMode(activity)) {
+            // 本地收藏模式：云端曲目也写本地库，一次结算
+            int added = addedLocal
+                    + (cloudTargets.isEmpty() ? 0 : manager.addFavorites(cloudTargets));
+            callback.onFinished(added, total - added, 0, total);
+            return;
+        }
+
+        // 云端收藏模式：没有云端曲目时直接结算（本地部分已入库）
+        if (cloudTargets.isEmpty()) {
+            callback.onFinished(addedLocal, total - addedLocal, 0, total);
+            return;
+        }
+        String cookie = MusicPlayerManager.getInstance().getCookie();
+        if (cookie == null || cookie.isEmpty()) {
+            callback.onNeedLogin(addedLocal);
+            return;
+        }
+        likeSequentially(cloudTargets, cookie, 0, 0, addedLocal, total, callback);
     }
 
     /**
      * 逐首串行提交云端收藏，全部处理完后回调一次。
      *
-     * @param valid   过滤后的待收藏歌曲
-     * @param skipped 过滤阶段已跳过的数量，原样带回到结果里
-     * @param failed  已经失败的数量
-     * @param total   用户实际选中的总数
+     * @param valid     待提交云端的曲目（已滤掉本地曲目）
+     * @param failed    已经失败的数量
+     * @param baseAdded 进入本方法前已经成功加入**本地**收藏的数量，结算时并入 added
+     * @param total     用户实际选中的总数
      */
     private static void likeSequentially(final List<Song> valid, final String cookie,
-                                        final int index, final int skipped, final int failed,
+                                        final int index, final int failed, final int baseAdded,
                                         final int total, final Callback callback) {
         if (index >= valid.size()) {
-            callback.onFinished(valid.size() - failed, skipped, failed, total);
+            int added = baseAdded + (valid.size() - failed);
+            callback.onFinished(added, Math.max(0, total - added - failed), failed, total);
             return;
         }
         MusicApiHelper.likeTrack(valid.get(index).getId(), true, cookie,
                 new MusicApiHelper.LikeCallback() {
                     @Override
                     public void onResult(boolean success) {
-                        likeSequentially(valid, cookie, index + 1, skipped,
-                                success ? failed : failed + 1, total, callback);
+                        likeSequentially(valid, cookie, index + 1,
+                                success ? failed : failed + 1, baseAdded, total, callback);
                     }
 
                     @Override
                     public void onError(String message) {
-                        likeSequentially(valid, cookie, index + 1, skipped,
-                                failed + 1, total, callback);
+                        likeSequentially(valid, cookie, index + 1,
+                                failed + 1, baseAdded, total, callback);
                     }
                 });
     }

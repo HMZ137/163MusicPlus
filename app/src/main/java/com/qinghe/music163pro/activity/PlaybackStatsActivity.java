@@ -67,6 +67,10 @@ public class PlaybackStatsActivity extends BaseWatchActivity {
         for (int i = 0; i < top.size(); i++) {
             PlaybackStats.TrackStat track = top.get(i);
             String title = (i + 1) + ". " + safe(track.name);
+            if (track.transName != null && !track.transName.isEmpty()
+                    && !track.transName.equals(track.name)) {
+                title = (i + 1) + ". " + safe(track.name) + "（" + track.transName + "）";
+            }
             String subtitle = safe(track.artist) + " · " + track.playCount + " 次";
             addTrackRow(title, subtitle);
         }

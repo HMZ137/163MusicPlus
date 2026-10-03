@@ -58,7 +58,7 @@ public class SongRecognitionResultActivity extends BaseWatchActivity {
                     TextView tvName = view.findViewById(R.id.tv_item_name);
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getName());
+                    tvName.setText(song.getDisplayName());
                     String artist = song.getArtist();
                     if (song.getAlbum() != null && !song.getAlbum().isEmpty()) {
                         artist += " · " + song.getAlbum();

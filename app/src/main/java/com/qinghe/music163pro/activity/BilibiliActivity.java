@@ -59,6 +59,10 @@ public class BilibiliActivity extends BaseWatchActivity {
         container.addView(createMenuItem(R.drawable.ic_favorite_border, "收藏",
                 () -> startActivity(new Intent(this, BilibiliFavoritesActivity.class))));
 
+        // 打开过的 BV 号（BV 号记不住，靠它找回「刚才那个视频」）
+        container.addView(createMenuItem(R.drawable.ic_history, "历史记录",
+                () -> startActivity(new Intent(this, BilibiliHistoryActivity.class))));
+
         scrollView.addView(container);
         setContentView(scrollView);
     }

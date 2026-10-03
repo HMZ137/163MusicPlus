@@ -1,6 +1,8 @@
 package com.qinghe.music163pro.util;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.text.TextUtils;
 
@@ -118,6 +120,13 @@ public final class LocalMetadata {
             if (coverFile == null) {
                 return null;
             }
+            // 优先走「降采样 + 重编码」，把单张封面从数百 KB 压到几十 KB（缓存膨胀的主因）
+            if (writeCoverScaled(picture, coverFile)) {
+                return coverFile;
+            }
+            // 解码失败（个别异常封面格式）时回落到原样写字节，保证仍能显示
+            //noinspection ResultOfMethodCallIgnored
+            coverFile.delete();
             File parent = coverFile.getParentFile();
             if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
                 return null;
@@ -191,6 +200,121 @@ public final class LocalMetadata {
         } catch (Exception e) {
             // 理论上不会走到；退化成 hashCode 也比没有强
             return Integer.toHexString(audioPath.hashCode());
+        }
+    }
+
+    /** 封面缓存里保存的最长边（像素）。手表屏约 378px，256 足够清晰，又能把单张从数百 KB 压到几十 KB。 */
+    private static final int COVER_MAX_PX = 256;
+    /** 重编码质量，85 在手表观感上与原图无明显差别。 */
+    private static final int COVER_JPEG_QUALITY = 85;
+    /** 封面缓存总量上限：超过就按最久未修改淘汰（20MB ≈ 1000 张，够用且不会反复重抽）。 */
+    private static final long COVER_CACHE_MAX_BYTES = 20L * 1024 * 1024;
+
+    /**
+     * 把内嵌封面降采样并重编码后写盘。
+     *
+     * <p><b>为什么必须压：</b>以前是原样写 {@code getEmbeddedPicture()} 的字节 —— 一张
+     * 500×500 的 PNG 封面动辄 400KB+，455 首本地歌就是近百 MB（实机实测 95MB），
+     * 这是缓存膨胀的主因。压到最长边 {@link #COVER_MAX_PX} 的 JPEG 后，单张通常 20KB 上下。</p>
+     *
+     * @return true 表示已按新方式写好；false 表示解码失败，调用方回落到原样写字节
+     */
+    private static boolean writeCoverScaled(byte[] picture, File coverFile) {
+        Bitmap bitmap = null;
+        try {
+            // 先只读尺寸算采样率，避免把整张大图读进内存
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(picture, 0, picture.length, bounds);
+            int w = bounds.outWidth;
+            int h = bounds.outHeight;
+            if (w <= 0 || h <= 0) {
+                return false;
+            }
+            int sample = 1;
+            while (Math.max(w, h) / (sample * 2) >= COVER_MAX_PX) {
+                sample *= 2;
+            }
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            bitmap = BitmapFactory.decodeByteArray(picture, 0, picture.length, opts);
+            if (bitmap == null) {
+                return false;
+            }
+            int maxSide = Math.max(bitmap.getWidth(), bitmap.getHeight());
+            if (maxSide > COVER_MAX_PX) {
+                float scale = (float) COVER_MAX_PX / (float) maxSide;
+                Bitmap scaled = Bitmap.createScaledBitmap(bitmap,
+                        Math.max(1, Math.round(bitmap.getWidth() * scale)),
+                        Math.max(1, Math.round(bitmap.getHeight() * scale)), true);
+                if (scaled != bitmap) {
+                    bitmap.recycle();
+                    bitmap = scaled;
+                }
+            }
+            File parent = coverFile.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+                return false;
+            }
+            try (OutputStream out = new FileOutputStream(coverFile)) {
+                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, COVER_JPEG_QUALITY, out)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        } finally {
+            if (bitmap != null) {
+                bitmap.recycle();
+            }
+        }
+    }
+
+    /**
+     * 把封面缓存压回上限以内：超限时优先删「最久未修改」的封面，直到降到上限的 80%。
+     *
+     * <p>以前这里没有任何回收，只增不减。现在封面本身已经小了（单张约 20KB），
+     * 20MB 上限足够日常使用，且淘汰后下次重抽也很快。</p>
+     *
+     * <p>只删 {@code .img} 封面，不动 {@code .none} 标记 —— 它们是 0 字节，留着能避免重复解析。
+     * 本方法会做磁盘 IO，请在后台线程调用。</p>
+     */
+    public static void trimCoverCache(Context context) {
+        if (context == null) {
+            return;
+        }
+        File dir = coverCacheDir(context);
+        File[] children = dir.listFiles();
+        if (children == null || children.length == 0) {
+            return;
+        }
+        long total = 0;
+        java.util.List<File> covers = new java.util.ArrayList<>();
+        for (File child : children) {
+            if (child == null || !child.isFile()) {
+                continue;
+            }
+            total += child.length();
+            if (child.getName().endsWith(SUFFIX_COVER)) {
+                covers.add(child);
+            }
+        }
+        if (total <= COVER_CACHE_MAX_BYTES) {
+            return;
+        }
+        // 最久未修改的先删（列表与播放页取图时不会回写 mtime，所以这里近似 FIFO）
+        java.util.Collections.sort(covers,
+                (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+        long target = COVER_CACHE_MAX_BYTES * 8 / 10;
+        for (File cover : covers) {
+            if (total <= target) {
+                break;
+            }
+            long len = cover.length();
+            if (cover.delete()) {
+                total -= len;
+            }
         }
     }
 

@@ -140,6 +140,9 @@ public class SongInfoActivity extends BaseWatchActivity {
         }
         if (artistName != null && !artistName.isEmpty()) {
             addInfoRow("歌手", artistName);
+            if (artistId > 0) {
+                addArtistEntry();
+            }
         }
         addInfoRow("歌曲ID", String.valueOf(songId));
     }
@@ -164,7 +167,7 @@ public class SongInfoActivity extends BaseWatchActivity {
                 coverView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 GradientDrawable coverBg = new GradientDrawable();
                 coverBg.setColor(COLOR_CARD_BG);
-                coverBg.setCornerRadius(px(8));
+                coverBg.setCornerRadius(0);
                 coverView.setBackground(coverBg);
                 LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(coverSize, coverSize);
                 coverParams.gravity = Gravity.CENTER_HORIZONTAL;
@@ -623,10 +626,8 @@ public class SongInfoActivity extends BaseWatchActivity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setPadding(px(8), px(6), px(8), px(6));
-        GradientDrawable cardBg = new GradientDrawable();
-        cardBg.setColor(COLOR_CARD_BG);
-        cardBg.setCornerRadius(px(6));
-        card.setBackground(cardBg);
+        // 统一直角卡片底（bg_card_row 自带 inset，纵向多张卡片之间有缝隙）
+        card.setBackground(getResources().getDrawable(R.drawable.bg_card_row));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         cardParams.setMargins(0, px(3), 0, px(3));
@@ -641,7 +642,7 @@ public class SongInfoActivity extends BaseWatchActivity {
         ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
         GradientDrawable coverBg = new GradientDrawable();
         coverBg.setColor(0xFF333333);
-        coverBg.setCornerRadius(px(3));
+        coverBg.setCornerRadius(0);
         ivCover.setBackground(coverBg);
         if (!coverUrlRes.isEmpty()) {
             NetworkImageLoader.load(ivCover, coverUrlRes);
@@ -1037,6 +1038,39 @@ public class SongInfoActivity extends BaseWatchActivity {
 
         contentLayout.addView(row);
         contentLayout.addView(makeSpacer(px(4)));
+    }
+
+    /** 「查看歌手主页」入口：带歌手 id 打开歌手页。 */
+    private void addArtistEntry() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.graphics.drawable.GradientDrawable bg =
+                new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0x1AFFFFFF);
+        bg.setCornerRadius(px(10));
+        row.setBackground(bg);
+        row.setPadding(px(10), px(4), px(10), px(4));
+        row.setClickable(true);
+        row.setFocusable(true);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, px(3), 0, px(2));
+        row.setLayoutParams(lp);
+
+        TextView tv = new TextView(this);
+        tv.setText("查看歌手主页 ›");
+        tv.setTextColor(0xFFBB86FC);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
+        row.addView(tv);
+
+        row.setOnClickListener(v -> {
+            Intent intent = new Intent(this, ArtistDetailActivity.class);
+            intent.putExtra("artist_id", artistId);
+            intent.putExtra("artist_name", artistName);
+            startActivity(intent);
+        });
+        contentLayout.addView(row);
     }
 
     private void addInfoRow(String label, String value) {

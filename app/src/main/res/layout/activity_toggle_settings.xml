@@ -33,14 +33,15 @@
         -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="12dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -67,23 +68,54 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
-        <!-- Keep screen on: SwitchMaterial row -->
+        <!-- 纯在线模式：与「本地播放模式」互斥。隐藏所有本地/离线功能，但**下载管理保留** -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="12dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="纯在线模式"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="隐藏本地音乐 / 本地歌单 / 局域网传歌，只留在线功能与下载管理"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_online_only_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Keep screen on: SwitchMaterial row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -110,22 +142,55 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
+        <!-- OLED 防烧屏：SwitchMaterial row -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="12dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="OLED 防烧屏"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="主页面内容每 30 秒轻微移位"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switch_oled_burn_protection"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -152,24 +217,19 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
         <!-- Favorites mode: cyclic selection row (本地/云端) -->
         <LinearLayout
             android:id="@+id/row_fav_mode"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -197,24 +257,19 @@
                 android:alpha="0.5" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
         <!-- Sleep timer mode: cyclic selection (总时长/播放净时长) -->
         <LinearLayout
             android:id="@+id/row_sleep_timer_mode"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -242,24 +297,19 @@
                 android:alpha="0.5" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
         <!-- Speed mode: 3-value cyclic row -->
         <LinearLayout
             android:id="@+id/row_speed_mode"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -287,24 +337,19 @@
                 android:alpha="0.5" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
         <!-- Lyric scroll mode: 每行/阻塞 cyclic row -->
         <LinearLayout
             android:id="@+id/row_lyric_scroll_mode"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -332,17 +377,12 @@
                 android:alpha="0.5" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
         <!-- Lyric time offset: ±0.5s per tap, for lyrics that are out of sync -->
         <LinearLayout
             android:id="@+id/row_lyric_offset"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -380,7 +420,7 @@
                 android:paddingBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?attr/selectableItemBackground" />
+                android:background="@drawable/bg_card_tile" />
 
             <TextView
                 android:id="@+id/btn_lyric_offset_plus"
@@ -395,27 +435,22 @@
                 android:paddingBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?attr/selectableItemBackground" />
+                android:background="@drawable/bg_card_tile" />
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
 
         <!-- Lyric resume interval: only meaningful in 阻塞 mode -->
         <LinearLayout
             android:id="@+id/row_lyric_resume_interval"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -443,23 +478,18 @@
                 android:alpha="0.5" />
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginStart="16dp"
-            android:background="@color/divider" />
-
         <LinearLayout
             android:id="@+id/row_recognition_mode"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackground">
+            android:background="@drawable/bg_card_tile">
 
             <LinearLayout
                 android:layout_width="0dp"

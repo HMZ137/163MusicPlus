@@ -115,7 +115,7 @@ public class HistoryActivity extends BaseWatchActivity {
                     TextView tvName = view.findViewById(R.id.tv_item_name);
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getName());
+                    tvName.setText(song.getDisplayName());
                     tvArtist.setText(song.getArtist());
                     if (ivCover != null) {
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());

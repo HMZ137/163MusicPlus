@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import com.qinghe.music163pro.util.UiKit;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -36,7 +37,6 @@ public class LanTransferActivity extends BaseWatchActivity {
 
     private TextView tvStatus;
     private TextView tvUrl;
-    private TextView tvDir;
     private TextView tvCount;
     private TextView btnToggle;
 
@@ -79,18 +79,47 @@ public class LanTransferActivity extends BaseWatchActivity {
         titleBar.addView(title);
         root.addView(titleBar);
 
-        tvStatus = bodyText(0xFFCCCCCC, 14);
+        tvStatus = bodyText(0xFFCCCCCC, 13);
         root.addView(tvStatus);
 
-        tvUrl = bodyText(0xFFBB86FC, 15);
-        tvUrl.setTextIsSelectable(true);
-        root.addView(tvUrl);
+        // ── 地址卡片：大号地址 + 点击复制（信息分区，借鉴 ZeroMusic 的 Server 页） ──
+        LinearLayout addrCard = new LinearLayout(this);
+        addrCard.setOrientation(LinearLayout.VERTICAL);
+        addrCard.setGravity(Gravity.CENTER);
+        addrCard.setPadding(px(12), px(12), px(12), px(12));
+        addrCard.setBackground(UiKit.card(this));
+        LinearLayout.LayoutParams addrLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        addrLp.setMargins(0, px(8), 0, px(8));
+        addrCard.setLayoutParams(addrLp);
 
-        tvDir = bodyText(0xFF9A9A9A, 12);
-        root.addView(tvDir);
+        TextView addrLabel = bodyText(0xFF9A9A9A, 11);
+        addrLabel.setText("电脑 / 手机浏览器打开");
+        addrCard.addView(addrLabel);
+
+        tvUrl = bodyText(0xFFBB86FC, 19);
+        tvUrl.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        tvUrl.setTextIsSelectable(true);
+        tvUrl.setPadding(px(4), px(6), px(4), px(6));
+        addrCard.addView(tvUrl);
+
+        TextView addrTip = bodyText(0xFF757575, 11);
+        addrTip.setText("点击地址复制到剪贴板");
+        addrCard.addView(addrTip);
+        addrCard.setOnClickListener(v -> copyUrl());
+        root.addView(addrCard);
 
         tvCount = bodyText(0xFF9A9A9A, 12);
         root.addView(tvCount);
+
+        // ── 三步指引 ──
+        TextView steps = bodyText(0xFF8A8A8A, 11);
+        steps.setGravity(Gravity.START);
+        steps.setText("① 手表与电脑连同一个 Wi-Fi\n"
+                + "② 电脑浏览器打开上方地址\n"
+                + "③ 选文件上传：音乐→ Music，其它→ TransFiles\n"
+                + "④ 用完回这里点「停止」");
+        root.addView(steps);
 
         root.addView(makeSpacer(px(8)));
 
@@ -102,7 +131,7 @@ public class LanTransferActivity extends BaseWatchActivity {
         android.graphics.drawable.GradientDrawable bg =
                 new android.graphics.drawable.GradientDrawable();
         bg.setColor(0xFFBB86FC);
-        bg.setCornerRadius(dpToPx(8));
+        bg.setCornerRadius(UiKit.dp(this, UiKit.DP_BUTTON_RADIUS));
         btnToggle.setBackground(bg);
         btnToggle.setClickable(true);
         btnToggle.setFocusable(true);
@@ -113,11 +142,29 @@ public class LanTransferActivity extends BaseWatchActivity {
         btnToggle.setLayoutParams(btnLp);
         root.addView(btnToggle);
 
-        root.addView(bodyText(0xFF757575, 11), new LinearLayout.LayoutParams(
+        root.addView(bodyText(0xFF757575, 10), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         ((TextView) root.getChildAt(root.getChildCount() - 1))
-                .setText("用法：电脑与手表连同一个 WiFi → 用浏览器打开上面的地址 → "
-                        + "选文件上传（音乐进 Music，其它进 TransFiles）。用完请回来点「停止」。");
+                .setGravity(Gravity.CENTER);
+        ((TextView) root.getChildAt(root.getChildCount() - 1))
+                .setText("音乐保存于 /sdcard/Music，其它文件在 /sdcard/TransFiles");
+    }
+
+    /** 点地址卡片：复制到剪贴板，省去手动抄 IP。 */
+    private void copyUrl() {
+        String url = tvUrl.getText() != null ? tvUrl.getText().toString() : "";
+        if (!url.startsWith("http")) {
+            android.widget.Toast.makeText(this, "服务未启动，暂无地址可复制",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("url", url));
+            android.widget.Toast.makeText(this, "地址已复制",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
     }
 
     private TextView bodyText(int color, int sizeSp) {
@@ -217,22 +264,20 @@ public class LanTransferActivity extends BaseWatchActivity {
         boolean on = server != null && server.isRunning();
         if (on) {
             String ip = LanTransferServer.getLanAddress(this);
-            tvStatus.setText("服务运行中");
+            tvStatus.setText("● 服务运行中");
+            tvStatus.setTextColor(0xFF7EE2A8);
             tvUrl.setText(ip != null
                     ? "http://" + ip + ":" + server.getPort()
                     : "未获取到局域网 IP（请确认已连 WiFi）");
-            tvDir.setText("音乐→ " + server.getSaveDir().getAbsolutePath()
-                    + " ｜ 其它→ " + LanTransferServer.defaultTransFilesDir().getAbsolutePath());
             int count = server.getUploadedCount();
             tvCount.setText(count > 0
-                    ? "已接收 " + count + " 个文件（最近：" + server.getLastFileName() + "）"
-                    : "尚未接收到文件");
+                    ? "本次已接收 " + count + " 个文件 · 最近：" + server.getLastFileName()
+                    : "尚未接收到文件，传一个试试");
             btnToggle.setText("停止");
         } else {
-            tvStatus.setText("服务已停止");
+            tvStatus.setText("○ 服务已停止");
+            tvStatus.setTextColor(0xFF9A9A9A);
             tvUrl.setText("—");
-            tvDir.setText("保存目录：音乐→ " + LanTransferServer.defaultSaveDir().getAbsolutePath()
-                    + " ｜ 其它→ " + LanTransferServer.defaultTransFilesDir().getAbsolutePath());
             tvCount.setText("点击下面的按钮开始");
             btnToggle.setText("开始");
         }

@@ -554,6 +554,7 @@ public class MusicPlayerManager {
     }
 
     public void resume() {
+        cancelPendingSleepStopOnManualAction();
         if (usingExoPlayer && exoPlayer != null) {
             exoPlayer.play();
             isPlaying = true;
@@ -683,22 +684,52 @@ public class MusicPlayerManager {
         }
     }
 
+    /**
+     * 「放完当前曲再停」已到点时，**任何「往下切歌」的动作都要改成停在这里**。
+     *
+     * <p>以前这个判断只挂在「自然播完」这一条路径上，于是只要切歌是从别的入口进来的
+     * （顺序/随机的推进、通知栏的下一首、外部 next()），到点的定时就被绕过去了 ——
+     * 这正是「播完当前不生效」的根因。现在把判断收口在这里，所有自动切歌入口统一拦一次。</p>
+     *
+     * @return true 表示已经停止播放，调用方**必须直接返回**，不要再切歌
+     */
+    private boolean stopForPendingSleepTimer() {
+        if (!sleepTimerStopAfterCurrent) {
+            return false;
+        }
+        sleepTimerStopAfterCurrent = false;
+        boolean exitApp = shouldExitAfterSleepTimer();
+        Log.i(TAG, "sleepTimer(finish-track) fired: stop playback, exitApp=" + exitApp);
+        if (exitApp) {
+            stop();
+        } else {
+            pause();
+        }
+        if (callback != null) {
+            mainHandler.post(() -> callback.onSleepTimerTriggered(exitApp));
+        }
+        return true;
+    }
+
+    /**
+     * 用户**手动**切歌 / 主动继续播放时，撤掉「放完当前曲再停」的待停状态。
+     *
+     * <p>手动动作代表「我还想继续听」，此时如果还留着待停标志，会在下一首结束时
+     * 突然停掉，看起来像 bug。定时本身（若是总时长/净时长模式）不受影响。</p>
+     */
+    private void cancelPendingSleepStopOnManualAction() {
+        if (sleepTimerStopAfterCurrent) {
+            sleepTimerStopAfterCurrent = false;
+            Log.i(TAG, "sleepTimer(finish-track): canceled by manual action");
+        }
+    }
+
     private void handleSongCompleted() {
         isPlaying = false;
         notifyPlayStateChanged(false);
 
         // 「放完当前曲再停」：定时已到点，这一首就是最后一首，不再往下切
-        if (sleepTimerStopAfterCurrent) {
-            sleepTimerStopAfterCurrent = false;
-            boolean exitApp = shouldExitAfterSleepTimer();
-            if (exitApp) {
-                stop();
-            } else {
-                pause();
-            }
-            if (callback != null) {
-                mainHandler.post(() -> callback.onSleepTimerTriggered(exitApp));
-            }
+        if (stopForPendingSleepTimer()) {
             return;
         }
 
@@ -733,8 +764,40 @@ public class MusicPlayerManager {
      * 「到底自动加载更多」的行为。单曲循环只作用于「自动播完」，手动点下一首照常切歌，
      * 与主流播放器一致。</p>
      */
+    /** 听歌打卡门槛：播放满多少毫秒才上报（跟着网易的习惯，避免划歌也记一笔）。 */
+    private static final int SCROBBLE_MIN_MS = 30_000;
+    private long scrobbledSongId = -1L;
+
+    /**
+     * 播放满 30 秒给服务端打一次卡（每首歌只报一次）。
+     * 由界面的进度定时器调用，因此不额外引入定时器。
+     */
+    public void reportPlayIfNeeded() {
+        Song song = getCurrentSong();
+        if (song == null || song.getId() <= 0 || !isPlaying()) {
+            return;
+        }
+        if (scrobbledSongId == song.getId()) {
+            return;
+        }
+        if (getCurrentPosition() < SCROBBLE_MIN_MS) {
+            return;
+        }
+        scrobbledSongId = song.getId();
+        long sourceId = sourcePlaylistId > 0 ? sourcePlaylistId : song.getId();
+        android.util.Log.i("Scrobble", "触发打卡: songId=" + song.getId()
+                + " pos=" + getCurrentPosition() + " sourceId=" + sourceId);
+        MusicApiHelper.scrobble(song.getId(), sourceId, getCookie());
+    }
+
+    /** 取不到播放地址时最多连续自动跳过几首（防整列表灰歌时无限跳）。 */
+    private static final int MAX_AUTO_SKIP = 3;
+    private int autoSkipCount = 0;
+
     public void next() {
         if (playlist.isEmpty()) return;
+        // 手动切歌 = 还想继续听 → 撤销「放完当前曲再停」，避免下一首结束又莫名其妙停掉
+        cancelPendingSleepStopOnManualAction();
         // 「下一首播放」优先：用户明确指定了接下来听什么，随机模式下也让位于它
         if (consumeQueuedNext()) return;
         if (playMode == PlayMode.RANDOM && !personalFmMode) {
@@ -750,6 +813,7 @@ public class MusicPlayerManager {
      */
     public void previous() {
         if (playlist.isEmpty()) return;
+        cancelPendingSleepStopOnManualAction();
         if (playMode == PlayMode.RANDOM && !personalFmMode) {
             playShuffle(false);
         } else {
@@ -1019,6 +1083,7 @@ public class MusicPlayerManager {
                 new MusicApiHelper.UrlCallback() {
             @Override
             public void onResult(String freshUrl) {
+                autoSkipCount = 0;   // 成功播放后清零"连续跳过"计数
                 song.setUrl(freshUrl);
                 currentlyPlayingSongId = song.getId();
                 play(freshUrl);
@@ -1030,8 +1095,21 @@ public class MusicPlayerManager {
                 if (song.getUrl() != null && !song.getUrl().isEmpty()) {
                     currentlyPlayingSongId = song.getId();
                     play(song.getUrl());
-                } else if (callback != null) {
-                    mainHandler.post(() -> callback.onError("无法获取歌曲链接: " + message));
+                } else if (autoSkipCount < MAX_AUTO_SKIP) {
+                    // 真的取不到播放地址（无版权/下架/VIP 限制）→ 明确提示并自动跳下一首，
+                    // 避免用户点了没反应；连续跳过有上限，防止整列表都是灰歌时无限跳。
+                    autoSkipCount++;
+                    if (appContext != null) {
+                        mainHandler.post(() -> android.widget.Toast.makeText(appContext,
+                                "该歌曲无法播放，已自动跳过",
+                                android.widget.Toast.LENGTH_SHORT).show());
+                    }
+                    mainHandler.post(MusicPlayerManager.this::next);
+                } else {
+                    autoSkipCount = 0;
+                    if (callback != null) {
+                        mainHandler.post(() -> callback.onError("无法获取歌曲链接: " + message));
+                    }
                 }
             }
         });
@@ -1591,6 +1669,16 @@ public class MusicPlayerManager {
     /**
      * Check if a sleep timer is active.
      */
+    /**
+     * 「放完当前曲再停」是否已到点、正在等这一首结束。
+     *
+     * <p>界面用它显示「本曲结束后停止」这类状态文字；{@link #isSleepTimerActive()} 也已把
+     * 这种状态算作生效。</p>
+     */
+    public boolean isSleepTimerStopAfterCurrentPending() {
+        return sleepTimerStopAfterCurrent;
+    }
+
     public boolean isSleepTimerActive() {
         if (sleepTimerStopAfterCurrent) {
             // 「放完当前曲再停」已到点、正在等这首结束，仍然算生效
@@ -1860,6 +1948,7 @@ public class MusicPlayerManager {
      * @param forward true = 下一首，false = 上一首
      */
     private void playShuffle(boolean forward) {
+        if (stopForPendingSleepTimer()) return;
         if (playlist.isEmpty()) return;
         if (playlist.size() == 1) {
             playCurrent();
@@ -1917,6 +2006,7 @@ public class MusicPlayerManager {
     }
 
     private void playNextSequential() {
+        if (stopForPendingSleepTimer()) return;
         if (playlist.isEmpty()) return;
         if (personalFmMode && currentIndex == playlist.size() - 1) {
             loadMorePersonalFmAndAdvance();

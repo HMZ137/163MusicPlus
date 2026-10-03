@@ -55,6 +55,11 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         videoTitle = getIntent().getStringExtra("video_title");
         ownerName = getIntent().getStringExtra("owner_name");
 
+        // 打开即记录历史：本页是 BV 号的统一入口（从BV号打开 / 搜索 / 收藏 / 播放列表都到这里），
+        // 所以记在这里覆盖面最全 —— 用户要的正是「所有打开过的 BV 号」。
+        com.qinghe.music163pro.manager.BilibiliHistoryManager
+                .record(this, bvid, videoTitle, ownerName);
+
         ScrollView scrollView = new ScrollView(this);
         scrollView.setBackgroundColor(getResources().getColor(R.color.bg_dark));
         scrollView.setFillViewport(true);

@@ -68,12 +68,15 @@ public final class PlaybackStats {
         public final String name;
         public final String artist;
         public final int playCount;
+        /** 歌名译名（可能为空），供「原名（译名）」显示。 */
+        public final String transName;
 
-        TrackStat(long songId, String name, String artist, int playCount) {
+        TrackStat(long songId, String name, String artist, int playCount, String transName) {
             this.songId = songId;
             this.name = name;
             this.artist = artist;
             this.playCount = playCount;
+            this.transName = transName == null ? "" : transName;
         }
     }
 
@@ -91,10 +94,13 @@ public final class PlaybackStats {
     }
 
     private static final class MutableTrack {
+        /** 歌名译名（网易云 tns），用于统计页显示「原名（译名）」。 */
         final long songId;
         String name;
         String artist;
         int playCount;
+
+        String transName;
 
         MutableTrack(long songId, String name, String artist) {
             this.songId = songId;
@@ -119,11 +125,13 @@ public final class PlaybackStats {
                 MutableTrack track = tracks.get(song.getId());
                 if (track == null) {
                     track = new MutableTrack(song.getId(), song.getName(), song.getArtist());
+                    track.transName = song.getTransName();
                     tracks.put(song.getId(), track);
                     trimIfNeededLocked();
                 } else {
                     // 曲名 / 曲师可能被编辑过，以最新为准
                     track.name = song.getName();
+                    track.transName = song.getTransName();
                     track.artist = song.getArtist();
                 }
                 track.playCount++;
@@ -178,7 +186,8 @@ public final class PlaybackStats {
             ensureLoaded(context);
             List<TrackStat> all = new ArrayList<>();
             for (MutableTrack track : tracks.values()) {
-                all.add(new TrackStat(track.songId, track.name, track.artist, track.playCount));
+                all.add(new TrackStat(track.songId, track.name, track.artist, track.playCount,
+                        track.transName));
             }
             Collections.sort(all, (left, right) -> Integer.compare(right.playCount, left.playCount));
             if (limit > 0 && all.size() > limit) {
@@ -278,6 +287,7 @@ public final class PlaybackStats {
                     }
                     MutableTrack track = new MutableTrack(id,
                             item.optString("name", ""), item.optString("artist", ""));
+                    track.transName = item.optString("transName", "");
                     track.playCount = item.optInt("playCount", 0);
                     tracks.put(id, track);
                 }
@@ -309,6 +319,7 @@ public final class PlaybackStats {
                 JSONObject item = new JSONObject();
                 item.put("id", track.songId);
                 item.put("name", track.name);
+                item.put("transName", track.transName == null ? "" : track.transName);
                 item.put("artist", track.artist);
                 item.put("playCount", track.playCount);
                 array.put(item);

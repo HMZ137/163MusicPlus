@@ -23,7 +23,7 @@
         <EditText
             android:id="@+id/et_search"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="30dp"
             android:layout_weight="1"
             android:background="@color/surface_elevated"
             android:hint="@string/search_hint"
@@ -35,15 +35,23 @@
             android:textColorHint="@color/text_disabled"
             android:textSize="13sp" />
 
+        <!--
+          高度 30dp 与左侧输入框一致；MaterialButton 自带上下 6dp inset（XML 的
+          app:insetTop 本工程 Material 版本不认），由 SearchActivity 代码里
+          setInsetTop/Bottom(0) 归零，保证底衬铺满 30dp、与输入框完全等高。
+        -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_search"
             android:layout_width="52dp"
-            android:layout_height="36dp"
+            android:layout_height="30dp"
             android:layout_marginStart="4dp"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:maxLines="1"
             android:text="@string/search"
             android:textSize="12sp"
             android:textAllCaps="false"
-            android:minHeight="36dp"
+            android:minHeight="30dp"
             style="@style/Widget.App.Button" />
     </LinearLayout>
 

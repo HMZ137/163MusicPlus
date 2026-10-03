@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import com.qinghe.music163pro.util.UiKit;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -155,7 +156,7 @@ public class PersonalFMActivity extends BaseWatchActivity {
     private android.graphics.drawable.GradientDrawable makeRoundBackground(int color) {
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(dp(10));
+        bg.setCornerRadius(UiKit.dp(this, UiKit.DP_BUTTON_RADIUS));
         bg.setColor(color);
         return bg;
     }

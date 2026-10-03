@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  列表行卡片底：ripple + inset 内缩（左右 6dp / 上下 3dp）。
+  为什么必须用 inset 而不是 layout_margin：这些行都跑在 ListView 里，
+  AbsListView.LayoutParams 不支持 margin，XML 里的 layout_margin 会被静默丢弃；
+  inset 是 drawable 自身内缩，在 ListView 里依然生效，行与行之间才会露出页面底色。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33BB86FC">
+    <item>
+        <inset
+            android:insetLeft="6dp"
+            android:insetTop="3dp"
+            android:insetRight="6dp"
+            android:insetBottom="3dp">
+            <shape android:shape="rectangle">
+                <solid android:color="#1E1F24" />
+                <corners android:radius="0dp" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

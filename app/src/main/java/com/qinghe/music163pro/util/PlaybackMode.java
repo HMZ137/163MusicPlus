@@ -22,6 +22,8 @@ public final class PlaybackMode {
     public static final String PREFS_NAME = "music163_settings";
     /** 本地播放模式开关（false = 云音乐模式，默认）。 */
     public static final String PREF_LOCAL_ONLY = "local_only_mode";
+    /** 纯在线模式开关：隐藏所有本地 / 离线功能（只保留下载管理）。 */
+    public static final String PREF_ONLINE_ONLY = "online_only_mode";
     /** 收藏模式：true = 走云端接口。 */
     public static final String PREF_FAV_MODE_CLOUD = "fav_mode_cloud";
     /** 进入本地模式前用户选的收藏模式，退出时还原用。 */
@@ -57,6 +59,8 @@ public final class PlaybackMode {
         SharedPreferences.Editor editor = p.edit()
                 .putBoolean(PREF_LOCAL_ONLY, localOnly);
         if (localOnly) {
+            // 与纯在线模式互斥：进本地模式就把那个开关清掉
+            editor.putBoolean(PREF_ONLINE_ONLY, false);
             // 关掉云端收藏，并记住用户原本的选择
             editor.putBoolean(PREF_FAV_MODE_CLOUD_SAVED,
                     p.getBoolean(PREF_FAV_MODE_CLOUD, false));
@@ -71,6 +75,56 @@ public final class PlaybackMode {
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    // ==================== 纯在线模式 ====================
+
+    /**
+     * 当前是否处于「纯在线模式」。
+     *
+     * <p>与本地播放模式正好相反：把**所有本地 / 离线功能**收起来（本机音乐、本地歌单、
+     * 局域网传歌、本地收藏），只保留在线能力 —— 例外是**下载管理照留**，用户总得有地方
+     * 管理已经下到卡里的歌。</p>
+     */
+    public static boolean isOnlineOnly(Context context) {
+        if (context == null) {
+            return false;
+        }
+        return prefs(context).getBoolean(PREF_ONLINE_ONLY, false);
+    }
+
+    /**
+     * 切换纯在线模式。与 {@link #setLocalOnly} **互斥**：开纯在线就一定是「云音乐 + 云端收藏」。
+     *
+     * <p>和本地模式一样，收藏分流也是**在切模式这一处把 {@code fav_mode_cloud} 写对**，
+     * 而不是去改散落的 7 个读取点 —— 这样不会漏改某一处。</p>
+     */
+    public static void setOnlineOnly(Context context, boolean onlineOnly) {
+        if (context == null) {
+            return;
+        }
+        SharedPreferences p = prefs(context);
+        if (p.getBoolean(PREF_ONLINE_ONLY, false) == onlineOnly) {
+            return;
+        }
+        SharedPreferences.Editor editor = p.edit().putBoolean(PREF_ONLINE_ONLY, onlineOnly);
+        if (onlineOnly) {
+            // 互斥：退出本地模式；收藏切到云端
+            editor.putBoolean(PREF_LOCAL_ONLY, false);
+            editor.putBoolean(PREF_FAV_MODE_CLOUD, true);
+            editor.remove(PREF_FAV_MODE_CLOUD_SAVED);
+        }
+        editor.apply();
+    }
+
+    /**
+     * 本地 / 离线的**入口**当前是否应当隐藏。
+     *
+     * <p>调用点：我的歌单的「本地歌单」Tab、下载管理页的「本地」按钮、本机音乐页的
+     * 「局域网传歌」。集中一处判断，避免某个入口漏藏。</p>
+     */
+    public static boolean isLocalEntryHidden(Context context) {
+        return isOnlineOnly(context);
     }
 
     /**

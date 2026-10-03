@@ -7,10 +7,28 @@
 
     <!-- Song name at top -->
     <TextView
+        android:id="@+id/btn_ai_toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingStart="6dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="6dp"
+        android:text="AI"
+        android:textColor="#80FFFFFF"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/tv_lyrics_song_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
+        android:layout_toStartOf="@id/btn_ai_toggle"
         android:ellipsize="marquee"
         android:focusable="true"
         android:focusableInTouchMode="true"

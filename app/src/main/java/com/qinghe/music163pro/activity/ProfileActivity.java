@@ -332,7 +332,7 @@ public class ProfileActivity extends BaseWatchActivity {
         row.setPadding(px(12), px(14), px(12), px(14));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xFF1E1E1E);
-        bg.setCornerRadius(px(6));
+        bg.setCornerRadius(0);
         row.setBackground(bg);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);

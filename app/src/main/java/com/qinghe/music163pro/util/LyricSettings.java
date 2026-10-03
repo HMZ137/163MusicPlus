@@ -175,6 +175,19 @@ public final class LyricSettings {
         return BACKDROP_COLOR;
     }
 
+    // ==================== 全屏歌词入口 ====================
+
+    /** 歌词层是否显示「全屏」按钮（默认显示）。关掉后入口与沉浸页一起隐藏。 */
+    private static final String KEY_FULLSCREEN_BUTTON = "lyric_fullscreen_button_enabled";
+
+    public static boolean isFullscreenButtonEnabled(Context context) {
+        return prefs(context).getBoolean(KEY_FULLSCREEN_BUTTON, true);
+    }
+
+    public static void setFullscreenButtonEnabled(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_FULLSCREEN_BUTTON, enabled).apply();
+    }
+
     private static int getFontSize(Context context, String key, int fallback) {
         int value = prefs(context).getInt(key, fallback);
         return Math.max(FONT_MIN, Math.min(FONT_MAX, value));

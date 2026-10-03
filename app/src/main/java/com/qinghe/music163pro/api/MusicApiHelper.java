@@ -434,6 +434,7 @@ public class MusicApiHelper {
                         coverUrl = al.optString("picUrl", "");
                     }
                     Song song = new Song(id, name, artist, album);
+                    song.setTransName(pickTransName(s));
                     if (!coverUrl.isEmpty()) {
                         song.setCoverUrl(coverUrl);
                     }
@@ -843,6 +844,406 @@ public class MusicApiHelper {
             }
         }
         return null;
+    }
+
+    // ==================== 歌手页 ====================
+
+    /** 歌手详情（含热门 50 首）。 */
+    public static class ArtistDetail {
+        public long id;
+        public String name = "";
+        public String picUrl = "";
+        public String briefDesc = "";
+        public int musicSize;
+        public int albumSize;
+        public final java.util.List<Song> hotSongs = new java.util.ArrayList<>();
+    }
+
+    public interface ArtistDetailCallback {
+        void onResult(ArtistDetail detail);
+
+        void onError(String message);
+    }
+
+    /** 歌手详情 + 热门 50 首（weapi /api/v1/artist/{id}）。 */
+    public static void getArtistDetail(long artistId, String cookie,
+                                       ArtistDetailCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", artistId);
+                String response = weapiPost("/api/v1/artist/" + artistId, data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                ArtistDetail detail = new ArtistDetail();
+                detail.id = artistId;
+                JSONObject artist = json.optJSONObject("artist");
+                if (artist != null) {
+                    detail.name = artist.optString("name", "");
+                    detail.picUrl = artist.optString("picUrl", "");
+                    detail.briefDesc = artist.optString("briefDesc", "");
+                    if (detail.briefDesc.isEmpty()) {
+                        detail.briefDesc = artist.optString("description", "");
+                    }
+                    detail.musicSize = artist.optInt("musicSize", 0);
+                    detail.albumSize = artist.optInt("albumSize", 0);
+                }
+                detail.hotSongs.addAll(parseSongArray(json.optJSONArray("hotSongs")));
+                mainHandler.post(() -> callback.onResult(detail));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "歌手详情失败: " + artistId, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public interface ArtistSongsCallback {
+        void onResult(java.util.List<Song> songs);
+
+        void onError(String message);
+    }
+
+    /** 歌手全部歌曲（weapi /api/v1/artist/songs，order=hot|time）。 */
+    public static void getArtistSongs(long artistId, int offset, int limit, String order,
+                                      String cookie, ArtistSongsCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", artistId);
+                data.put("offset", offset);
+                data.put("limit", limit);
+                data.put("order", order == null ? "hot" : order);
+                String response = weapiPost("/api/v1/artist/songs", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                java.util.List<Song> songs = parseSongArray(json.optJSONArray("songs"));
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "歌手歌曲失败: " + artistId, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public interface ArtistSubCallback {
+        void onResult(boolean subscribed);
+
+        void onError(String message);
+    }
+
+    /** 收藏 / 取消收藏歌手（weapi /api/artist/sub，t=1 收藏，t=0 取消）。 */
+    public static void subArtist(long artistId, boolean subscribe, String cookie,
+                                 ArtistSubCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("artistId", artistId);
+                data.put("artistIds", "[" + artistId + "]");
+                data.put("t", subscribe ? 1 : 0);
+                String response = weapiPost("/api/artist/sub", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", 200);
+                if (code != 200) {
+                    String msg = json.optString("message", "操作失败");
+                    mainHandler.post(() -> callback.onError(msg));
+                    return;
+                }
+                mainHandler.post(() -> callback.onResult(subscribe));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "收藏歌手失败: " + artistId, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * 解析歌曲数组（兼容新版 ar/al 与旧版 artists/album 两套字段）。
+     * 歌手页、心动模式等都复用它。
+     */
+    static java.util.List<Song> parseSongArray(JSONArray arr) {
+        java.util.List<Song> out = new java.util.ArrayList<>();
+        if (arr == null) {
+            return out;
+        }
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject s = arr.optJSONObject(i);
+            if (s == null) {
+                continue;
+            }
+            long id = s.optLong("id", 0);
+            if (id <= 0) {
+                continue;
+            }
+            String name = s.optString("name", "");
+            JSONArray ar = s.optJSONArray("ar");
+            if (ar == null) {
+                ar = s.optJSONArray("artists");
+            }
+            StringBuilder artistSb = new StringBuilder();
+            if (ar != null) {
+                for (int j = 0; j < ar.length(); j++) {
+                    JSONObject a = ar.optJSONObject(j);
+                    if (a == null) {
+                        continue;
+                    }
+                    if (artistSb.length() > 0) {
+                        artistSb.append(" / ");
+                    }
+                    artistSb.append(a.optString("name", ""));
+                }
+            }
+            JSONObject al = s.optJSONObject("al");
+            if (al == null) {
+                al = s.optJSONObject("album");
+            }
+            String album = al != null ? al.optString("name", "") : "";
+            String cover = al != null ? al.optString("picUrl", "") : "";
+            long albumId = al != null ? al.optLong("id", 0) : 0;
+            Song song = new Song(id, name, artistSb.toString(), album);
+            if (!cover.isEmpty()) {
+                song.setCoverUrl(cover);
+            }
+            if (albumId > 0) {
+                song.setAlbumId(albumId);
+            }
+            out.add(song);
+        }
+        return out;
+    }
+
+    // ==================== 打卡 / 听歌排行 / 心动模式 ====================
+
+    /** 听歌打卡（weapi /api/scrobble）：让账号里的听歌记录、排行与手表同步。 */
+    public static void scrobble(long songId, long sourceId, String cookie) {
+        executor.execute(() -> {
+            try {
+                // 网易的"听歌打卡"实际走 /api/feedback/weblog（weapi），
+                // 数据体是 logs 数组 + action/json（与 NeteaseCloudMusicApi 的 scrobble 一致）。
+                // 早先用 /api/scrobble 会返回 404「接口未找到」。
+                JSONObject inner = new JSONObject();
+                inner.put("download", 0);
+                inner.put("end", "playend");
+                inner.put("id", songId);
+                inner.put("sourceId", sourceId > 0 ? sourceId : songId);
+                inner.put("time", 60);
+                inner.put("type", "song");
+                inner.put("wifi", 0);
+                inner.put("source", "list");
+
+                JSONObject log = new JSONObject();
+                log.put("action", "play");
+                log.put("json", inner);
+
+                JSONArray logs = new JSONArray();
+                logs.put(log);
+
+                JSONObject data = new JSONObject();
+                data.put("logs", logs.toString());
+                data.put("csrf_token", extractCsrfToken(cookie));
+
+                String response = weapiPost("/api/feedback/weblog", data.toString(), cookie);
+                android.util.Log.i("Scrobble", "服务端响应: " + response);
+            } catch (Exception e) {
+                MusicLog.w(TAG, "听歌打卡失败: " + songId, e);
+            }
+        });
+    }
+
+    /** 听歌排行里的一条：歌曲 + 播放次数。 */
+    public static class RecordItem {
+        public final Song song;
+        public final int playCount;
+
+        public RecordItem(Song song, int playCount) {
+            this.song = song;
+            this.playCount = playCount;
+        }
+    }
+
+    public interface UserRecordCallback {
+        void onResult(java.util.List<RecordItem> items);
+
+        void onError(String message);
+    }
+
+    /** 听歌排行（weapi /api/v1/play/record，type=1 本周 / 0 全部时间）。 */
+    public static void getUserRecord(long uid, int type, String cookie,
+                                     UserRecordCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("uid", uid);
+                data.put("type", type);
+                String response = weapiPost("/api/v1/play/record", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray arr = type == 1
+                        ? json.optJSONArray("weekData") : json.optJSONArray("allData");
+                java.util.List<RecordItem> out = new java.util.ArrayList<>();
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject item = arr.optJSONObject(i);
+                        if (item == null) {
+                            continue;
+                        }
+                        JSONObject songJson = item.optJSONObject("song");
+                        if (songJson == null) {
+                            continue;
+                        }
+                        java.util.List<Song> one = parseSongArray(new JSONArray().put(songJson));
+                        if (one.isEmpty()) {
+                            continue;
+                        }
+                        out.add(new RecordItem(one.get(0), item.optInt("playCount", 0)));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(out));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "听歌排行失败: uid=" + uid, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /** 通用「歌曲列表」回调（心动模式等复用）。 */
+    public interface SongListCallback {
+        void onResult(java.util.List<Song> songs);
+
+        void onError(String message);
+    }
+
+    /**
+     * 心动模式（weapi /api/playmode/intelligence/list）：
+     * 以当前歌曲 + 当前歌单为种子，生成一串「越听越对味」的相似曲目队列。
+     */
+    public static void getIntelligenceList(long songId, long playlistId, String cookie,
+                                           SongListCallback callback) {
+        executor.execute(() -> {
+            try {
+                // 注意参数名：官方实现是 songId / type / playlistId / startMusicId / count
+                // （早先用 id/pid/sid 会拿到空的 data，且不传 count 时默认只给 1 首）
+                JSONObject data = new JSONObject();
+                data.put("songId", songId);
+                data.put("type", playlistId > 0 ? "fromPlayOne" : "fromPage");
+                data.put("playlistId", playlistId > 0 ? playlistId : songId);
+                data.put("startMusicId", songId);
+                data.put("count", 30);
+                String response = weapiPost("/api/playmode/intelligence/list",
+                        data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray arr = json.optJSONArray("data");
+                java.util.List<Song> out = new java.util.ArrayList<>();
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject item = arr.optJSONObject(i);
+                        if (item == null) {
+                            continue;
+                        }
+                        JSONObject songJson = item.optJSONObject("songInfo");
+                        if (songJson == null) {
+                            songJson = item;
+                        }
+                        java.util.List<Song> one = parseSongArray(new JSONArray().put(songJson));
+                        if (!one.isEmpty()) {
+                            out.add(one.get(0));
+                        }
+                    }
+                }
+                // 兜底：心动模式本是为「歌单内智能续播」设计的，没有歌单上下文（如从排行/搜索播放）
+                // 时官方接口会返回空 —— 这时退化为「相似歌曲」，保证按钮始终有反应。
+                if (out.isEmpty()) {
+                    JSONObject fallback = new JSONObject();
+                    fallback.put("songid", songId);
+                    fallback.put("limit", 30);
+                    fallback.put("offset", 0);
+                    fallback.put("csrf_token", extractCsrfToken(cookie));
+                    String fallbackResp = weapiPost("/api/v1/discovery/simiSong",
+                            fallback.toString(), cookie);
+                    out.addAll(parseSongArray(new JSONObject(fallbackResp).optJSONArray("songs")));
+                    android.util.Log.i("Intelligence", "智能列表为空 → 相似歌曲兜底 n=" + out.size());
+                }
+                final java.util.List<Song> finalOut = out;
+                mainHandler.post(() -> callback.onResult(finalOut));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "心动模式失败: " + songId, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== 搜索建议 ====================
+
+    public interface KeywordSuggestCallback {
+        void onResult(java.util.List<String> keywords);
+
+        void onError(String message);
+    }
+
+    /** 搜索联想词（weapi /api/search/suggest/keyword）：手表上打字难，用联想补全。 */
+    public static void suggestKeywords(String keyword, String cookie,
+                                       KeywordSuggestCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("s", keyword);
+                String response = weapiPost("/api/search/suggest/keyword", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                java.util.List<String> out = new java.util.ArrayList<>();
+                JSONObject result = json.optJSONObject("result");
+                if (result != null) {
+                    JSONArray allMatch = result.optJSONArray("allMatch");
+                    if (allMatch != null) {
+                        for (int i = 0; i < allMatch.length(); i++) {
+                            JSONObject item = allMatch.optJSONObject(i);
+                            if (item == null) {
+                                continue;
+                            }
+                            String kw = item.optString("keyword", "");
+                            if (!kw.isEmpty()) {
+                                out.add(kw);
+                            }
+                        }
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(out));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "搜索建议失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== 歌单动态 ====================
+
+    public interface PlaylistDynamicCallback {
+        void onResult(long playCount, long subscribedCount, long commentCount, long shareCount);
+
+        void onError(String message);
+    }
+
+    /** 歌单动态信息：播放量 / 收藏数 / 评论数 / 分享数（weapi /api/playlist/detail/dynamic）。 */
+    public static void getPlaylistDynamic(long playlistId, String cookie,
+                                          PlaylistDynamicCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", playlistId);
+                String response = weapiPost("/api/playlist/detail/dynamic", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                long play = json.optLong("playCount", 0);
+                long sub = json.optLong("subscribedCount", 0);
+                long comment = json.optLong("commentCount", 0);
+                long share = json.optLong("shareCount", 0);
+                mainHandler.post(() -> callback.onResult(play, sub, comment, share));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "歌单动态失败: " + playlistId, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
     }
 
     // ==================== QR Login ====================
@@ -3297,6 +3698,27 @@ public class MusicApiHelper {
         });
     }
 
+    /**
+     * 取歌名译名：网易云歌曲对象里的 {@code tns}（translated names）数组，取第一个非空项。
+     * 老接口可能不给该字段，返回空串。
+     */
+    private static String pickTransName(JSONObject songObj) {
+        if (songObj == null) {
+            return "";
+        }
+        JSONArray tns = songObj.optJSONArray("tns");
+        if (tns == null || tns.length() == 0) {
+            return "";
+        }
+        for (int i = 0; i < tns.length(); i++) {
+            String t = tns.optString(i, "");
+            if (!t.isEmpty()) {
+                return t;
+            }
+        }
+        return "";
+    }
+
     private static Song parseSongFromJson(JSONObject songObj) {
         if (songObj == null) {
             return null;
@@ -3328,6 +3750,7 @@ public class MusicApiHelper {
             return null;
         }
         Song parsedSong = new Song(songId, songName, artist, album);
+        parsedSong.setTransName(pickTransName(songObj));
         if (!coverUrl.isEmpty()) {
             parsedSong.setCoverUrl(coverUrl);
         }

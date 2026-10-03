@@ -2,11 +2,13 @@ package com.qinghe.music163pro.util;
 
 import android.app.Activity;
 import android.content.Context;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.qinghe.music163pro.R;
 
@@ -129,6 +131,39 @@ public final class WatchBackButton {
                     Math.max(padEnd, inset),
                     titleBar.getPaddingBottom());
         }
+
+        // 标题栏里的文字一律压成单行 + 结尾截断。
+        //
+        // 为什么必须统一做：本方法把标题行的 paddingStart 撑到返回按钮占位（本机约 100px）、
+        // paddingEnd 撑到圆角内缩，再加上全局缩放(115%)，标题实际可用宽度只剩约 220px。而不少
+        // 页面的标题是运行时才填进去的（歌单名 / 歌名 / MV 名 / 设置项名），一旦超过这个宽度，
+        // TextView 默认换行 —— 中文会被折成一列竖排（本项目已实测多例：我的歌单、本地音乐管理…）。
+        // 统一单行 + END 截断后，超长文本退化为结尾「…」，不会再竖排。
+        forceSingleLineTitles(titleBar);
+    }
+
+    /** 把标题栏内的所有文字压成单行 + 结尾省略（含直接传入标题 TextView 的页面）。 */
+    private static void forceSingleLineTitles(View root) {
+        if (root == null) {
+            return;
+        }
+        if (root instanceof TextView) {
+            applySingleLine((TextView) root);
+        } else if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                forceSingleLineTitles(group.getChildAt(i));
+            }
+        }
+    }
+
+    /** 幂等地把某个 TextView 设成单行 + END 截断。 */
+    private static void applySingleLine(TextView tv) {
+        if (tv == null || tv.getMaxLines() == 1) {
+            return;
+        }
+        tv.setSingleLine(true);
+        tv.setEllipsize(TextUtils.TruncateAt.END);
     }
 
     /**

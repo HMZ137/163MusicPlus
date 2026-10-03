@@ -56,12 +56,26 @@
     <string name="multi_select_favorite_failed">收藏失败 %1$d 首</string>
     <string name="multi_select_favorite_existed">选中的歌曲均已收藏</string>
     <string name="multi_select_favorite_need_login">请先登录以使用云端收藏</string>
+
+    <!-- 本地歌单 -->
+    <string name="add_to_local_playlist">加入歌单</string>
+    <string name="new_playlist">新建歌单</string>
+    <string name="playlist_name_hint">输入歌单名称</string>
+    <string name="create_local_playlist">新建本地歌单</string>
+    <string name="playlist_name_empty">名称不能为空</string>
+    <string name="created_and_added">已创建并加入 %1$d 首</string>
+    <string name="added_to_playlist">已加入 %1$d 首</string>
+    <string name="already_in_playlist">已在歌单中</string>
+    <string name="create_failed">创建失败</string>
+
     <string name="download_tidy">整理</string>
     <string name="local_music">本地音乐</string>
     <string name="local_music_entry">本地</string>
     <string name="local_music_shuffle">随机</string>
     <!-- 打开「字母选择页」的入口按钮。短，因为 320px 标题栏还要留给标题和「随机」 -->
     <string name="local_music_letters">A-Z</string>
+    <string name="local_music_sort">排序</string>
+    <string name="local_music_more">更多</string>
     <string name="letter_picker_title">选择字母</string>
     <!-- 带组数的标题。不写成字符串拼接：拼接无法被翻译，lint 也会报 SetTextI18n -->
     <string name="letter_picker_title_groups">选择字母 · %1$d组</string>

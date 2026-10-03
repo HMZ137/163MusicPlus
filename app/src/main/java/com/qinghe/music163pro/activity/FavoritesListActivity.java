@@ -81,11 +81,11 @@ public class FavoritesListActivity extends BaseWatchActivity {
                     TextView tvName = view.findViewById(R.id.tv_item_name);
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getName());
+                    tvName.setText(song.getDisplayName());
                     // 本地收藏带「本地」标签：它的 id 是路径派生的负数，
                     // 不属于网易云曲目体系（没有云端音质/评论/歌单可用）。
                     if (LocalTracks.isLocalId(song.getId())) {
-                        tvName.setText(song.getName() + " [本地]");
+                        tvName.setText(song.getDisplayName() + " [本地]");
                         tvArtist.setText(LocalTracks.safeName(song.getArtist()));
                     } else {
                         tvArtist.setText(song.getArtist());
@@ -311,13 +311,17 @@ public class FavoritesListActivity extends BaseWatchActivity {
                 // Rebuild the list preserving original order
                 List<Song> updated = new ArrayList<>();
                 for (Long id : ids) {
+                    // 本地收藏优先：先用本地那条，只有本地没有时才用 API 返回的曲目。
+                    // 反过来（先放 API 结果）会把本地收藏顶成"在线版本"，
+                    // 表现就是本地歌一闪而过、最后只剩在线收藏。
+                    Song local = localMap.get(id);
+                    if (local != null) {
+                        updated.add(local);
+                        continue;
+                    }
                     Song s = songMap.get(id);
                     if (s != null) {
                         updated.add(s);
-                    } else {
-                        // Keep local song if API didn't return it
-                        Song local = localMap.get(id);
-                        if (local != null) updated.add(local);
                     }
                 }
                 favoritesList.clear();
@@ -350,9 +354,22 @@ public class FavoritesListActivity extends BaseWatchActivity {
             @Override
             public void onResult(List<Song> songs) {
                 favoritesList.clear();
-                favoritesList.addAll(songs);
+                // 云端收藏 + 本地收藏 合并显示：本地歌曲不该受"收藏模式"影响，联网也要能看到
+                java.util.Set<Long> cloudIds = new java.util.HashSet<>();
+                for (Song cs : songs) {
+                    cloudIds.add(cs.getId());
+                }
+                List<Song> merged = new ArrayList<>(songs);
+                for (Song local : favoritesManager.getFavorites()) {
+                    if (local != null && !cloudIds.contains(local.getId())) {
+                        merged.add(local);
+                    }
+                }
+                favoritesList.addAll(merged);
                 songAdapter.notifyDataSetChanged();
-                tvEmpty.setText("\u6682\u65e0\u4e91\u7aef\u6536\u85cf");
+                if (merged.isEmpty()) {
+                    tvEmpty.setText("暂无收藏");
+                }
                 updateEmptyState();
             }
 

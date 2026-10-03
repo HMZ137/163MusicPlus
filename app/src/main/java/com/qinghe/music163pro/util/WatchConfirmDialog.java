@@ -116,7 +116,9 @@ public final class WatchConfirmDialog {
 
         LinearLayout dialog = new LinearLayout(activity);
         dialog.setOrientation(LinearLayout.VERTICAL);
-        dialog.setBackgroundColor(options.dialogBackgroundColor);
+        // UI 现代化：弹窗底色统一走 UiKit（#1E1F24、圆角 14dp）——
+        // 之前"两套底色"的分叉就从这类各自 setBackgroundColor 的地方来的
+        dialog.setBackground(UiKit.dialogCard(activity));
         dialog.setPadding(
                 WatchUiUtils.px(activity, 16),
                 WatchUiUtils.px(activity, 12),

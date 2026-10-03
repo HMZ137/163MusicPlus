@@ -279,7 +279,7 @@ public class CommentActivity extends BaseWatchActivity {
 
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(COLOR_INPUT_BG);
-        inputBg.setCornerRadius(px(12));
+        inputBg.setCornerRadius(0);
         inputField.setBackground(inputBg);
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
@@ -498,7 +498,7 @@ public class CommentActivity extends BaseWatchActivity {
 
                     GradientDrawable repliedBg = new GradientDrawable();
                     repliedBg.setColor(0xFF2A2A2A);
-                    repliedBg.setCornerRadius(px(4));
+                    repliedBg.setCornerRadius(0);
                     repliedTv.setBackground(repliedBg);
 
                     LinearLayout.LayoutParams repliedParams = new LinearLayout.LayoutParams(

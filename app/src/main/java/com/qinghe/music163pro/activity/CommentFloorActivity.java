@@ -213,7 +213,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
 
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(COLOR_INPUT_BG);
-        inputBg.setCornerRadius(px(12));
+        inputBg.setCornerRadius(0);
         inputField.setBackground(inputBg);
         inputField.setPadding(px(8), px(6), px(8), px(6));
 
@@ -345,7 +345,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(COLOR_PARENT_BG);
-        bg.setCornerRadius(px(6));
+        bg.setCornerRadius(0);
         item.setBackground(bg);
 
         long commentId = comment.optLong("commentId", 0);

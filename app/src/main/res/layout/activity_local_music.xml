@@ -7,82 +7,113 @@
     android:padding="6dp">
 
     <!--
-      标题栏：右侧放「A-Z」和「随机」两个动作。
-      改成 RelativeLayout + layout_toStartOf 链式避让是必须的 —— 之前用的是
-      LinearLayout（标题 weight=1），再加一个按钮会让标题被挤到左半边、看着像没居中。
-      下载列表页早就踩过这个坑，这里直接对齐它的做法。
+      标题栏两行：
+        第 1 行 = 右侧动作按钮（A-Z / 排序 / 随机）；
+        第 2 行 = 标题「本地音乐」。
+      两行一起被 WatchBackButton.applyTitleBarInset() 撑到「返回按钮占地」的高度（本机约 101px），
+      所以头部总高≈一个返回按钮 —— 不再额外吃掉列表空间（这是上一版踩的坑：把占位加到第 1 行上，
+      那一行被强行撑到 101px，再叠一行标题，头部近 150px，列表只剩两行半）。
+      标题要放长文本（如扫描进度）放不下，所以进度改到下面的状态行去显示。
     -->
-    <RelativeLayout
+    <LinearLayout
         android:id="@+id/layout_local_music_title_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="6dp">
+        android:orientation="vertical">
 
-        <!-- 标题止于「A-Z」按钮之前，否则居中后会伸到按钮底下 -->
+        <RelativeLayout
+            android:id="@+id/layout_local_music_action_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <!--
+              本页一共有 5 个操作（搜索 / 排序 / A-Z 字母索引 / 随机播放 / 局域网传歌），
+              标题栏扣掉返回按钮占位后只有约 220px，一行放不下 5 个文字按钮。
+              所以：最常用的两个留在外面，其余（含全部 5 个的完整入口）收进「更多」二级菜单。
+            -->
+            <TextView
+                android:id="@+id/btn_local_search"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@id/btn_local_sort"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="4dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="4dp"
+                android:text="@string/search"
+                android:textColor="@color/colorPrimary"
+                android:textSize="11sp" />
+
+            <!-- 排序方式：曲名 / 曲师 / 专辑（选择会记住） -->
+            <TextView
+                android:id="@+id/btn_local_sort"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@id/btn_local_more"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="4dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="4dp"
+                android:text="@string/local_music_sort"
+                android:textColor="@color/colorPrimary"
+                android:textSize="11sp" />
+
+            <!-- 更多：五个操作都在这里（A-Z 字母索引 / 随机播放 / 局域网传歌 等） -->
+            <TextView
+                android:id="@+id/btn_local_more"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="4dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="4dp"
+                android:text="@string/local_music_more"
+                android:textColor="@color/colorPrimary"
+                android:textSize="11sp" />
+        </RelativeLayout>
+
         <TextView
             android:id="@+id/tv_local_music_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentStart="true"
-            android:layout_toStartOf="@id/btn_local_letters"
-            android:layout_centerVertical="true"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:letterSpacing="0.05"
+            android:maxLines="1"
+            android:singleLine="true"
             android:text="@string/local_music"
             android:textColor="@color/text_primary"
             android:textSize="@dimen/watch_title_text_size"
-            android:textStyle="bold"
-            android:letterSpacing="0.05"
-            android:gravity="center" />
-
-        <!-- 打开独立的字母选择页。原来那条贴边的窄索引条已经去掉，列表因此拿回全宽 -->
-        <TextView
-            android:id="@+id/btn_local_letters"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_toStartOf="@id/btn_local_shuffle"
-            android:layout_centerVertical="true"
-            android:text="@string/local_music_letters"
-            android:textColor="@color/colorPrimary"
-            android:textSize="12sp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/btn_local_shuffle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:text="@string/local_music_shuffle"
-            android:textColor="@color/colorPrimary"
-            android:textSize="12sp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:clickable="true"
-            android:focusable="true" />
-    </RelativeLayout>
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <!--
-      局域网传歌入口。放在这里而不是「更多」菜单：MoreActivity.applyMenuOrder() 会
-      removeAllViews() 后只按 key 重新加回，没在 viewByKey 里注册的磁贴会整块消失。
-      而「把歌传进来」本来就是本机音乐该有的入口。
+      状态 / 筛选行：只在需要时出现 —— 扫描进度 / 搜索命中 / 已移出若干首。
+      点按行为：搜索中 → 清除搜索；否则 → 打开「已移出」恢复界面。
     -->
     <TextView
-        android:id="@+id/btn_local_lan_transfer"
+        android:id="@+id/tv_status_row"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:gravity="center"
-        android:text="局域网传歌"
-        android:textColor="@color/colorPrimary"
-        android:textSize="12sp"
+        android:layout_height="32dp"
         android:background="?attr/selectableItemBackground"
         android:clickable="true"
-        android:focusable="true" />
+        android:ellipsize="end"
+        android:focusable="true"
+        android:gravity="center"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone" />
 
     <ListView
         android:id="@+id/lv_local_music"

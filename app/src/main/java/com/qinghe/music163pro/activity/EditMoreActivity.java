@@ -118,10 +118,8 @@ public class EditMoreActivity extends BaseWatchActivity {
         FrameLayout row = new FrameLayout(this);
         row.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(52)));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF1E1E1E);
-        bg.setCornerRadius(px(6));
-        row.setBackground(bg);
+        // 统一直角卡片底（bg_card_tile 自带 inset 缝隙与涟漪）
+        row.setBackground(getResources().getDrawable(com.qinghe.music163pro.R.drawable.bg_card_tile));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(52));
         params.bottomMargin = px(4);
@@ -164,10 +162,8 @@ public class EditMoreActivity extends BaseWatchActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(px(12), 0, px(12), 0);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF1A1A1A);
-        bg.setCornerRadius(px(6));
-        row.setBackground(bg);
+        // 统一直角卡片底（自带 inset 缝隙与涟漪）
+        row.setBackground(getResources().getDrawable(com.qinghe.music163pro.R.drawable.bg_card_tile));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(52));
         params.bottomMargin = px(4);

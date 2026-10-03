@@ -70,6 +70,17 @@ public class LoginActivity extends BaseWatchActivity {
         TextView btnQrLogin = findViewById(R.id.btn_qr_login);
         TextView btnExport = findViewById(R.id.btn_export_cookie);
         TextView btnImport = findViewById(R.id.btn_import_cookie);
+        // 归零 MaterialButton 默认上下 6dp inset：按钮间距只由 margin 决定，三行按钮更紧凑
+        zeroVerticalInsets(btnSave);
+        zeroVerticalInsets(btnQrLogin);
+        zeroVerticalInsets(btnExport);
+        zeroVerticalInsets(btnImport);
+
+        // 密码 / 验证码登录入口：跳对应登录页
+        findViewById(R.id.btn_password_login_entry).setOnClickListener(v ->
+                startActivity(new Intent(this, PasswordLoginActivity.class)));
+        findViewById(R.id.btn_captcha_login_entry).setOnClickListener(v ->
+                startActivity(new Intent(this, CaptchaLoginActivity.class)));
 
         // Load saved values
         etCookie.setText(prefs.getString(CookieBackup.KEY_COOKIE, ""));
@@ -101,6 +112,16 @@ public class LoginActivity extends BaseWatchActivity {
     }
 
     // ── Cookie 的保存 ──────────────────────────────────────────────────────
+
+    /** MaterialButton 默认自带上下 6dp inset，会让「按钮看起来比声明的高度矮、行距虚胖」；归零后底衬铺满声明高度。 */
+    private static void zeroVerticalInsets(android.view.View v) {
+        if (v instanceof com.google.android.material.button.MaterialButton) {
+            com.google.android.material.button.MaterialButton b =
+                    (com.google.android.material.button.MaterialButton) v;
+            b.setInsetTop(0);
+            b.setInsetBottom(0);
+        }
+    }
 
     private void saveCookie() {
         String cookie = etCookie.getText() == null ? "" : etCookie.getText().toString().trim();

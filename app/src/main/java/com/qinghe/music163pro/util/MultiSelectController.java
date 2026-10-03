@@ -279,29 +279,46 @@ public final class MultiSelectController {
 
         bar.addView(buildHeaderRow());
 
-        LinearLayout actionRow = new LinearLayout(activity);
-        actionRow.setOrientation(LinearLayout.HORIZONTAL);
-        actionRow.setPadding(0, px(2), 0, 0);
-        for (Action action : actions) {
-            actionRow.addView(buildActionButton(action));
-        }
-        // 最后一个动作按钮不需要右边距，避免动作栏右侧留白。
-        if (actionRow.getChildCount() > 0) {
+        // 动作按钮**每行两个**。
+        // 三个动作挤在一行时，每个按钮只有约 1/3 屏宽：「加入歌单 / 移出列表」这四个字放不下会被
+        // 折成两行，而「收藏」只有一行 —— 三个按钮看起来大小不一（实机截图确认）。两两成行后按钮
+        // 宽度翻倍，四个字能单行放下，三个按钮也就自然等大了。
+        final int perRow = 2;
+        for (int i = 0; i < actions.size(); i += perRow) {
+            LinearLayout actionRow = new LinearLayout(activity);
+            actionRow.setOrientation(LinearLayout.HORIZONTAL);
+            actionRow.setPadding(0, px(2), 0, 0);
+            int count = 0;
+            for (int j = 0; j < perRow && i + j < actions.size(); j++) {
+                actionRow.addView(buildActionButton(actions.get(i + j)));
+                count++;
+            }
+            if (count == 1) {
+                // 最后一行只剩一个按钮时补等宽占位：与上一行左对齐，且宽度保持一致。
+                // 高度必须写死为 1px —— 裸 View 的高度若给 WRAP_CONTENT，在 AT_MOST 约束下会
+                // 「撑满可用高度」，把这一行、进而整条动作栏顶到全屏高，gravity=BOTTOM 随之失效、
+                // 动作条会跑到屏幕顶部（实机复现并定位）。
+                View spacer = new View(activity);
+                spacer.setLayoutParams(new LinearLayout.LayoutParams(0, px(1), 1f));
+                actionRow.addView(spacer);
+            }
+            // 最后一个动作按钮（或占位）不需要右边距，避免动作栏右侧留白。
             View last = actionRow.getChildAt(actionRow.getChildCount() - 1);
             ViewGroup.LayoutParams raw = last.getLayoutParams();
             if (raw instanceof LinearLayout.LayoutParams) {
                 ((LinearLayout.LayoutParams) raw).rightMargin = 0;
                 last.setLayoutParams(raw);
             }
+            bar.addView(actionRow);
         }
-        bar.addView(actionRow);
 
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+        // 参数必须在 addView 时一起传：先 setLayoutParams 再 addView 在部分容器上会被重新生成，
+        // 结果就是「gravity=BOTTOM」丢失、动作条跑到屏幕顶部（两行版本实机复现）。
+        final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         params.gravity = Gravity.BOTTOM;
-        bar.setLayoutParams(params);
 
-        content.addView(bar);
+        content.addView(bar, params);
         actionBar = bar;
         updateHeaderText();
     }
@@ -342,12 +359,15 @@ public final class MultiSelectController {
         button.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         button.setGravity(Gravity.CENTER);
         button.setPadding(px(16), px(9), px(16), px(9));
+        // 单行 + 截断：保证所有动作按钮高度一致（标签字数不同也不会把某个按钮撑成两行）
+        button.setSingleLine(true);
+        button.setEllipsize(android.text.TextUtils.TruncateAt.END);
         button.setClickable(true);
         button.setFocusable(true);
 
         GradientDrawable background = new GradientDrawable();
         background.setColor(ACTION_BUTTON_BG);
-        background.setCornerRadius(px(6));
+        background.setCornerRadius(UiKit.dp(activity, UiKit.DP_BUTTON_RADIUS));
         button.setBackground(background);
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(

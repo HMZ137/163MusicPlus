@@ -32,6 +32,8 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private static final String PREF_LYRIC_SCROLL_MODE = "lyric_scroll_mode";
     private static final String PREF_LYRIC_RESUME_INTERVAL = "lyric_resume_interval";
     private static final String PREF_SLEEP_TIMER_EXIT_APP = "sleep_timer_exit_app";
+    /** 主页面 OLED 防烧屏：开启后内容周期轻微移位（MainActivity 读取）。 */
+    private static final String PREF_OLED_BURN_PROTECTION = "oled_burn_protection";
     private static final String PREF_SLEEP_TIMER_MODE = "sleep_timer_mode";
     private static final String PREF_FAV_MODE_CLOUD = "fav_mode_cloud";
     private static final int MODE_MANUAL = 0;
@@ -52,7 +54,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
     private SwitchMaterial switchKeepScreenOn;
     private SwitchMaterial switchSleepTimerExitApp;
+    private SwitchMaterial switchOledBurnProtection;
     private SwitchMaterial switchLocalOnlyMode;
+    private SwitchMaterial switchOnlineOnlyMode;
     private TextView tvFavModeValue;
     private TextView tvSleepTimerModeValue;
     private TextView tvSpeedModeValue;
@@ -85,7 +89,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
         switchKeepScreenOn = findViewById(R.id.switch_keep_screen_on);
         switchSleepTimerExitApp = findViewById(R.id.switch_sleep_timer_exit_app);
+        switchOledBurnProtection = findViewById(R.id.switch_oled_burn_protection);
         switchLocalOnlyMode = findViewById(R.id.switch_local_only_mode);
+        switchOnlineOnlyMode = findViewById(R.id.switch_online_only_mode);
         tvFavModeValue = findViewById(R.id.tv_fav_mode_value);
         tvSleepTimerModeValue = findViewById(R.id.tv_sleep_timer_mode_value);
         tvSpeedModeValue = findViewById(R.id.tv_speed_mode_value);
@@ -132,11 +138,38 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 // 必须走 PlaybackMode.setLocalOnly —— 它同时会关掉/还原「收藏走云端」，
                 // 直接写 pref 会漏掉那一步
                 PlaybackMode.setLocalOnly(this, isChecked);
+                // 两种模式互斥：开本地就把「纯在线」关掉（setLocalOnly 内部也会清掉那个键）
+                syncModeSwitches(!isChecked, false);
                 // 收藏模式的值在本地模式下是「锁定」的，切完模式要重新回显一次
                 updateFavModeValue();
                 Toast.makeText(this, isChecked
                                 ? "已切换到本地播放模式，云端功能已隐藏"
                                 : "已切换到云音乐模式",
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (switchOnlineOnlyMode != null) {
+            switchOnlineOnlyMode.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                PlaybackMode.setOnlineOnly(this, isChecked);
+                syncModeSwitches(false, isChecked);
+                updateFavModeValue();
+                Toast.makeText(this, isChecked
+                                ? "已切换到纯在线模式，本地功能已隐藏（下载管理保留）"
+                                : "已退出纯在线模式",
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // OLED 防烧屏：主页面内容周期性轻微移位（MainActivity onResume 时读取生效）
+        if (switchOledBurnProtection != null) {
+            switchOledBurnProtection.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                prefs.edit().putBoolean(PREF_OLED_BURN_PROTECTION, isChecked).apply();
+                Toast.makeText(this,
+                        isChecked ? "已开启 OLED 防烧屏，主页面内容会周期轻微移位"
+                                : "已关闭 OLED 防烧屏",
                         Toast.LENGTH_SHORT).show();
             });
         }
@@ -206,9 +239,12 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         LinearLayout backdropRow = new LinearLayout(this);
         backdropRow.setOrientation(LinearLayout.HORIZONTAL);
         backdropRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        backdropRow.setPadding(dpToPx(16), dpToPx(4), dpToPx(16), dpToPx(4));
+        backdropRow.setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6));
+        // 直角卡片底（与开关行一致）；minHeight 防止放大字号后两行文字被截断
+        backdropRow.setBackground(getResources().getDrawable(R.drawable.bg_card_tile));
+        backdropRow.setMinimumHeight(dpToPx(48));
         backdropRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(48)));
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         LinearLayout backdropText = new LinearLayout(this);
         backdropText.setOrientation(LinearLayout.VERTICAL);
@@ -236,6 +272,93 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         backdropRow.addView(backdropSwitch);
 
         container.addView(backdropRow);
+
+        // 全屏歌词：控制歌词层右上角要不要出现「全屏」按钮（以及那个沉浸页的入口）
+        LinearLayout fullscreenRow = new LinearLayout(this);
+        fullscreenRow.setOrientation(LinearLayout.HORIZONTAL);
+        fullscreenRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        fullscreenRow.setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6));
+        fullscreenRow.setBackground(getResources().getDrawable(
+                com.qinghe.music163pro.R.drawable.bg_card_tile));
+        fullscreenRow.setMinimumHeight(dpToPx(48));
+        fullscreenRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout fullscreenText = new LinearLayout(this);
+        fullscreenText.setOrientation(LinearLayout.VERTICAL);
+        fullscreenText.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView fullscreenTitle = new TextView(this);
+        fullscreenTitle.setText("全屏歌词按钮");
+        fullscreenTitle.setTextColor(getResources().getColor(R.color.text_primary));
+        fullscreenTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        fullscreenText.addView(fullscreenTitle);
+        TextView fullscreenHint = new TextView(this);
+        fullscreenHint.setText("歌词层显示「全屏」按钮，可进入沉浸式大字歌词");
+        fullscreenHint.setTextColor(getResources().getColor(R.color.text_secondary));
+        fullscreenHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        fullscreenText.addView(fullscreenHint);
+        fullscreenRow.addView(fullscreenText);
+        com.google.android.material.switchmaterial.SwitchMaterial fullscreenSwitch =
+                new com.google.android.material.switchmaterial.SwitchMaterial(this);
+        fullscreenSwitch.setChecked(LyricSettings.isFullscreenButtonEnabled(this));
+        fullscreenSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (updatingSwitch) {
+                return;
+            }
+            LyricSettings.setFullscreenButtonEnabled(this, checked);
+        });
+        fullscreenRow.addView(fullscreenSwitch);
+        fullscreenRow.setOnClickListener(v -> fullscreenSwitch.toggle());
+        container.addView(fullscreenRow);
+
+        // 语言学习模式入口：AI 歌词（词性着色 + 无翻译歌曲的 AI 翻译）
+        LinearLayout languageRow = new LinearLayout(this);
+        languageRow.setOrientation(LinearLayout.HORIZONTAL);
+        languageRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        languageRow.setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6));
+        languageRow.setBackground(getResources().getDrawable(
+                com.qinghe.music163pro.R.drawable.bg_card_tile));
+        languageRow.setMinimumHeight(dpToPx(48));
+        languageRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout languageText = new LinearLayout(this);
+        languageText.setOrientation(LinearLayout.VERTICAL);
+        languageText.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView languageTitle = new TextView(this);
+        languageTitle.setText("高级歌词翻译");
+        languageTitle.setTextColor(getResources().getColor(R.color.text_primary));
+        languageTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        languageText.addView(languageTitle);
+        TextView languageHint = new TextView(this);
+        languageHint.setText("歌词词性着色 / 自动翻译；设置在「设置 → 高级歌词翻译」");
+        languageHint.setTextColor(getResources().getColor(R.color.text_secondary));
+        languageHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        languageText.addView(languageHint);
+        languageRow.addView(languageText);
+        // 功能开关留在这里；详细设置（Key / 模型 / 缓存 / 图例）在「设置 → 高级歌词翻译」
+        com.google.android.material.switchmaterial.SwitchMaterial languageSwitch =
+                new com.google.android.material.switchmaterial.SwitchMaterial(this);
+        languageSwitch.setChecked(
+                com.qinghe.music163pro.util.AiLyricSettings.isEnabled(this));
+        languageSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (updatingSwitch) {
+                return;
+            }
+            if (checked && !com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
+                btn.setChecked(false);
+                Toast.makeText(this, "请先在「设置 → 高级歌词翻译」填写 DeepSeek API Key",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            com.qinghe.music163pro.util.AiLyricSettings.setEnabled(this, checked);
+            Toast.makeText(this, checked
+                    ? "已开启高级歌词翻译：歌词按词性着色，缺翻译的歌交给 AI"
+                    : "已关闭（歌词页仍可用「AI」按钮单次激活）", Toast.LENGTH_SHORT).show();
+        });
+        languageRow.addView(languageSwitch);
+        languageRow.setOnClickListener(v -> languageSwitch.toggle());
+        container.addView(languageRow);
 
         lyricFontValues = new TextView[]{originalValue, romajiValue, translationValue};
         refreshLyricFontValues();
@@ -284,9 +407,12 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(dpToPx(16), dpToPx(4), dpToPx(16), dpToPx(4));
+        row.setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6));
+        // 直角卡片底（与开关行一致）；高度用 minHeight 防止放大字号后两行文字被截断
+        row.setBackground(getResources().getDrawable(R.drawable.bg_card_tile));
+        row.setMinimumHeight(dpToPx(48));
         row.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(48)));
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         LinearLayout textColumn = new LinearLayout(this);
         textColumn.setOrientation(LinearLayout.VERTICAL);
@@ -336,8 +462,14 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         updatingSwitch = true;
         switchKeepScreenOn.setChecked(prefs.getBoolean("keep_screen_on", false));
         switchSleepTimerExitApp.setChecked(prefs.getBoolean(PREF_SLEEP_TIMER_EXIT_APP, false));
+        if (switchOledBurnProtection != null) {
+            switchOledBurnProtection.setChecked(prefs.getBoolean(PREF_OLED_BURN_PROTECTION, false));
+        }
         if (switchLocalOnlyMode != null) {
             switchLocalOnlyMode.setChecked(PlaybackMode.isLocalOnly(this));
+            if (switchOnlineOnlyMode != null) {
+                switchOnlineOnlyMode.setChecked(PlaybackMode.isOnlineOnly(this));
+            }
         }
         updatingSwitch = false;
         updateFavModeValue();
@@ -359,6 +491,18 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         prefs.edit().putBoolean(PREF_FAV_MODE_CLOUD, newCloud).apply();
         updateFavModeValue();
         Toast.makeText(this, "收藏模式已切换为: " + (newCloud ? "云端" : "本地"), Toast.LENGTH_SHORT).show();
+    }
+
+    /** 同步两个模式开关的勾选状态（互斥）：一次性设对并用 updatingSwitch 挡住互相触发。 */
+    private void syncModeSwitches(boolean localOnly, boolean onlineOnly) {
+        updatingSwitch = true;
+        if (switchLocalOnlyMode != null) {
+            switchLocalOnlyMode.setChecked(localOnly);
+        }
+        if (switchOnlineOnlyMode != null) {
+            switchOnlineOnlyMode.setChecked(onlineOnly);
+        }
+        updatingSwitch = false;
     }
 
     private void updateFavModeValue() {
