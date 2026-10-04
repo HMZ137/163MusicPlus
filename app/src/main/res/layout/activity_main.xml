@@ -67,7 +67,7 @@
     <LinearLayout
         android:id="@+id/main_content_block"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:layout_below="@id/btn_more"
         android:layout_above="@id/bottom_safe_area"
         android:layout_centerHorizontal="true"
@@ -75,6 +75,23 @@
         android:orientation="vertical"
         android:paddingStart="4dp"
         android:paddingEnd="4dp">
+
+        <!--
+          中间信息区（歌名 / 曲师 / 进度 / 时间）：唯一「可以伸缩」的一段，weight=1。
+
+          为什么必须这样做：本页从头到尾都是按 dp 写死高度的，而手表分辨率不变、**密度会变**
+          （本机从 270 提到 320，同样 44dp 的按钮就长了 18%）。原来整块是 wrap_content
+          再居中，内容总高一旦超过「顶栏按钮 ↔ 底部安全区」这条安全带，底部两行操作按钮
+          就会被顶到带外——表现就是「下三个按钮被挤出去」，密度越高越明显。
+          改成「信息区吸收全部伸缩、两行按钮固定在底部」后，无论密度怎么变，
+          播放控制与音量/功能按钮永远贴在安全区之上。
+        -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
 
         <!--
           歌名：改为「自绘跑马灯」——偏移由 MainActivity 用 scrollTo 每帧驱动，不再用系统
@@ -158,6 +175,8 @@
                 android:text="0:00"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
+        </LinearLayout>
+
         </LinearLayout>
 
         <!-- Playback controls row -->
