@@ -56,6 +56,9 @@ public final class LocalMetadataIndex {
     private static final Object LOCK = new Object();
     private static File cacheFile;
     private static boolean loaded;
+    /** 写盘合并：有改动待写 / 当前是否正在写（见 {@link #scheduleWriteLocked}）。 */
+    private static boolean writePending = false;
+    private static boolean writeScheduled = false;
     /** 路径 → 条目。LinkedHashMap 保序，便于超限时丢最旧的。 */
     private static final Map<String, Entry> entries = new LinkedHashMap<>();
 
@@ -119,9 +122,11 @@ public final class LocalMetadataIndex {
                 return null;
             }
             if (e.size != audio.length() || e.modified != audio.lastModified()) {
-                // 文件被换过：标签和封面都可能已经不同了
+                // 文件被换过：标签和封面都可能已经不同了。
+                // 这里只从内存里丢掉，不写盘 —— 一次扫描里失效的可能是几百首，
+                // 每次都触发全量重写就是灾难（见 scheduleWriteLocked 的说明）。
+                // 本轮扫描结束时 retain()/put() 会把变更一次性合并落盘。
                 entries.remove(path);
-                scheduleWriteLocked();
                 LocalMetadata.invalidateCoverCache(context.getApplicationContext(), path);
                 return null;
             }
@@ -238,15 +243,53 @@ public final class LocalMetadataIndex {
         }
     }
 
-    /** 落盘：缓存可重建，写失败只记日志，不影响主流程。写盘放后台线程。 */
+    /**
+     * 落盘：**合并去抖**，而不是「每次改动都起一个线程重写全量」。
+     *
+     * <p>为什么必须合并：一次全量重扫（换了 400 多首歌）会连续调用几百次 put，
+     * 旧写法等于开几百个线程、每个都把整份索引（100KB 级）重新序列化写盘 ——
+     * 在手表上是纯粹的 CPU/IO 风暴，还会把并发的小快照写回去，导致索引被截断成
+     * 「只有前几首」，下一轮又变成全量 miss，于是每切一次页面就重来一遍。</p>
+     *
+     * <p>现在：至多一个写线程在跑，期间的新改动只置 dirty；跑完若 dirty 就再写一轮
+     * （写入的是当时最新的快照，所以最后落盘的一定是完整的）。</p>
+     */
     private static void scheduleWriteLocked() {
-        final List<Entry> snapshot = new ArrayList<>(entries.values());
-        final File target = cacheFile;
-        if (target == null) {
-            return;
+        writePending = true;
+        if (writeScheduled) {
+            return;     // 已经排了一轮，等它跑完自然会带上这次改动
         }
-        new Thread(() -> writeFile(target, snapshot), "LocalMetadataIndex-write").start();
+        writeScheduled = true;
+        WRITE_EXECUTOR.execute(() -> {
+            while (true) {
+                List<Entry> snapshot;
+                File target;
+                synchronized (LOCK) {
+                    if (!writePending) {
+                        writeScheduled = false;
+                        return;
+                    }
+                    writePending = false;
+                    snapshot = new ArrayList<>(entries.values());
+                    target = cacheFile;
+                }
+                if (target != null) {
+                    writeFile(target, snapshot);
+                }
+            }
+        });
     }
+
+    /**
+     * 单线程写盘执行器：常驻一个 MIN_PRIORITY 线程，空闲时几乎不耗电。
+     * 用它而不是「每次改动 new Thread」：后者会在一次全量重扫里开出几百个线程。
+     */
+    private static final java.util.concurrent.ExecutorService WRITE_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "LocalMetadataIndex-write");
+                t.setPriority(Thread.MIN_PRIORITY);
+                return t;
+            });
 
     private static void writeFile(File target, List<Entry> snapshot) {
         try {

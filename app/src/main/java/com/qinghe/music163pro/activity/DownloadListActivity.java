@@ -51,6 +51,14 @@ public class DownloadListActivity extends BaseWatchActivity {
     private static final long REFRESH_INTERVAL_MS = 1000L;
 
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    /** 加载代数：读盘在后台跑，连续触发时只认最后一次的结果。 */
+    private int loadGeneration = 0;
+    private static final java.util.concurrent.ExecutorService LOAD_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "downloads-load");
+                t.setPriority(Thread.MIN_PRIORITY);
+                return t;
+            });
     private final Runnable refreshTick = new Runnable() {
         @Override
         public void run() {
@@ -170,7 +178,6 @@ public class DownloadListActivity extends BaseWatchActivity {
         }
 
         loadDownloads();
-        updateEmptyState();
     }
 
     @Override
@@ -349,33 +356,57 @@ public class DownloadListActivity extends BaseWatchActivity {
         });
     }
 
+    /**
+     * 重新加载下载列表。
+     *
+     * <p><b>必须放后台线程</b>：每个下载目录都要打开读一遍 info.json（没有 info.json 的
+     * 还要 listDirectory + 按名字解析），本机 357 首就是 357 次磁盘读。全放主线程时
+     * 实测卡死 11 秒触发 ANR（logcat: Completed ANR in 11154ms），系统随后
+     * Force finishing 本页面 —— 用户看到的就是「进下载列表卡很久、然后闪退回上一页」。</p>
+     *
+     * <p>用 {@link #loadGeneration} 丢弃过期结果：onCreate 与 onResume 都会调它，
+     * 快速来回切页时只有最后一次的结果会落地。</p>
+     */
     private void loadDownloads() {
-        downloadedSongs.clear();
+        final int generation = ++loadGeneration;
+        updateEmptyState();
+        LOAD_EXECUTOR.execute(() -> {
+            List<Song> loaded = new ArrayList<>();
+            // Load from new subfolder format (with info.json)
+            try {
+                List<File> songDirs = DownloadManager.getDownloadedSongDirs();
+                for (File dir : songDirs) {
+                    Song song = DownloadManager.loadSongInfo(dir);
+                    if (song != null) {
+                        song.setForceLocalPlayback(true);
+                        loaded.add(song);
+                    }
+                }
 
-        // Load from new subfolder format (with info.json)
-        List<File> songDirs = DownloadManager.getDownloadedSongDirs();
-        for (File dir : songDirs) {
-            Song song = DownloadManager.loadSongInfo(dir);
-            if (song != null) {
-                song.setForceLocalPlayback(true);
-                downloadedSongs.add(song);
+                // Load legacy flat .mp3 files (backward compatibility)
+                List<File> legacyFiles = DownloadManager.getDownloadedFiles();
+                for (File file : legacyFiles) {
+                    loaded.add(fileToSong(file));
+                }
+            } catch (Throwable ignored) {
+                // 单个下载目录读失败不该让整页空掉：已经读到的部分照常显示
             }
-        }
-
-        // Load legacy flat .mp3 files (backward compatibility)
-        List<File> legacyFiles = DownloadManager.getDownloadedFiles();
-        for (File file : legacyFiles) {
-            Song song = fileToSong(file);
-            downloadedSongs.add(song);
-        }
-
-        if (adapter != null) {
-            adapter.notifyDataSetChanged();
-        }
-        updateTitleText();
-
-        // Fetch covers from network for songs without covers (legacy downloads)
-        fetchMissingCovers();
+            final List<Song> result = loaded;
+            refreshHandler.post(() -> {
+                if (generation != loadGeneration || isFinishing() || isDestroyed()) {
+                    return;   // 已被更新的一次加载取代，或页面已关
+                }
+                downloadedSongs.clear();
+                downloadedSongs.addAll(result);
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
+                updateTitleText();
+                updateEmptyState();
+                // Fetch covers from network for songs without covers (legacy downloads)
+                fetchMissingCovers();
+            });
+        });
     }
 
     /**

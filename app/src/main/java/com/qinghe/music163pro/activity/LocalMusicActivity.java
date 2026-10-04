@@ -294,7 +294,8 @@ public class LocalMusicActivity extends BaseWatchActivity {
                     allSongs.addAll(cachedSongs);
                     scanStatus = "已显示缓存 · 校验中…";
                     updateStatusRow();
-                    applySearch(searchQuery);
+                    // 不排序：缓存顺序即上次排好的，等走完目录自然会排一次
+                    applySearch(searchQuery, false);
                     updateEmptyState();
                 });
             }
@@ -1098,6 +1099,15 @@ public class LocalMusicActivity extends BaseWatchActivity {
      * 传空串等于清除搜索、恢复全量。
      */
     private void applySearch(String query) {
+        applySearch(query, true);
+    }
+
+    /**
+     * @param sort 是否重排。排序在主线程，而它比的是<b>逐字 GBK 拼音</b>（ScriptSort.sortKeyOf），
+     *              几百首就是几千次字符级转写 —— 本机实测一趟要数秒。缓存首屏那一趟刻意传 false：
+     *              缓存里的顺序本来就是上次排好的，几秒后走完目录还会再排一次，不必排两遍。
+     */
+    private void applySearch(String query, boolean sort) {
         searchQuery = query == null ? "" : query;
         localSongs.clear();
         if (searchQuery.isEmpty()) {
@@ -1110,7 +1120,9 @@ public class LocalMusicActivity extends BaseWatchActivity {
                 }
             }
         }
-        sortAndIndex();
+        if (sort) {
+            sortAndIndex();
+        }
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
