@@ -57,6 +57,22 @@ public class DownloadManager {
     private static final String LYRICS_FILE = "lyrics.lrc";
     private static final String ROMALRC_FILE = "romalrc.lrc";
     private static final String COVER_FILE = "cover.jpg";
+
+    /**
+     * 媒体扫描器的「跳过此目录」标记。
+     *
+     * <p><b>为什么必须有它：</b>每个下载目录里的 {@code cover.jpg} 是给 App 自己展示用的
+     * 专辑封面，但 Android 的媒体扫描器只按扩展名判断，会把它们全部收进相册 ——
+     * 下载几十首歌，相册里就多出几十张一模一样的方形封面图，翻照片时非常碍事。
+     * 一个 {@code .nomedia} 文件能让扫描器跳过所在目录**及其整棵子树**，
+     * 从根上阻止封面被收录。</p>
+     *
+     * <p>放在 {@code 163Music/Download/} 根下（而不是每首歌的目录里）：既省事，
+     * 又顺带避免系统音乐库把下载的歌重复收录一遍。本 App 的本地歌曲走自己的目录扫描
+     * （见 {@code LocalMusicActivity}）、铃声走直接插入 MediaStore，都不依赖媒体库，
+     * 因此屏蔽扫描不影响任何功能。</p>
+     */
+    private static final String NOMEDIA_FILE = ".nomedia";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -404,6 +420,9 @@ public class DownloadManager {
                     return;
                 }
             }
+            // 保证下载树对媒体扫描不可见：否则 cover.jpg 会被相册收录，
+            // 下载几十首歌相册里就多出几十张封面图。
+            ensureNoMediaMarker();
 
             File outputParent = bilibili ? songDir : getQualityDir(songDir, quality);
             if (!outputParent.exists() && !outputParent.mkdirs()) {
@@ -722,6 +741,50 @@ public class DownloadManager {
             cachedDownloadRootPath = cached;
         }
         return cached;
+    }
+
+    // ==================== 媒体扫描屏蔽（相册不再收录封面） ====================
+
+    /**
+     * 确保下载根目录下存在 {@link #NOMEDIA_FILE}，让媒体扫描器跳过整棵下载树。
+     *
+     * <p>幂等且廉价（只 stat 一次），可以在每次写下载文件前放心调用。
+     * 注意<b>不能</b>把 {@code .nomedia} 写进单首歌的目录：那是下一层的标记，
+     * 而扫描器只认「向上最近的标记」，写在根上才能覆盖全部歌曲目录，
+     * 也免去每下载一首就多一个标记文件。</p>
+     *
+     * @return 本次是否新创建了标记文件
+     */
+    public static boolean ensureNoMediaMarker() {
+        File root = new File(Environment.getExternalStorageDirectory(), DOWNLOAD_DIR);
+        if (!root.exists() && !root.mkdirs()) {
+            return false;
+        }
+        File marker = new File(root, NOMEDIA_FILE);
+        if (marker.exists()) {
+            return false;
+        }
+        try {
+            // 内容留空即可，扫描器只判断文件是否存在
+            if (marker.createNewFile()) {
+                Log.i(TAG, "已创建 " + marker.getAbsolutePath() + "，媒体扫描将跳过下载目录");
+                return true;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "创建 .nomedia 失败", e);
+        }
+        return false;
+    }
+
+    /** 下载根目录下是否已有 {@link #NOMEDIA_FILE} 标记。 */
+    public static boolean hasNoMediaMarker() {
+        return new File(new File(Environment.getExternalStorageDirectory(), DOWNLOAD_DIR),
+                NOMEDIA_FILE).exists();
+    }
+
+    /** 下载根目录（供媒体扫描刷新等外部逻辑使用）。 */
+    public static File getDownloadRoot() {
+        return new File(Environment.getExternalStorageDirectory(), DOWNLOAD_DIR);
     }
 
     /**

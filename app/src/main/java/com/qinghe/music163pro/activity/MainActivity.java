@@ -67,6 +67,8 @@ import com.google.android.material.button.MaterialButton;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements MusicPlayerManager.PlayerCallback {
 
@@ -268,6 +270,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         // Initialize file logging
         MusicLog.init(new File("/sdcard/163Music"));
+
+        // 让相册别再收下载下来的封面：在下载根目录放 .nomedia，
+        // 并清掉**已经**被收录进相册的历史封面记录。放后台线程，不拖启动。
+        new Thread(this::applyMediaVisibilityFix).start();
 
         // 本地封面缓存自动回收（上限 20MB）：放后台线程，别拖慢启动。
         // 以前这里只增不减，实机一度涨到 95MB —— 用户反馈的「缓存动辄百 M」就是它。
@@ -1543,6 +1549,103 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 updateChorusMarker(playerManager.getDuration());
             }
         });
+    }
+
+    /**
+     * 让下载目录对系统媒体库「隐身」，把封面从相册里清出去。
+     *
+     * <p><b>要解决的问题：</b>每首下载的歌都会在
+     * {@code /sdcard/163Music/Download/<歌名>/cover.jpg} 存一份专辑封面（App 自己展示用），
+     * 但 Android 媒体扫描器只认扩展名，会把这几十张方形封面当成照片收进相册，
+     * 翻照片时被它们淹没。</p>
+     *
+     * <p><b>两步处理：</b></p>
+     * <ol>
+     *   <li>在下载根目录放 {@code .nomedia} —— 扫描器会跳过该目录及其整棵子树，
+     *       以后新下载的封面不再被收录；</li>
+     *   <li>若本次是新创建标记（说明升级前已有一批封面被收录），再<b>主动删除</b>
+     *       媒体库里指向下载目录下图片的记录。之所以不偷懒只发一次目录扫描通知：
+     *       各家 ROM 的扫描器对「目录路径 + .nomedia」的处理并不一致，有的只刷一层、
+     *       有的干脆忽略目录参数；直接按路径前缀删记录，效果确定。</li>
+     * </ol>
+     *
+     * <p>只做一次（靠 {@code .nomedia} 是否存在判断），后续启动直接短路。
+     * 整个过程在后台线程执行。</p>
+     */
+    private void applyMediaVisibilityFix() {
+        try {
+            boolean created = DownloadManager.ensureNoMediaMarker();
+            if (!created) {
+                if (!DownloadManager.hasNoMediaMarker()) {
+                    MusicLog.w("MediaFix", "无法创建 .nomedia，相册仍会收录封面");
+                }
+                return;   // 标记已存在，历史封面也早已清过，不必重复扫库
+            }
+            File root = DownloadManager.getDownloadRoot();
+            String rootPath = root.getAbsolutePath();
+            MusicLog.i("MediaFix", "已放置 .nomedia，开始清理相册里的历史封面: " + rootPath);
+            int removed = purgeImagesUnder(rootPath);
+            MusicLog.i("MediaFix", "媒体库中已移除下载目录下的图片记录 " + removed + " 条");
+            // 兜底：再让系统重扫一次该目录（新机型能借此把缩略图缓存一并刷新）
+            android.media.MediaScannerConnection.scanFile(
+                    getApplicationContext(), new String[]{rootPath}, null, null);
+        } catch (Throwable t) {
+            MusicLog.w("MediaFix", "媒体可见性处理失败: " + t);
+        }
+    }
+
+    /**
+     * 删除媒体库中所有位于 {@code pathPrefix} 之下的图片记录（只动库里的索引，不删文件）。
+     *
+     * <p>查询走 {@code DATA LIKE} —— 它是唯一能按「路径前缀」过滤的字段。
+     * API 29 起 {@code DATA} 虽然被标记废弃，但读写仍然有效（只是不再保证与
+     * 真实路径一致），对这里「筛出下载目录下的图」够用；拿到的 id 再逐条 delete，
+     * 失败不会抛到调用方。</p>
+     *
+     * @return 实际删除的记录条数
+     */
+    private int purgeImagesUnder(String pathPrefix) {
+        int removed = 0;
+        try {
+            android.content.ContentResolver cr = getContentResolver();
+            android.net.Uri collection = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+            String[] projection = {android.provider.MediaStore.Images.Media._ID,
+                    android.provider.MediaStore.Images.Media.DATA};
+            String selection = android.provider.MediaStore.Images.Media.DATA + " LIKE ?";
+            String[] args = {pathPrefix + "/%"};
+            try (android.database.Cursor cursor = cr.query(
+                    collection, projection, selection, args, null)) {
+                if (cursor == null) {
+                    return 0;
+                }
+                List<Long> ids = new ArrayList<>();
+                int dataIdx = cursor.getColumnIndex(android.provider.MediaStore.Images.Media.DATA);
+                int idIdx = cursor.getColumnIndex(android.provider.MediaStore.Images.Media._ID);
+                if (idIdx < 0) {
+                    return 0;
+                }
+                while (cursor.moveToNext()) {
+                    String data = dataIdx >= 0 ? cursor.getString(dataIdx) : null;
+                    // LIKE 只保证前缀匹配，这里再核对一次，避免误删同前缀的其它目录
+                    if (data != null && data.startsWith(pathPrefix + "/")) {
+                        ids.add(cursor.getLong(idIdx));
+                    }
+                }
+                for (Long id : ids) {
+                    android.net.Uri uri = android.content.ContentUris.withAppendedId(collection, id);
+                    try {
+                        if (cr.delete(uri, null, null) > 0) {
+                            removed++;
+                        }
+                    } catch (Throwable ignored) {
+                        // 单条删不掉（不是本应用拥有的记录）就跳过，别中断整批
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            MusicLog.w("MediaFix", "清理媒体库记录失败: " + t);
+        }
+        return removed;
     }
 
     private void clearChorusInfo() {
