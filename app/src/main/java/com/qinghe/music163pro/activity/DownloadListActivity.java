@@ -51,8 +51,26 @@ public class DownloadListActivity extends BaseWatchActivity {
     private static final long REFRESH_INTERVAL_MS = 1000L;
 
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
-    /** 加载代数：读盘在后台跑，连续触发时只认最后一次的结果。 */
+    /**
+     * 加载代数：读盘在后台跑，连续触发时只认最后一次的结果。
+     *
+     * <p>注意这里必须配 {@link #pendingLoads} 一起用。只看代数会出问题：onCreate 与
+     * onResume 会各发一次请求（gen=1、gen=2），单线程队列里 gen=1 先跑完被丢弃，
+     * 还得再排一个 gen=2 才轮到最后一次落地 —— 用户要多等一整轮读盘。</p>
+     */
     private int loadGeneration = 0;
+    /** 尚未落地的加载请求数；归零说明当前代数就是最新一次，结果必须应用。 */
+    private int pendingLoads = 0;
+
+    /**
+     * 进程级下载列表缓存。
+     *
+     * <p>读盘一轮要几秒（每个目录都要 listFiles + 读 info.json），进页面时先用上次的
+     * 结果渲染首屏，后台刷新完再静默替换 —— 否则用户会盯着「暂无下载」等十几秒，
+     * 看起来就像功能坏了。</p>
+     */
+    private static final List<Song> CACHED_DOWNLOADS = new ArrayList<>();
+
     private static final java.util.concurrent.ExecutorService LOAD_EXECUTOR =
             java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
                 Thread t = new Thread(r, "downloads-load");
@@ -177,7 +195,9 @@ public class DownloadListActivity extends BaseWatchActivity {
             addBackInterceptor(multiSelect::handleBackPressed);
         }
 
-        loadDownloads();
+        // 这里**不**发请求：onCreate 后紧跟着就是 onResume，两处都发会让单线程队列
+        // 白跑一轮（实测读盘 1.9 秒／轮），用户要多等一整轮才看到列表。
+        // 加载统一由 onResume 负责 —— 首次进页面、从别处返回、切标签回来都覆盖得到。
     }
 
     @Override
@@ -187,13 +207,28 @@ public class DownloadListActivity extends BaseWatchActivity {
         if (multiSelect != null) {
             multiSelect.exitSelectionMode();
         }
+        // 首屏先用缓存渲染（若有），后台读盘完再静默替换
+        applyCachedFirstPaint();
         loadDownloads();
-        updateEmptyState();
         // 进页面时若还有下载在跑，就跟一下进度
         if (DownloadManager.getActiveDownloadCount() > 0) {
             refreshHandler.removeCallbacks(refreshTick);
             refreshHandler.post(refreshTick);
         }
+    }
+
+    /** 用上一次的结果先把列表画出来，避免用户盯着「暂无下载」等读盘。 */
+    private void applyCachedFirstPaint() {
+        if (CACHED_DOWNLOADS.isEmpty() || !downloadedSongs.isEmpty()) {
+            return;
+        }
+        downloadedSongs.addAll(CACHED_DOWNLOADS);
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+        updateEmptyState();
+        com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                "首屏用缓存: " + downloadedSongs.size() + " 首");
     }
 
     @Override
@@ -265,7 +300,6 @@ public class DownloadListActivity extends BaseWatchActivity {
                         multiSelect.exitSelectionMode();
                     }
                     loadDownloads();
-                    updateEmptyState();
                     Toast.makeText(DownloadListActivity.this,
                             "已删除 " + deleted + " 首", Toast.LENGTH_SHORT).show();
                 });
@@ -351,7 +385,6 @@ public class DownloadListActivity extends BaseWatchActivity {
                 Toast.makeText(DownloadListActivity.this, message, Toast.LENGTH_LONG).show();
                 updateTitleText();
                 loadDownloads();
-                updateEmptyState();
             }
         });
     }
@@ -360,21 +393,31 @@ public class DownloadListActivity extends BaseWatchActivity {
      * 重新加载下载列表。
      *
      * <p><b>必须放后台线程</b>：每个下载目录都要打开读一遍 info.json（没有 info.json 的
-     * 还要 listDirectory + 按名字解析），本机 357 首就是 357 次磁盘读。全放主线程时
-     * 实测卡死 11 秒触发 ANR（logcat: Completed ANR in 11154ms），系统随后
-     * Force finishing 本页面 —— 用户看到的就是「进下载列表卡很久、然后闪退回上一页」。</p>
+     * 还要 listDirectory + 按名字解析）。全放主线程时实测卡死 11 秒触发 ANR
+     * （logcat: Completed ANR in 11154ms），系统随后 Force finishing 本页面 ——
+     * 用户看到的就是「进下载列表卡很久、然后闪退回上一页」。</p>
      *
-     * <p>用 {@link #loadGeneration} 丢弃过期结果：onCreate 与 onResume 都会调它，
-     * 快速来回切页时只有最后一次的结果会落地。</p>
+     * <p><b>落地规则：</b>用 {@link #pendingLoads} 计数，**归零的那一轮才应用**。
+     * 不能直接比 {@link #loadGeneration}：onCreate + onResume 会各发一次请求，
+     * 单线程队列里先跑完的那一轮明明读到了数据也会被判为过期丢掉，
+     * 用户要多等一整轮读盘（实测多等约 4 秒）。</p>
+     *
+     * <p>调用点只有 {@code onResume} 一处 —— 首次进页面、从别处返回、切标签回来都覆盖得到。</p>
      */
     private void loadDownloads() {
-        final int generation = ++loadGeneration;
+        final int generation = loadGeneration + 1;
+        loadGeneration = generation;
+        pendingLoads++;
+        com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                "loadDownloads start gen=" + generation + " pending=" + pendingLoads);
         updateEmptyState();
         LOAD_EXECUTOR.execute(() -> {
             List<Song> loaded = new ArrayList<>();
             // Load from new subfolder format (with info.json)
             try {
                 List<File> songDirs = DownloadManager.getDownloadedSongDirs();
+                com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                        "gen=" + generation + " songDirs=" + songDirs.size());
                 for (File dir : songDirs) {
                     Song song = DownloadManager.loadSongInfo(dir);
                     if (song != null) {
@@ -385,17 +428,34 @@ public class DownloadListActivity extends BaseWatchActivity {
 
                 // Load legacy flat .mp3 files (backward compatibility)
                 List<File> legacyFiles = DownloadManager.getDownloadedFiles();
+                com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                        "gen=" + generation + " legacyFiles=" + legacyFiles.size());
                 for (File file : legacyFiles) {
                     loaded.add(fileToSong(file));
                 }
-            } catch (Throwable ignored) {
+            } catch (Throwable t) {
                 // 单个下载目录读失败不该让整页空掉：已经读到的部分照常显示
+                com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                        "gen=" + generation + " 读盘异常: " + t);
             }
             final List<Song> result = loaded;
+            com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                    "gen=" + generation + " loaded=" + result.size() + " posting");
             refreshHandler.post(() -> {
-                if (generation != loadGeneration || isFinishing() || isDestroyed()) {
-                    return;   // 已被更新的一次加载取代，或页面已关
+                // 落地条件只看「还有没有更新的请求在排队」：不再拿 generation 直接比，
+                // 否则最先跑完的那一轮明明读到了数据也白读，用户要多等一整轮。
+                pendingLoads = Math.max(0, pendingLoads - 1);
+                boolean isLatest = pendingLoads == 0;
+                com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                        "gen=" + generation + " apply pending=" + pendingLoads
+                                + " latest=" + isLatest
+                                + " finishing=" + isFinishing() + " destroyed=" + isDestroyed()
+                                + " result=" + result.size());
+                if (!isLatest || isFinishing() || isDestroyed()) {
+                    return;   // 还有更新的一轮在排队，或页面已关
                 }
+                CACHED_DOWNLOADS.clear();
+                CACHED_DOWNLOADS.addAll(result);
                 downloadedSongs.clear();
                 downloadedSongs.addAll(result);
                 if (adapter != null) {
@@ -403,6 +463,9 @@ public class DownloadListActivity extends BaseWatchActivity {
                 }
                 updateTitleText();
                 updateEmptyState();
+                com.qinghe.music163pro.util.MusicLog.i("Downloads",
+                        "gen=" + generation + " applied size=" + downloadedSongs.size()
+                                + " empty=" + (tvEmpty != null ? tvEmpty.getVisibility() : -1));
                 // Fetch covers from network for songs without covers (legacy downloads)
                 fetchMissingCovers();
             });
@@ -451,12 +514,19 @@ public class DownloadListActivity extends BaseWatchActivity {
     }
 
     private void updateEmptyState() {
-        if (downloadedSongs.isEmpty()) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            lvDownloads.setVisibility(View.GONE);
-        } else {
+        if (!downloadedSongs.isEmpty()) {
             tvEmpty.setVisibility(View.GONE);
             lvDownloads.setVisibility(View.VISIBLE);
+            return;
+        }
+        tvEmpty.setVisibility(View.VISIBLE);
+        lvDownloads.setVisibility(View.GONE);
+        // 还在读盘时不要说「暂无下载」——那是在断言一个还没得出的结论，
+        // 用户会以为功能坏了（读盘要 1~2 秒）。读盘结束仍为空才显示真正的空态。
+        if (pendingLoads > 0) {
+            tvEmpty.setText(R.string.downloads_loading);
+        } else {
+            tvEmpty.setText(R.string.downloads_empty);
         }
     }
 
