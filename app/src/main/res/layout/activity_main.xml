@@ -108,6 +108,7 @@
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:gravity="center"
+            android:includeFontPadding="false"
             android:marqueeRepeatLimit="marquee_forever"
             android:singleLine="true"
             android:text="@string/no_song"
@@ -122,6 +123,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:gravity="center"
+            android:includeFontPadding="false"
             android:singleLine="true"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
@@ -133,11 +135,20 @@
           时间标签仍保持"固定宽度"：宽度不变时 setText 只重绘、不触发布局，
           这样主页歌名的 marquee 才不会因播放中的每秒刷新被重置回行首。
         -->
+        <!--
+          进度条高度必须「收口」：SeekBar 是 wrap_content 时，其可绘制(thumb+track)自带的
+          上下留白会把剩余空间全部吃掉 —— 实测它独占 36px 后，紧挨着的时间行被压成 0px。
+          这里显式限定高度，让进度条只拿它该拿的那一份，剩余空间留给时间标签。
+        -->
         <SeekBar
             android:id="@+id/seek_bar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="20dp"
+            android:maxHeight="20dp"
+            android:minHeight="20dp"
             android:max="100"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
             android:progress="0"
             android:progressTint="@color/colorPrimary"
             android:thumbTint="@color/colorPrimary" />
@@ -145,16 +156,27 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:minHeight="18dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <!--
+              时间标签宽度不再写死 34dp（那是 density=270 时的经验值，320 下会裁掉数字）：
+              改为 wrap_content + minWidth。宽度仍相对稳定（0:00 与 12:34 宽度差极小），
+              不会因为每秒 setText 触发布局把歌名跑马灯冲回行首。
+            -->
             <TextView
                 android:id="@+id/tv_current_time"
-                android:layout_width="34dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="34dp"
+                android:minHeight="16dp"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
                 android:fontFeatureSettings="tnum"
                 android:includeFontPadding="false"
                 android:gravity="center"
+                android:singleLine="true"
                 android:text="0:00"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
@@ -167,11 +189,16 @@
 
             <TextView
                 android:id="@+id/tv_total_time"
-                android:layout_width="34dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:minWidth="34dp"
+                android:minHeight="16dp"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
                 android:fontFeatureSettings="tnum"
                 android:includeFontPadding="false"
                 android:gravity="center"
+                android:singleLine="true"
                 android:text="0:00"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
@@ -180,19 +207,20 @@
         </LinearLayout>
 
         <!-- Playback controls row -->
+        <!-- 高度 44->40dp、上间距 3->2dp：给上方信息区让出空间（高密度下时间标签行曾被压成 0px） -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="2dp"
             android:gravity="center"
             android:orientation="horizontal">
 
             <ImageView
                 android:id="@+id/btn_prev"
                 android:layout_width="54dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_marginEnd="5dp"
-                android:padding="11dp"
+                android:padding="10dp"
                 android:src="@drawable/ic_skip_previous"
                 android:alpha="0.87"
                 android:clickable="true"
@@ -201,10 +229,10 @@
             <ImageView
                 android:id="@+id/btn_play"
                 android:layout_width="54dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_marginStart="5dp"
                 android:layout_marginEnd="5dp"
-                android:padding="9dp"
+                android:padding="8dp"
                 android:src="@drawable/ic_play_arrow"
                 android:alpha="1.0"
                 android:clickable="true"
@@ -213,9 +241,9 @@
             <ImageView
                 android:id="@+id/btn_next"
                 android:layout_width="54dp"
-                android:layout_height="44dp"
+                android:layout_height="40dp"
                 android:layout_marginStart="5dp"
-                android:padding="11dp"
+                android:padding="10dp"
                 android:src="@drawable/ic_skip_next"
                 android:alpha="0.87"
                 android:clickable="true"
@@ -223,20 +251,20 @@
         </LinearLayout>
 
         <!-- Volume / function controls row -->
-        <!-- 底部留出间距：原来这一行紧贴下方安全区（只差约 7px），在圆角屏上看着「粘在边框上」 -->
+        <!-- 高度 38->34dp、上下间距收紧：同样是为信息区让位，同时仍保证 >=34dp 的可点区域 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="1dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <ImageView
                 android:id="@+id/btn_vol_down"
                 android:layout_width="46dp"
-                android:layout_height="38dp"
-                android:padding="10dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
                 android:src="@drawable/ic_volume_down"
                 android:alpha="0.6"
                 android:clickable="true"
@@ -251,8 +279,8 @@
             <ImageView
                 android:id="@+id/btn_favorite"
                 android:layout_width="46dp"
-                android:layout_height="38dp"
-                android:padding="10dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
                 android:src="@drawable/ic_more_horiz"
                 android:clickable="true"
                 android:focusable="true" />
@@ -265,8 +293,8 @@
             <ImageView
                 android:id="@+id/btn_vol_up"
                 android:layout_width="46dp"
-                android:layout_height="38dp"
-                android:padding="10dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
                 android:src="@drawable/ic_volume_up"
                 android:alpha="0.6"
                 android:clickable="true"
