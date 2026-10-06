@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -77,6 +78,22 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         root.setBackgroundColor(0xFF121212);
         root.setPadding(px(8), px(6), px(8), px(6));
         setContentView(root);
+
+        // ── 可滚动的头部：头像 / 名字 / 统计 / 简介 / 切换按钮 / 相似歌手 ──
+        // 这些内容以前直接挂在 root 上，是「固定」的：在 378×496 的表盘上，
+        // 它们连同顶栏一起把歌曲列表挤到只剩两三行（几乎看不见作品）。
+        // 现在统一装进 ListView 的 header view，随列表一起滚 —— 往下滑一次
+        // 头部让开，整屏都留给作品列表。
+        //
+        // 两个必须遵守的约束：
+        //   1) addHeaderView 必须在 setAdapter 之前调用；
+        //   2) header 自身的 LayoutParams 必须是 AbsListView.LayoutParams
+        //      （ListView 内部按该类型取尺寸/强转，用 LinearLayout.LayoutParams 会 class cast）。
+        LinearLayout listHeader = new LinearLayout(this);
+        listHeader.setOrientation(LinearLayout.VERTICAL);
+        listHeader.setLayoutParams(new AbsListView.LayoutParams(
+                AbsListView.LayoutParams.MATCH_PARENT,
+                AbsListView.LayoutParams.WRAP_CONTENT));
 
         // ── 顶栏：返回占位 + 标题 + 收藏 ──
         android.widget.RelativeLayout titleBar = new android.widget.RelativeLayout(this);
@@ -165,7 +182,7 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         infoCol.addView(tvStat);
 
         header.addView(infoCol);
-        root.addView(header);
+        listHeader.addView(header);
 
         // ── 简介（最多 4 行）──
         tvDesc = new TextView(this);
@@ -175,7 +192,7 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         tvDesc.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tvDesc.setPadding(px(6), 0, px(6), px(4));
         tvDesc.setVisibility(View.GONE);
-        root.addView(tvDesc);
+        listHeader.addView(tvDesc);
 
         // ── 切换：热门 50 首 / 全部歌曲 ──
         LinearLayout switchRow = new LinearLayout(this);
@@ -193,7 +210,7 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         btnLp1.setMarginEnd(px(6));
         switchRow.addView(btnHot, btnLp1);
         switchRow.addView(btnAll);
-        root.addView(switchRow);
+        listHeader.addView(switchRow);
 
         btnHot.setOnClickListener(v -> switchMode(0));
         btnAll.setOnClickListener(v -> switchMode(1));
@@ -215,7 +232,7 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         btnSimilar.setOnClickListener(v -> openSimilarArtists());
         similarRow.addView(btnSimilar, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        root.addView(similarRow);
+        listHeader.addView(similarRow);
 
         // ── 歌曲列表 ──
         lvSongs = new ListView(this);
@@ -223,6 +240,12 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         lvSongs.setDividerHeight(0);
         lvSongs.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        // header 里的「热门 50 首 / 全部歌曲 / 相似歌手」是可点按钮。
+        // ListView 默认 itemsCanFocus=false，会屏蔽子视图的点击 —— 必须打开，
+        // 否则这些按钮全部失效。列表行（item_song 根布局）本身不可聚焦，
+        // 所以打开后歌曲行的点击回调照常触发，两者互不干扰。
+        lvSongs.setItemsCanFocus(true);
+        lvSongs.addHeaderView(listHeader, null, false);   // 必须在 setAdapter 之前
         adapter = new SongAdapter();
         lvSongs.setAdapter(adapter);
         lvSongs.setOnItemClickListener((parent, view, position, id) -> playFrom(position));
@@ -338,11 +361,15 @@ public class ArtistDetailActivity extends BaseWatchActivity {
 
     /** 以歌手页列表为播放队列开始播放。 */
     private void playFrom(int position) {
-        if (songs.isEmpty() || position < 0 || position >= songs.size()) {
+        // 头部已作为 ListView 的 header view，占掉位置 0..n-1：
+        // onItemClick 回调里的 position 是「含 header 的绝对位置」，必须先扣除，
+        // 否则点第 1 首会播成第 2 首（经典的 header 偏移一位 bug）。
+        int dataPosition = position - lvSongs.getHeaderViewsCount();
+        if (songs.isEmpty() || dataPosition < 0 || dataPosition >= songs.size()) {
             return;
         }
         List<Song> playlist = new ArrayList<>(songs);
-        playerManager.setPlaylistFromSource(playlist, position,
+        playerManager.setPlaylistFromSource(playlist, dataPosition,
                 0L, artistName == null ? "歌手" : artistName, playlist.size(),
                 artistName == null ? "" : artistName, 0, false);
         playerManager.playCurrent();
