@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -50,6 +51,13 @@ public class ArtistDetailActivity extends BaseWatchActivity {
     private TextView btnHot;
     private TextView btnAll;
     private TextView btnSimilar;
+
+    /** 头部里「原位」的切换行（随列表滚动）。同时用于计算吸顶时机。 */
+    private LinearLayout switchRow;
+    /** 叠在列表上方的吸顶副本；头部里那份滚出顶部时显示。 */
+    private LinearLayout stickyTabsRow;
+    private TextView btnHotSticky;
+    private TextView btnAllSticky;
 
     private ListView lvSongs;
     private SongAdapter adapter;
@@ -194,8 +202,12 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         tvDesc.setVisibility(View.GONE);
         listHeader.addView(tvDesc);
 
-        // ── 切换：热门 50 首 / 全部歌曲 ──
-        LinearLayout switchRow = new LinearLayout(this);
+        // ── 切换：热门 50 首 / 全部歌曲（吸顶）──
+        // 需求：滑到列表深处时也要能切模式，不必一路滑回顶部。
+        // 做法是经典的 sticky header：头部里放一份「原位」切换行（随列表自然滚动、位置对），
+        // 另外在列表上方叠一份完全同构的「吸顶」副本；当原位那份滚过列表顶部就显示副本。
+        // 两份共用 applySwitchStyle / switchMode，所以高亮与行为永远一致，不存在状态不同步。
+        switchRow = new LinearLayout(this);
         switchRow.setOrientation(LinearLayout.HORIZONTAL);
         switchRow.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams switchLp = new LinearLayout.LayoutParams(
@@ -214,6 +226,26 @@ public class ArtistDetailActivity extends BaseWatchActivity {
 
         btnHot.setOnClickListener(v -> switchMode(0));
         btnAll.setOnClickListener(v -> switchMode(1));
+
+        // 吸顶副本：与原位那份尺寸完全一致（原位是 margin 2/3，这里用等价 padding 2/3，
+        // 这样交接时按钮位置不跳），背景取页面底色以盖住下面滚过的列表内容。
+        stickyTabsRow = new LinearLayout(this);
+        stickyTabsRow.setOrientation(LinearLayout.HORIZONTAL);
+        stickyTabsRow.setGravity(Gravity.CENTER);
+        stickyTabsRow.setBackgroundColor(0xFF121212);
+        stickyTabsRow.setPadding(0, px(2), 0, px(3));
+        stickyTabsRow.setVisibility(View.GONE);
+
+        btnHotSticky = buildSwitchButton("热门 50 首");
+        btnAllSticky = buildSwitchButton("全部歌曲");
+        LinearLayout.LayoutParams btnLp2 = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnLp2.setMarginEnd(px(6));
+        stickyTabsRow.addView(btnHotSticky, btnLp2);
+        stickyTabsRow.addView(btnAllSticky);
+
+        btnHotSticky.setOnClickListener(v -> switchMode(0));
+        btnAllSticky.setOnClickListener(v -> switchMode(1));
         updateSwitchStyle();
 
         // ── 「相似歌手」单独占一行、通栏 ──
@@ -235,11 +267,15 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         listHeader.addView(similarRow);
 
         // ── 歌曲列表 ──
+        // 外面套一层 FrameLayout：吸顶切换行要「叠」在列表之上，而不是参与 LinearLayout 排版。
+        // 如果让它留在排版流里，GONE->VISIBLE 会改变高度、把列表整体往下顶 —— 会出现跳变。
+        FrameLayout listHolder = new FrameLayout(this);
+        listHolder.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
         lvSongs = new ListView(this);
         lvSongs.setDivider(null);
         lvSongs.setDividerHeight(0);
-        lvSongs.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         // header 里的「热门 50 首 / 全部歌曲 / 相似歌手」是可点按钮。
         // ListView 默认 itemsCanFocus=false，会屏蔽子视图的点击 —— 必须打开，
         // 否则这些按钮全部失效。列表行（item_song 根布局）本身不可聚焦，
@@ -249,9 +285,56 @@ public class ArtistDetailActivity extends BaseWatchActivity {
         adapter = new SongAdapter();
         lvSongs.setAdapter(adapter);
         lvSongs.setOnItemClickListener((parent, view, position, id) -> playFrom(position));
-        root.addView(lvSongs);
+        lvSongs.setOnScrollListener(new AbsListView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+            }
+
+            @Override
+            public void onScroll(AbsListView view, int firstVisibleItem,
+                                 int visibleItemCount, int totalItemCount) {
+                updateStickyTabs();
+            }
+        });
+
+        FrameLayout.LayoutParams stickyLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        stickyLp.gravity = Gravity.TOP;
+
+        listHolder.addView(lvSongs, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        listHolder.addView(stickyTabsRow, stickyLp);
+        root.addView(listHolder);
 
         loadArtist();
+    }
+
+    /**
+     * 决定「热门/全部」切换行是否该吸顶。
+     *
+     * <p>判据：原位切换行是否已被滚到列表顶部之上。header 是 ListView 的位置 0，
+     * 只要它还在可见区，{@code getChildAt(0)} 就是它，{@code -getTop()} 即已滚过的距离；
+     * 一旦 header 整体滚出，firstVisibleItem 会变成 1，此时直接认定已吸顶。</p>
+     *
+     * <p>阈值减掉 paddingTop：原位那份用 margin、吸顶副本用等价 padding，
+     * 减掉这一段才能让交接瞬间按钮落在同一像素上，不出现跳动。</p>
+     */
+    private void updateStickyTabs() {
+        if (lvSongs == null || switchRow == null || stickyTabsRow == null) {
+            return;
+        }
+        boolean sticky;
+        if (lvSongs.getFirstVisiblePosition() == 0) {
+            View headerView = lvSongs.getChildAt(0);
+            int scrolled = headerView == null ? 0 : -headerView.getTop();
+            sticky = scrolled >= switchRow.getTop() - px(2);
+        } else {
+            sticky = true;
+        }
+        int want = sticky ? View.VISIBLE : View.GONE;
+        if (stickyTabsRow.getVisibility() != want) {
+            stickyTabsRow.setVisibility(want);
+        }
     }
 
     private void loadArtist() {
@@ -392,6 +475,13 @@ public class ArtistDetailActivity extends BaseWatchActivity {
     private void updateSwitchStyle() {
         applySwitchStyle(btnHot, mode == 0);
         applySwitchStyle(btnAll, mode == 1);
+        // 吸顶副本必须一起更新，否则两份会在视觉上不同步（一份高亮一份描边）
+        if (btnHotSticky != null) {
+            applySwitchStyle(btnHotSticky, mode == 0);
+        }
+        if (btnAllSticky != null) {
+            applySwitchStyle(btnAllSticky, mode == 1);
+        }
     }
 
     private void applySwitchStyle(TextView btn, boolean on) {
