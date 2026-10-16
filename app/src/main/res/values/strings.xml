@@ -88,4 +88,11 @@
     <string name="playback_stats_clear">清空统计</string>
     <string name="bilibili_entry">听bilibili</string>
     <string name="export_music">导出下载的音乐</string>
+
+    <!-- F3 本地黑名单 -->
+    <string name="hidden_tracks_title">黑名单</string>
+    <string name="hidden_tracks_hint">左划可移出黑名单（不会删除文件）</string>
+    <string name="hidden_tracks_empty">黑名单为空</string>
+    <string name="settings_hidden_tracks">黑名单</string>
+    <string name="settings_hidden_tracks_desc">已从本地列表移除的曲目</string>
 </resources>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F3 本地黑名单页布局。
+
+  结构尽量与项目其它列表页一致：
+    [标题栏] → [ListView（weight=1）] → [空态]
+  标题栏只放一行标题，走 WatchBackButton.applyTitleBarInset() 的占位约定（返回按钮不会压住字）。
+  标题 id 含 `title` ⇒ 会被 G5 的统一机制识别并居左（与本项目其它页同一套规则）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <LinearLayout
+        android:id="@+id/layout_hidden_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/tv_hidden_tracks_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="start"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="@string/hidden_tracks_title"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/watch_text_title"
+            android:textStyle="bold" />
+
+        <!-- 说明：左划移除；文件不会被删掉 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="@string/hidden_tracks_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/watch_text_caption" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/lv_hidden_tracks"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp" />
+
+    <TextView
+        android:id="@+id/tv_hidden_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/hidden_tracks_empty"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_sub"
+        android:visibility="gone" />
+</LinearLayout>

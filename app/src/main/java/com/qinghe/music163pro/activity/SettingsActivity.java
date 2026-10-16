@@ -46,6 +46,12 @@ public class SettingsActivity extends BaseWatchActivity {
 
         View btnToggle = findViewById(R.id.btn_settings_toggle);
         View btnEditMore = findViewById(R.id.btn_settings_edit_more);
+        // F3：本地黑名单入口 —— 列出被「移出列表」的曲目，左划可恢复（不删文件的语义见 LocalMusicHides）
+        View btnHiddenTracks = findViewById(R.id.btn_settings_hidden);
+        if (btnHiddenTracks != null) {
+            btnHiddenTracks.setOnClickListener(v ->
+                    startActivity(new android.content.Intent(this, HiddenTracksActivity.class)));
+        }
         // 高级歌词翻译：与「开关选项」同级的独立设置页（AI 词性着色 / 翻译）
         findViewById(R.id.btn_settings_advanced_lyrics).setOnClickListener(v ->
                 startActivity(new android.content.Intent(this, LanguageLearningActivity.class)));

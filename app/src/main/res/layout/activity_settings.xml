@@ -91,6 +91,49 @@
                     android:ellipsize="end" />
             </LinearLayout>
 
+            <!-- F3：本地黑名单入口（行样式与上面各行一致；两行文案按 1-7/1-8 规则截断） -->
+            <LinearLayout
+                android:id="@+id/btn_settings_hidden"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_delete"
+                    android:alpha="0.7" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_hidden_tracks"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_hidden_tracks_desc"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_caption"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/btn_settings_edit_more"
                 android:layout_width="match_parent"
