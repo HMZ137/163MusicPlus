@@ -28,6 +28,7 @@ import com.qinghe.music163pro.util.LocalMetadataIndex;
 import com.qinghe.music163pro.util.LocalMusicHides;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.LocalPlaylistManager;
+import com.qinghe.music163pro.util.LocalScanScope;
 import com.qinghe.music163pro.util.MultiSelectController;
 import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
@@ -68,10 +69,12 @@ import java.util.Map;
  */
 public class LocalMusicActivity extends BaseWatchActivity {
 
-    /** 递归深度上限，避免在大目录上扫太久。 */
-    private static final int MAX_DEPTH = 4;
-    /** 单次扫描最多收集多少首，防止内存被撑爆。 */
-    private static final int MAX_TRACKS = 500;
+    /**
+     * 递归深度上限 / 单次曲目上限**统一由 {@link LocalScanScope} 提供**（3-9：扫描范围唯一入口），
+     * 这里只留别名 —— 避免「扫描范围」与「性能上限」两处各写一份而漂移。
+     */
+    private static final int MAX_DEPTH = LocalScanScope.MAX_DEPTH;
+    private static final int MAX_TRACKS = LocalScanScope.MAX_TRACKS;
     /** 打开字母选择页的请求码。 */
     private static final int REQUEST_LETTER_PICKER = 0x51;
     /** 元信息补齐过程中，每处理这么多首就刷新一次列表。 */
@@ -413,18 +416,34 @@ public class LocalMusicActivity extends BaseWatchActivity {
         scanCacheMisses = 0;
         scanMissPaths.clear();
         scanFoundPaths.clear();
-        File external = Environment.getExternalStorageDirectory();
-        for (File root : new File[]{
-                new File(external, "163Music"),
-                new File(external, "Music"),
-                new File(external, "Download"),
-        }) {
+        // 扫描范围（内置根目录 ∪ 用户自定义目录）**唯一**由 LocalScanScope 给出（3-9）；
+        // 失效的自定义目录已在其中被跳过，这里只负责把「跳过了什么」告诉用户（3-11）。
+        for (File root : LocalScanScope.getScanRoots(this)) {
             collectAudio(root, 0, result);
             if (result.size() >= MAX_TRACKS) {
                 break;
             }
         }
+        warnSkippedScanDirs();
         return result;
+    }
+
+    /**
+     * 3-11：自定义扫描目录里有不可用的（不存在 / 无读权限 / 所在卷已卸载）时提示一次。
+     *
+     * <p>只提示、<b>不中断扫描</b> —— 内置目录与其余可用目录照常扫，失效项只是被跳过。</p>
+     */
+    private void warnSkippedScanDirs() {
+        List<String> skipped = LocalScanScope.getSkippedDirs(this);
+        if (skipped.isEmpty()) {
+            return;
+        }
+        final String message = "已跳过 " + skipped.size() + " 个不可用的自定义扫描目录";
+        MusicLog.w("LocalMusic", message + ": " + TextUtils.join(", ", skipped));
+        if (isFinishing()) {
+            return;
+        }
+        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
     }
 
     /**
@@ -457,17 +476,9 @@ public class LocalMusicActivity extends BaseWatchActivity {
         }
     }
 
-    /** 是否是 163Music/Download 下的目录（含其自身）。 */
+    /** 是否是 163Music/Download 下的目录（含其自身）。判定逻辑统一在 {@link LocalScanScope}。 */
     private boolean isDownloadSubtree(File dir) {
-        try {
-            File downloadDir = new File(
-                    new File(Environment.getExternalStorageDirectory(), "163Music"), "Download");
-            String downloadPath = downloadDir.getCanonicalPath();
-            String dirPath = dir.getCanonicalPath();
-            return dirPath.equals(downloadPath) || dirPath.startsWith(downloadPath + File.separator);
-        } catch (Exception e) {
-            return false;
-        }
+        return LocalScanScope.isDownloadSubtree(dir);
     }
 
     /** 从文件名猜出来的「曲名 / 曲师」。元信息读不到时用它兜底。 */
