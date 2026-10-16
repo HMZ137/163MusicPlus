@@ -234,25 +234,37 @@ public final class LocalScanScope {
     // ==================== 唯一入口（3-9） ====================
 
     /**
-     * 本次扫描的根目录 = 内置根目录 ∪ 可用的自定义目录。
+     * 本次扫描的根目录 = **可用的自定义目录（在前）∪ 内置根目录（在后）**。
+     *
+     * <p><b>顺序是有意义的，别改成"内置在前"</b>：{@link #MAX_TRACKS} 在满库设备上会把额度吃光，
+     * 自定义目录若排在后面，用户"加了目录却看不到新歌"（功能形同虚设）。
+     * 把用户显式指定的目录放最前，才能保证它们一定进得了列表。</p>
      *
      * <p>失效的自定义目录被静默跳过，不影响内置目录、也不抛异常。
      * 需要提示用户时用 {@link #getSkippedDirs(Context)}。</p>
      */
     public static List<File> getScanRoots(Context context) {
-        List<File> roots = getBuiltinRoots();
+        // ⚠️ 顺序**有意义**（D5 的修复，采用「自定义目录优先」方案）：
+        //   MAX_TRACKS=500 在满库设备上会把额度吃光（实测日志每次都是「共500首」）。
+        //   若自定义目录排在内置目录**之后**，用户"加了目录却看不到新歌"——
+        //   功能生效了但**用户看不到任何效果**，等于形同虚设。
+        //   把用户**显式指定**的目录放在最前，保证它们一定能进入额度；
+        //   内置目录照常扫描，只是满库时尾部被截断（这与改造前的行为一致）。
+        List<File> roots = new ArrayList<>();
+        int customCount = 0;
         for (File dir : getUsableCustomDirs(context)) {
-            boolean duplicate = false;
-            for (File root : roots) {
-                if (root.equals(dir)) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (!duplicate) {
+            if (!roots.contains(dir)) {
                 roots.add(dir);
+                customCount++;
             }
         }
+        for (File root : getBuiltinRoots()) {
+            if (!roots.contains(root)) {
+                roots.add(root);
+            }
+        }
+        MusicLog.i(TAG, "扫描根顺序: 自定义 " + customCount + " 个在前，内置 "
+                + (roots.size() - customCount) + " 个在后（满库时优先保住自定义目录）");
         return roots;
     }
 }
