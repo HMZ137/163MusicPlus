@@ -104,8 +104,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private boolean isUserSeeking = false;
     private boolean serviceStarted = false;
 
-    // Playlist indicator (top-left)
-    private ImageView btnPlaylistIndicator;
+    // M3：原左上角歌单按钮（btnPlaylistIndicator）已移除，
+    // 其能力迁到「更多功能」菜单的「播放列表」项（openCurrentPlaylistOrQueue）。
 
     // Functions overlay
     private FrameLayout overlayContainer;
@@ -360,12 +360,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         ImageView btnVolDown = findViewById(R.id.btn_vol_down);
         ImageView btnVolUp = findViewById(R.id.btn_vol_up);
         ImageView btnMore = findViewById(R.id.btn_more);
-        btnPlaylistIndicator = findViewById(R.id.btn_playlist_indicator);
         mainContentBlock = findViewById(R.id.main_content_block);
         // 圆角屏：顶栏两端图标避让物理圆角（原 4dp 边距会落进圆角切除区被切掉）
         int corner = WatchUiUtils.cornerInset(this);
         applyCornerInset(btnMore, corner, true);
-        applyCornerInset(btnPlaylistIndicator, corner, false);
         ensureChorusMarkerDot();
 
         playerManager = MusicPlayerManager.getInstance();
@@ -490,24 +488,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 startActivity(new Intent(MainActivity.this, MoreActivity.class)));
 
         // Playlist indicator: click to open playlist detail
-        btnPlaylistIndicator.setOnClickListener(v -> {
-            Song currentSong = playerManager.getCurrentSong();
-            if (currentSong != null && currentSong.isBilibili()) {
-                openBilibiliPlaylist(currentSong);
-            } else if (playerManager.hasSourcePlaylist()) {
-                Intent plIntent = new Intent(MainActivity.this, PlaylistDetailActivity.class);
-                plIntent.putExtra("playlist_id", playerManager.getSourcePlaylistId());
-                plIntent.putExtra("playlist_name", playerManager.getSourcePlaylistName());
-                plIntent.putExtra("track_count", playerManager.getSourcePlaylistTrackCount());
-                plIntent.putExtra("creator", playerManager.getSourcePlaylistCreator());
-                plIntent.putExtra("creator_user_id", playerManager.getSourcePlaylistCreatorUserId());
-                plIntent.putExtra("is_liked_playlist", playerManager.getSourcePlaylistIsLiked());
-                startActivity(plIntent);
-            } else if (currentSong != null && LocalTracks.isLocalOnly(currentSong)) {
-                // 本地歌没有云端歌单 id，左上角按钮直接展示当前播放队列（本机音乐列表）。
-                showPlaylistOverlay();
-            }
-        });
+        // M3：左上角歌单按钮已移除；其能力由「更多功能」(⋯) 菜单的「播放列表」项承载，
+        // 逻辑见 openCurrentPlaylistOrQueue()（原实现未重写，只搬了入口）。
 
         playerManager.setCallback(this);
 
@@ -975,8 +957,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row5.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        // M3：「播放列表」这一项现在承载原来左上角歌单按钮的全部能力
+        // （B 站视频列表 / 当前来源歌单详情 / 本地歌的当前队列），见 openCurrentPlaylistOrQueue()。
         row5.addView(createFuncItem(R.drawable.ic_queue_music, "播放列表",
-                v -> onFuncShowPlaylist()));
+                v -> openCurrentPlaylistOrQueue()));
         if (!cloudBlocked) {
             row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
                     v -> onFuncAddToPlaylist(song)));
@@ -5029,24 +5013,43 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         refreshMarquee();
     }
 
-    private void updatePlaylistIndicator() {
-        if (btnPlaylistIndicator != null) {
-            Song currentSong = playerManager.getCurrentSong();
-            // 三种情况都在左上角给一个「播放列表」入口：
-            //  - 云端歌单（hasSourcePlaylist）
-            //  - B 站视频（自带视频列表）
-            //  - 本地歌（本机音乐）
-            // 本地歌走 setPlaylist() 会 clearSourcePlaylistInfo()，hasSourcePlaylist() 为 false，
-            // 以前就导致左上角按钮消失，只能从「更多功能」(⋯) 菜单里点「播放列表」——
-            // 这就是「本地音乐的歌单按钮没挪到左上角」的原因。
-            if (playerManager.hasSourcePlaylist()
-                    || (currentSong != null && currentSong.isBilibili())
-                    || (currentSong != null && LocalTracks.isLocalOnly(currentSong))) {
-                btnPlaylistIndicator.setVisibility(View.VISIBLE);
-            } else {
-                btnPlaylistIndicator.setVisibility(View.GONE);
-            }
+    /**
+     * M3：原「左上角歌单按钮」的能力入口（现由「更多功能」菜单的「播放列表」项调用）。
+     *
+     * <p>三种来源各走各的，与改造前左上角按钮的行为**完全一致**，只是入口换到了菜单里：</p>
+     * <ul>
+     *   <li>B 站视频 → 打开该视频自带的列表；</li>
+     *   <li>有来源歌单（云端歌单 / 专辑 / 排行榜等）→ 打开该歌单详情页；</li>
+     *   <li>其余（本地歌、无来源歌单的云歌）→ 展示当前播放队列。</li>
+     * </ul>
+     *
+     * <p>最后那条是**新增的兜底**：原来左上角按钮在这两种情况下什么都不做，
+     * 但菜单项点了没反应会显得坏了，所以统一退化成「当前播放队列」。</p>
+     */
+    private void openCurrentPlaylistOrQueue() {
+        dismissOverlay();
+        Song currentSong = playerManager.getCurrentSong();
+        if (currentSong != null && currentSong.isBilibili()) {
+            openBilibiliPlaylist(currentSong);
+            return;
         }
+        if (playerManager.hasSourcePlaylist()) {
+            Intent plIntent = new Intent(MainActivity.this, PlaylistDetailActivity.class);
+            plIntent.putExtra("playlist_id", playerManager.getSourcePlaylistId());
+            plIntent.putExtra("playlist_name", playerManager.getSourcePlaylistName());
+            plIntent.putExtra("track_count", playerManager.getSourcePlaylistTrackCount());
+            plIntent.putExtra("creator", playerManager.getSourcePlaylistCreator());
+            plIntent.putExtra("creator_user_id", playerManager.getSourcePlaylistCreatorUserId());
+            plIntent.putExtra("is_liked_playlist", playerManager.getSourcePlaylistIsLiked());
+            startActivity(plIntent);
+            return;
+        }
+        // 本地歌 / 无来源歌单：退回「当前播放队列」
+        showPlaylistOverlay();
+    }
+
+    private void updatePlaylistIndicator() {
+        // M3：左上角歌单按钮已移除，显隐逻辑随之作废（能力迁到 openCurrentPlaylistOrQueue）。
     }
 
     @Override
