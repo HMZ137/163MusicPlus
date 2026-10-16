@@ -7,35 +7,139 @@
 
     <!-- M3：左上角歌单按钮已移除（能力迁到「更多功能」菜单的「播放列表」项） -->
 
-    <!-- Top right more button -->
-    <ImageView
-        android:id="@+id/btn_more"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentTop="true"
-        android:padding="6dp"
-        android:src="@drawable/ic_more_vert"
-        android:alpha="0.87"
-        android:clickable="true"
-        android:focusable="true" />
-
     <!--
-      顶部居中当前时间（TextClock 自走表，不用代码刷新）：
-      左边给歌单指示、右边给 ⋮ 留位；加粗 + 15sp，看得清但不抢播放信息。
+      M4 顶栏：**左标题 + 右侧预制菜单区** 两栏等高结构（参考 Main1.png：左上歌名、
+      下方小字曲师、右上汉堡按钮）。
+
+      高度 48dp 是**刻意沿用**原来的几何（8dp 根内边距 + 40dp 按钮），
+      在本机密度下正好等于 `WatchBackButton.applyTitleBarInset()` 的 94px 占位约定，
+      这样二级页与主界面的顶栏高度一致（M4 第 4 点）。
+
+      ⚠️ 跑马灯硬约束（M4 第 3 点，改这里前务必读）：
+      歌名用的是**系统 marquee**（见 `setupMarquee()`），偏移量由 TextView 内部持有，
+      **一旦发生布局就会被重置回行首**。所以：
+        1. 歌名所在栏宽度必须**只随屏幕/密度变化、不随文本变化** ——
+           左栏用 0dp + weight=1（吸收伸缩），歌名再 match_parent，
+           右栏是固定宽度（52dp 时间 + 40dp 按钮），因此歌名宽度是恒定的；
+        2. 每秒刷新的时间必须**避免触发布局** —— 时间用**固定宽度 + tnum**
+           （等宽数字），这样 setText 只重绘、不冒泡布局。
+      这两条一旦破坏，表现就是「歌名滚一小段就跳回开头」。
     -->
-    <TextClock
-        android:id="@+id/tv_clock"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
+    <LinearLayout
+        android:id="@+id/main_top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
         android:layout_alignParentTop="true"
-        android:layout_marginTop="4dp"
-        android:format24Hour="HH:mm"
-        android:format12Hour="HH:mm"
-        android:textStyle="bold"
-        android:textColor="#CCFFFFFF"
-        android:textSize="15sp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- 左栏：标题（歌名）+ 小字曲师，两行左对齐 -->
+        <LinearLayout
+            android:id="@+id/main_top_bar_title"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="8dp">
+
+            <!--
+              歌名：**系统 marquee**（`setupMarquee()` 里 setSelected(true) 驱动）。
+              左对齐（`gravity="start"`）符合 Main1.png 的目标形态。
+              宽度 match_parent（父栏宽度恒定）⇒ 不随文本变化。
+            -->
+            <TextView
+                android:id="@+id/tv_song_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="marquee"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="start"
+                android:includeFontPadding="false"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:singleLine="true"
+                android:text="@string/no_song"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/watch_text_title"
+                android:textStyle="bold" />
+
+            <!--
+              第二行：曲师（左，小字号）+ 时间（右，固定宽度 + tnum）。
+              曲师用 0dp + weight=1 ⇒ 宽度只随屏幕变化、不随文本变化；
+              时间固定 46dp + 等宽数字 ⇒ 每秒自走时宽度恒定。
+              两者都不触发布局，因此**不会把歌名的 marquee 冲回行首**（M4 第 3 点）。
+            -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tv_artist"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:gravity="start"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/watch_text_sub" />
+
+                <!--
+                  时间：**固定宽度 56dp + `tnum`（等宽数字）**。
+
+                  为什么必须是「固定宽度」而**不能**用 `wrap_content`：
+                  `TextView.checkForRelayout()` 在宽度是 `wrap_content` 时，
+                  只要 `setText` 就会走 `requestLayout()`；而**一次布局就会把歌名的
+                  marquee 偏移重置回行首**（M4 第 3 点点名的坑）。
+                  宽度固定 + 文本放得下时，`checkForRelayout()` 只重绘、不请求布局。
+                  `tnum` 则保证不同数字宽度一致，避免"到点变宽"。
+
+                  56dp ≈ 109px：实测 `HH:mm` 在 15sp 粗体下需要约 101px，
+                  故 56dp 有余量。**46dp（89px）会裁掉最后一位**（截图曾是「03:0」）。
+                -->
+                <TextClock
+                    android:id="@+id/tv_clock"
+                    android:layout_width="56dp"
+                    android:layout_height="wrap_content"
+                    android:fontFeatureSettings="tnum"
+                    android:format24Hour="HH:mm"
+                    android:format12Hour="HH:mm"
+                    android:gravity="center"
+                    android:textStyle="bold"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!--
+          右栏：预制菜单区（与左栏等高 = match_parent）。
+          这里**只放菜单按钮**；「数量与内容由配置决定」（M4 第 1 点），
+          以后要加预制菜单按钮直接往这一栏加即可。
+        -->
+        <LinearLayout
+            android:id="@+id/main_top_bar_menu"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingEnd="4dp">
+
+            <ImageView
+                android:id="@+id/btn_more"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_more_vert"
+                android:alpha="0.87"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+    </LinearLayout>
 
     <!--
       底部安全区：给圆形表盘下边缘留一点余量，避免最底下一排（音量键）顶到
@@ -49,14 +153,15 @@
 
     <!--
       居中内容块：不再用 layout_centerInParent（那是对父容器全边界居中，UI 放大后
-      会顶到顶栏把「更多」(⋮) 按钮盖住）。改挂到顶栏按钮之下、底部安全区之上，再用
-      gravity="center" 在安全带内竖直居中 —— 任意缩放下都不会再和 ⋮ 重叠。
+      会顶到顶栏把「更多」(⋮) 按钮盖住）。改挂到**顶栏**之下、底部安全区之上，再用
+      gravity="center" 在安全带内竖直居中 —— 任意缩放下都不会再和顶栏重叠。
+      M4 起改挂 `@id/main_top_bar`（原先挂 `@id/btn_more`，而按钮现在在顶栏内部）。
     -->
     <LinearLayout
         android:id="@+id/main_content_block"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/btn_more"
+        android:layout_below="@id/main_top_bar"
         android:layout_above="@id/bottom_safe_area"
         android:layout_centerHorizontal="true"
         android:gravity="center"
@@ -82,39 +187,10 @@
             android:orientation="vertical">
 
         <!--
-          歌名：改为「自绘跑马灯」——偏移由 MainActivity 用 scrollTo 每帧驱动，不再用系统
-          ellipsize="marquee"。原因：系统 marquee 只要经历一次布局，就会把滚动偏移重置回行首；
-          而播放时进度条/时间标签每秒都在刷新，必然触发布局，于是歌名「滚一小段就跳回开头」。
-          自绘偏移由我们自己持有，不受布局影响（布局把 scrollX 冲掉也会在下一帧补回来）。
-          短歌名放得下时仍靠 gravity=center 居中显示（不滚动）。
+          M4：歌名（`tv_song_name`）与曲师（`tv_artist`）已**搬到顶栏**
+          `@id/main_top_bar` 的左栏，不再属于中部信息区。
+          中部信息区现在只放「进度条 + 时间」——它依旧是那唯一可伸缩的一段（weight=1）。
         -->
-        <TextView
-            android:id="@+id/tv_song_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="marquee"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:marqueeRepeatLimit="marquee_forever"
-            android:singleLine="true"
-            android:text="@string/no_song"
-            android:textColor="@color/text_primary"
-            android:textSize="@dimen/watch_text_title"
-            android:textStyle="bold" />
-
-        <!-- Artist name -->
-        <TextView
-            android:id="@+id/tv_artist"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:singleLine="true"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/watch_text_sub" />
 
         <!--
           进度区重排（避免"歌名滚动稳定性 vs 进度条宽度"二选一）：
@@ -153,11 +229,20 @@
               改为 wrap_content + minWidth。宽度仍相对稳定（0:00 与 12:34 宽度差极小），
               不会因为每秒 setText 触发布局把歌名跑马灯冲回行首。
             -->
+            <!--
+              进度时间：**固定宽度 44dp + tnum**（原为 wrap_content + minWidth=34dp）。
+              为什么必须改成固定宽度：`TextView.checkForRelayout()` 只要宽度是
+              `wrap_content`，`setText` 就会 `requestLayout()`（`minWidth` 只有在与
+              `maxWidth` 相等时才走"静态宽度"那条捷径，这里并不成立）。
+              而这两个标签**播放中每秒都在 setText**（`formatTime` 还会让文本从
+              "9:59" 变 "10:00" 而改变宽度）⇒ 每秒一次布局 ⇒ **把歌名 marquee 冲回行首**。
+              改成固定宽度后，文本放得下时 `checkForRelayout()` 只重绘、不请求布局。
+              44dp ≈ 85px：11sp 下能容纳到 "120:00"，足够覆盖长音频。
+            -->
             <TextView
                 android:id="@+id/tv_current_time"
-                android:layout_width="wrap_content"
+                android:layout_width="44dp"
                 android:layout_height="wrap_content"
-                android:minWidth="34dp"
                 android:minHeight="16dp"
                 android:layout_marginStart="2dp"
                 android:layout_marginEnd="2dp"
@@ -177,9 +262,8 @@
 
             <TextView
                 android:id="@+id/tv_total_time"
-                android:layout_width="wrap_content"
+                android:layout_width="44dp"
                 android:layout_height="wrap_content"
-                android:minWidth="34dp"
                 android:minHeight="16dp"
                 android:layout_marginStart="2dp"
                 android:layout_marginEnd="2dp"
