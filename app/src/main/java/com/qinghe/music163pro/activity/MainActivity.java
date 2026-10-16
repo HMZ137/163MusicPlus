@@ -118,25 +118,86 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private TextView volumePercentView;
     private final Handler volumeHandler = new Handler();
 
-    // OLED 防烧屏（设置页开关）：主页面内容块周期性轻微移位，避免长时间静止灼屏
+    // OLED 防烧屏（设置页开关）：主页面「背景层 + 内容块」一起周期性轻微移位，避免长时间静止灼屏
     private View mainContentBlock;
+    /**
+     * 背景层：铺满全屏、**略微放大**的独立一层，插在内容之下。
+     *
+     * <p>为什么背景要单独一层：原先背景直接设在 {@code android.R.id.content}（整屏容器）上，
+     * 一动就会把整屏挪出去露边，所以历史上**从来没有参与移位** —— 结果最静止的模糊封面背景
+     * 反而成了最容易烧屏的那一层。放到独立层上并预先放大，就能在留出的余量内自由移位。</p>
+     */
+    private View mainBgLayer;
+    private static final String TAG_BG_LAYER = "main_bg_layer";
     private final Handler oledShiftHandler = new Handler();
     private int oledShiftIndex = 0;
-    /** 移位轨迹（px）：先归位再四方向微移，肉眼几乎无感但足够让像素轮换。 */
+    /** 内容块移位轨迹（px）：先归位再四方向微移，肉眼几乎无感但足够让像素轮换。 */
     private static final int[][] OLED_SHIFT_STEPS = {{0, 0}, {9, 5}, {0, 10}, {-9, 5}};
+    /**
+     * 背景层移位轨迹（px）。**必须比内容块幅度大**：背景是大片静止色块，最容易烧屏。
+     * 背景层预先放大 {@link #OLED_BG_SCALE} 倍，留出的余量必须大于这里的最大位移，
+     * 否则移位后会露出边缘 —— 378×496 屏上 6% 余量 ≈ 横向 11px / 纵向 15px。
+     */
+    private static final int[][] OLED_BG_SHIFT_STEPS = {{0, 0}, {9, 8}, {0, 11}, {-9, 8}};
+    /** 背景层预放大倍数：给上面的移位留余量，同时保证不会有空隙。 */
+    private static final float OLED_BG_SCALE = 1.06f;
     private static final long OLED_SHIFT_INTERVAL_MS = 30_000L;
     private final Runnable oledShiftTick = new Runnable() {
         @Override
         public void run() {
-            if (mainContentBlock == null || !isOledBurnProtectionOn()) {
+            if (!isOledBurnProtectionOn() || (mainContentBlock == null && mainBgLayer == null)) {
                 return;
             }
             oledShiftIndex = (oledShiftIndex + 1) % OLED_SHIFT_STEPS.length;
-            mainContentBlock.setTranslationX(OLED_SHIFT_STEPS[oledShiftIndex][0]);
-            mainContentBlock.setTranslationY(OLED_SHIFT_STEPS[oledShiftIndex][1]);
+            if (mainContentBlock != null) {
+                mainContentBlock.setTranslationX(OLED_SHIFT_STEPS[oledShiftIndex][0]);
+                mainContentBlock.setTranslationY(OLED_SHIFT_STEPS[oledShiftIndex][1]);
+            }
+            if (mainBgLayer != null) {
+                mainBgLayer.setTranslationX(OLED_BG_SHIFT_STEPS[oledShiftIndex][0]);
+                mainBgLayer.setTranslationY(OLED_BG_SHIFT_STEPS[oledShiftIndex][1]);
+            }
             oledShiftHandler.postDelayed(this, OLED_SHIFT_INTERVAL_MS);
         }
     };
+
+    /**
+     * 建（或复用）背景层，并挂在 {@code android.R.id.content} 的**索引 0**（所有内容之下）。
+     *
+     * <p>用 tag 记住它，避免 Activity 重建时反复叠加出一堆背景层。</p>
+     */
+    private void installBackgroundLayer() {
+        View content = getWindow().getDecorView().findViewById(android.R.id.content);
+        if (!(content instanceof android.view.ViewGroup)) {
+            return;
+        }
+        android.view.ViewGroup parent = (android.view.ViewGroup) content;
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            View child = parent.getChildAt(i);
+            if (TAG_BG_LAYER.equals(child.getTag())) {
+                mainBgLayer = child; // 已存在（Activity 重建），直接复用
+                return;
+            }
+        }
+        View layer = new View(this);
+        layer.setTag(TAG_BG_LAYER);
+        layer.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        // 略微放大：给防烧屏移位留余量，移位后也不会露出边缘
+        layer.setScaleX(OLED_BG_SCALE);
+        layer.setScaleY(OLED_BG_SCALE);
+        parent.addView(layer, 0);
+        mainBgLayer = layer;
+    }
+
+    /** 把背景画到背景层上；拿不到背景层时退回整屏容器（老行为）。 */
+    private void applyMainBackground() {
+        View target = mainBgLayer != null
+                ? mainBgLayer
+                : getWindow().getDecorView().findViewById(android.R.id.content);
+        BackgroundUtil.applyBackground(this, target);
+    }
 
     private boolean isOledBurnProtectionOn() {
         return getSharedPreferences("music163_settings", MODE_PRIVATE)
@@ -146,14 +207,20 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     /** onResume 时调用：按开关状态启动/停止周期移位；关闭时复位到原位。 */
     private void applyOledBurnProtection() {
         oledShiftHandler.removeCallbacks(oledShiftTick);
-        if (mainContentBlock == null) {
+        if (mainContentBlock == null && mainBgLayer == null) {
             return;
         }
         if (isOledBurnProtectionOn()) {
             oledShiftHandler.postDelayed(oledShiftTick, OLED_SHIFT_INTERVAL_MS);
         } else {
-            mainContentBlock.setTranslationX(0);
-            mainContentBlock.setTranslationY(0);
+            if (mainContentBlock != null) {
+                mainContentBlock.setTranslationX(0);
+                mainContentBlock.setTranslationY(0);
+            }
+            if (mainBgLayer != null) {
+                mainBgLayer.setTranslationX(0);
+                mainBgLayer.setTranslationY(0);
+            }
             oledShiftIndex = 0;
         }
     }
@@ -265,8 +332,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mainPlayerContentView = findViewById(R.id.main_player_layout);
-        BackgroundUtil.applyBackground(this,
-                getWindow().getDecorView().findViewById(android.R.id.content));
+        // 背景画到「可移位的背景层」上（防烧屏要连背景一起动），见 installBackgroundLayer
+        installBackgroundLayer();
+        applyMainBackground();
 
         // Initialize file logging
         MusicLog.init(new File("/sdcard/163Music"));
@@ -691,9 +759,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         // Reload speed mode setting
         playerManager.setSpeedMode(prefs.getInt("speed_mode", 0));
-        // Reapply custom background
-        BackgroundUtil.applyBackground(this,
-                getWindow().getDecorView().findViewById(android.R.id.content));
+        // Reapply custom background（画到可移位的背景层上）
+        applyMainBackground();
         // Keep the cover background in sync with the current song
         updateCoverBackground();
         // Preload cloud liked IDs cache so overlay shows correct favorite state
