@@ -1,18 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_dark"
-    android:fillViewport="true">
+    android:orientation="vertical">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
-
-        <TextView
+    <!-- G3：标题栏固定在此，不随下方列表滚动（可下滑收起 / 上滑展开） -->
+    <TextView
             android:id="@+id/tv_more_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -25,477 +20,493 @@
             android:paddingTop="4dp"
             android:paddingBottom="8dp" />
 
-        <!--
-          本机音乐：只在「本地播放模式」下出现，并且被 applyMenuOrder() 提到列表最前。
-          它不是 MoreMenuPreferences 里的可排序磁贴 —— 它的显隐由播放模式决定，
-          而不是由用户在「编辑更多菜单」里勾选。默认 gone，云音乐模式下完全不可见。
-        -->
-        <LinearLayout
-            android:id="@+id/btn_menu_local_music"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_phone_android"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="本机音乐"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+    <ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:background="@color/bg_dark"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:fillViewport="true">
 
         <LinearLayout
-            android:id="@+id/btn_menu_favorites"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_favorite_border"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="收藏列表"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
-        <LinearLayout
-            android:id="@+id/btn_menu_my_playlists"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_queue_music"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="我的歌单"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <!--
+              本机音乐：只在「本地播放模式」下出现，并且被 applyMenuOrder() 提到列表最前。
+              它不是 MoreMenuPreferences 里的可排序磁贴 —— 它的显隐由播放模式决定，
+              而不是由用户在「编辑更多菜单」里勾选。默认 gone，云音乐模式下完全不可见。
+            -->
+            <LinearLayout
+                android:id="@+id/btn_menu_local_music"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_phone_android"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="本机音乐"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_daily_recommend"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_today"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="每日推荐"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_favorites"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_favorite_border"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="收藏列表"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_radar_playlist"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_radar"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="雷达歌单"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_my_playlists"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_queue_music"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="我的歌单"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_music_cloud"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_cloud"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="音乐云盘"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_daily_recommend"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_today"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="每日推荐"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_search"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_search"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="搜索"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_radar_playlist"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_radar"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="雷达歌单"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_song_recognition"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:contentDescription="听歌识曲"
-                android:src="@drawable/ic_audio_search"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="听歌识曲"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_music_cloud"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_cloud"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="音乐云盘"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_downloads"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_get_app"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="@string/downloads"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_search"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_search"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="搜索"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_bilibili"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_bilibili"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="@string/bilibili_entry"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_song_recognition"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:contentDescription="听歌识曲"
+                    android:src="@drawable/ic_audio_search"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="听歌识曲"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_ringtones"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_notifications"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="铃声管理"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_downloads"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_get_app"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/downloads"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_toplist"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_leaderboard"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="排行榜"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_bilibili"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_bilibili"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/bilibili_entry"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_history"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_history"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="历史记录"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_ringtones"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_notifications"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="铃声管理"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_profile"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_person"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="个人中心"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_toplist"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_leaderboard"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="排行榜"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_personal_fm"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile"
-            android:visibility="gone">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_music_note"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="私人漫游"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_history"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_history"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="历史记录"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_login"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_vpn_key"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="登录"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_profile"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_person"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="个人中心"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/btn_menu_settings"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_settings"
-                android:alpha="0.7" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="设置"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/watch_text_body" android:singleLine="true"
- android:ellipsize="end"
- />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/btn_menu_personal_fm"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_music_note"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="私人漫游"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
 
-    </LinearLayout>
-</ScrollView>
+            <LinearLayout
+                android:id="@+id/btn_menu_login"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_vpn_key"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="登录"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_menu_settings"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_settings"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="设置"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_body" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_dark"
-    android:fillViewport="true">
+    android:orientation="vertical">
 
-    <LinearLayout
-        android:id="@+id/layout_toggle_settings_content"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
-
-        <TextView
+    <!-- G3：标题栏固定在此，不随下方列表滚动（可下滑收起 / 上滑展开） -->
+    <TextView
             android:id="@+id/tv_toggle_settings_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -26,556 +20,573 @@
             android:paddingTop="4dp"
             android:paddingBottom="8dp" />
 
-        <!--
-          本地播放模式：放了设置列表的第一项。它不是一个普通开关 ——
-          打开之后更多页里所有依赖账号/网络的入口都会消失，整个应用变成纯本地播放器，
-          所以要放在最容易找到的位置，也要让人一眼看出这是个「模式」而不是「偏好」。
-        -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="本地播放模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="只看本机音乐，隐藏云端功能"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switch_local_only_mode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <!-- 纯在线模式：与「本地播放模式」互斥。隐藏所有本地/离线功能，但**下载管理保留** -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="纯在线模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="隐藏本地音乐 / 本地歌单 / 局域网传歌，只留在线功能与下载管理"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switch_online_only_mode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <!-- Keep screen on: SwitchMaterial row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="屏幕常亮"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="保持屏幕不熄灭"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switch_keep_screen_on"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <!-- OLED 防烧屏：SwitchMaterial row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="OLED 防烧屏"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="主页面内容每 30 秒轻微移位"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switch_oled_burn_protection"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
+    <ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:background="@color/bg_dark"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:fillViewport="true">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
+        android:id="@+id/layout_toggle_settings_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
+            <!--
+              本地播放模式：放了设置列表的第一项。它不是一个普通开关 ——
+              打开之后更多页里所有依赖账号/网络的入口都会消失，整个应用变成纯本地播放器，
+              所以要放在最容易找到的位置，也要让人一眼看出这是个「模式」而不是「偏好」。
+            -->
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="定时结束退出应用"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="定时关闭时停止播放并退出"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switch_sleep_timer_exit_app"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <!-- Favorites mode: cyclic selection row (本地/云端) -->
-        <LinearLayout
-            android:id="@+id/row_fav_mode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="收藏模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_fav_mode_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@drawable/ic_more_horiz"
-                android:alpha="0.5" />
-        </LinearLayout>
-
-        <!-- Sleep timer mode: cyclic selection (总时长/播放净时长) -->
-        <LinearLayout
-            android:id="@+id/row_sleep_timer_mode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="定时关闭模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_sleep_timer_mode_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@drawable/ic_more_horiz"
-                android:alpha="0.5" />
-        </LinearLayout>
-
-        <!-- Speed mode: 3-value cyclic row -->
-        <LinearLayout
-            android:id="@+id/row_speed_mode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="变速模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_speed_mode_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@drawable/ic_more_horiz"
-                android:alpha="0.5" />
-        </LinearLayout>
-
-        <!-- Lyric scroll mode: 每行/阻塞 cyclic row -->
-        <LinearLayout
-            android:id="@+id/row_lyric_scroll_mode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="歌词滚动模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_lyric_scroll_mode_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@drawable/ic_more_horiz"
-                android:alpha="0.5" />
-        </LinearLayout>
-
-        <!-- Lyric time offset: ±0.5s per tap, for lyrics that are out of sync -->
-        <LinearLayout
-            android:id="@+id/row_lyric_offset"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="歌词偏移"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_lyric_offset_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/btn_lyric_offset_minus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="−"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:paddingStart="12dp"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
                 android:paddingEnd="12dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_card_tile" />
+                android:background="@drawable/bg_card_tile">
 
-            <TextView
-                android:id="@+id/btn_lyric_offset_plus"
-                android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="本地播放模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="只看本机音乐，隐藏云端功能"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_local_only_mode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- 纯在线模式：与「本地播放模式」互斥。隐藏所有本地/离线功能，但**下载管理保留** -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="+"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:paddingStart="12dp"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
                 android:paddingEnd="12dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="@drawable/bg_card_tile" />
-        </LinearLayout>
-
-        <!-- Lyric resume interval: only meaningful in 阻塞 mode -->
-        <LinearLayout
-            android:id="@+id/row_lyric_resume_interval"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
+                android:background="@drawable/bg_card_tile">
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="歌词恢复间隔"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_lyric_resume_interval_value"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="纯在线模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="隐藏本地音乐 / 本地歌单 / 局域网传歌，只留在线功能与下载管理"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_online_only_mode"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@drawable/ic_more_horiz"
-                android:alpha="0.5" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/row_recognition_mode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/watch_row_min_height"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="@drawable/bg_card_tile">
-
+            <!-- Keep screen on: SwitchMaterial row -->
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="听歌识曲模式"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/watch_text_body"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-                <TextView
-                    android:id="@+id/tv_recognition_mode_value"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="屏幕常亮"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="保持屏幕不熄灭"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_keep_screen_on"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/colorPrimary"
-                    android:textSize="@dimen/watch_text_sub"
-                    android:singleLine="true"
-                    android:tag="collapsible_desc"
-                    android:ellipsize="end" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:src="@drawable/ic_more_horiz"
-                android:alpha="0.5" />
-        </LinearLayout>
+            <!-- OLED 防烧屏：SwitchMaterial row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
 
-    </LinearLayout>
-</ScrollView>
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="OLED 防烧屏"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="主页面内容每 30 秒轻微移位"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_oled_burn_protection"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="定时结束退出应用"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="定时关闭时停止播放并退出"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_sleep_timer_exit_app"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- Favorites mode: cyclic selection row (本地/云端) -->
+            <LinearLayout
+                android:id="@+id/row_fav_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="收藏模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_fav_mode_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
+            <!-- Sleep timer mode: cyclic selection (总时长/播放净时长) -->
+            <LinearLayout
+                android:id="@+id/row_sleep_timer_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="定时关闭模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_sleep_timer_mode_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
+            <!-- Speed mode: 3-value cyclic row -->
+            <LinearLayout
+                android:id="@+id/row_speed_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="变速模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_speed_mode_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
+            <!-- Lyric scroll mode: 每行/阻塞 cyclic row -->
+            <LinearLayout
+                android:id="@+id/row_lyric_scroll_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="歌词滚动模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_lyric_scroll_mode_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
+            <!-- Lyric time offset: ±0.5s per tap, for lyrics that are out of sync -->
+            <LinearLayout
+                android:id="@+id/row_lyric_offset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="歌词偏移"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_lyric_offset_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/btn_lyric_offset_minus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="−"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_card_tile" />
+
+                <TextView
+                    android:id="@+id/btn_lyric_offset_plus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_card_tile" />
+            </LinearLayout>
+
+            <!-- Lyric resume interval: only meaningful in 阻塞 mode -->
+            <LinearLayout
+                android:id="@+id/row_lyric_resume_interval"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="歌词恢复间隔"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_lyric_resume_interval_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/row_recognition_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="听歌识曲模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_recognition_mode_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
