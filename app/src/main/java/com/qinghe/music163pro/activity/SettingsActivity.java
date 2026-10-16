@@ -46,6 +46,41 @@ public class SettingsActivity extends BaseWatchActivity {
 
         View btnToggle = findViewById(R.id.btn_settings_toggle);
         View btnEditMore = findViewById(R.id.btn_settings_edit_more);
+        // F5：响度分析（限音器）—— 手动触发一次；已在跑则再点一次=中断（符合文档「不得进入页面即全量分析」）
+        View btnLoudness = findViewById(R.id.btn_settings_loudness);
+        final TextView tvLoudnessValue = findViewById(R.id.tv_settings_loudness_value);
+        if (btnLoudness != null) {
+            btnLoudness.setOnClickListener(v -> {
+                if (com.qinghe.music163pro.util.LoudnessScan.isRunning()) {
+                    com.qinghe.music163pro.util.LoudnessScan.cancel();
+                    Toast.makeText(this, "正在中断（已完成的部分已保存）", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                boolean started = com.qinghe.music163pro.util.LoudnessScan.start(getApplicationContext(),
+                        new com.qinghe.music163pro.util.LoudnessScan.Listener() {
+                            @Override
+                            public void onProgress(int done, int total, int analyzed, int cached, int skipped, String name) {
+                                runOnUiThread(() -> {
+                                    if (isFinishing() || tvLoudnessValue == null) return;
+                                    tvLoudnessValue.setText(done + "/" + total);
+                                });
+                            }
+
+                            @Override
+                            public void onFinished(int analyzed, int cached, int skipped, boolean cancelled, long ms) {
+                                runOnUiThread(() -> {
+                                    if (isFinishing()) return;
+                                    if (tvLoudnessValue != null) tvLoudnessValue.setText("");
+                                    Toast.makeText(SettingsActivity.this,
+                                            (cancelled ? "已中断：" : "完成：") + "新分析 " + analyzed
+                                                    + " 首，命中缓存 " + cached + " 首，跳过 " + skipped + " 首",
+                                            Toast.LENGTH_LONG).show();
+                                });
+                            }
+                        });
+                Toast.makeText(this, started ? "开始分析响度（后台）…" : "已有分析在跑", Toast.LENGTH_SHORT).show();
+            });
+        }
         // F3：本地黑名单入口 —— 列出被「移出列表」的曲目，左划可恢复（不删文件的语义见 LocalMusicHides）
         View btnHiddenTracks = findViewById(R.id.btn_settings_hidden);
         if (btnHiddenTracks != null) {
