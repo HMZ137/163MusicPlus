@@ -87,6 +87,26 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * G3：观察竖直手势（<b>下滑收起 / 上滑展开</b> 标题栏）。
+     *
+     * <p>放在基类的 {@code dispatchTouchEvent} 里，是为了<b>只观察、不消费</b>事件 ——
+     * 返回 {@code super} 的结果，列表的滚动与点击完全不受影响。
+     * 标题栏由 {@link WatchBackButton} 的统一时机登记，页面无需自己接。</p>
+     */
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        com.qinghe.music163pro.util.TitleBarCollapse.observe(this, ev);
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // G3 验收要求「返回再进入时状态复位」：进页面一律展开标题栏（收起态不持久化）
+        com.qinghe.music163pro.util.TitleBarCollapse.reset(this);
+    }
+
     // ── 返回键拦截 ──────────────────────────────────────────────────────────
 
     /**
