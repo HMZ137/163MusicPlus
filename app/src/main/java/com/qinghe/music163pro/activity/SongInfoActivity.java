@@ -22,6 +22,7 @@ import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.UiKit;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -173,7 +174,7 @@ public class SongInfoActivity extends BaseWatchActivity {
                 coverView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 GradientDrawable coverBg = new GradientDrawable();
                 coverBg.setColor(COLOR_CARD_BG);
-                coverBg.setCornerRadius(0);
+                coverBg.setCornerRadius(UiKit.cardRadiusPx(this));
                 coverView.setBackground(coverBg);
                 LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(coverSize, coverSize);
                 coverParams.gravity = Gravity.CENTER_HORIZONTAL;
@@ -648,7 +649,7 @@ public class SongInfoActivity extends BaseWatchActivity {
         ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
         GradientDrawable coverBg = new GradientDrawable();
         coverBg.setColor(0xFF333333);
-        coverBg.setCornerRadius(0);
+        coverBg.setCornerRadius(UiKit.cardRadiusPx(this));
         ivCover.setBackground(coverBg);
         if (!coverUrlRes.isEmpty()) {
             NetworkImageLoader.load(ivCover, coverUrlRes);

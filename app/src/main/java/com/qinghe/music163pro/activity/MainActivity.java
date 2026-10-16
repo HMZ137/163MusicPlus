@@ -2678,7 +2678,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         android.graphics.drawable.GradientDrawable background =
                 new android.graphics.drawable.GradientDrawable();
         background.setColor(LyricSettings.getBackdropColor());
-        background.setCornerRadius(0);
+        background.setCornerRadius(0);  // 整屏背景不参与圆角化（圆角会让四角露出下层底色）
         return background;
     }
 
@@ -3353,7 +3353,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
             android.graphics.drawable.GradientDrawable coverBg = new android.graphics.drawable.GradientDrawable();
             coverBg.setColor(0xFF333333);
-            coverBg.setCornerRadius(0);
+            coverBg.setCornerRadius(UiKit.cardRadiusPx(this));
             ivCover.setBackground(coverBg);
             NetworkImageLoader.load(ivCover, song.getCoverUrl());
             itemLayout.addView(ivCover);
@@ -3412,7 +3412,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 android.graphics.drawable.GradientDrawable badgeBg =
                         new android.graphics.drawable.GradientDrawable();
                 badgeBg.setColor(0xFFBB86FC);
-                badgeBg.setCornerRadius(0);
+                badgeBg.setCornerRadius(UiKit.dp(this, 8));
                 badge.setBackground(badgeBg);
                 LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -3907,7 +3907,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             badge.setTextSize(11);
             badge.setPadding(dp(6), dp(2), dp(6), dp(2));
             GradientDrawable bg = new GradientDrawable();
-            bg.setCornerRadius(0);
+            bg.setCornerRadius(UiKit.dp(this, 8));
             bg.setColor(0x22FFFFFF);
             badge.setBackground(bg);
             row.addView(badge);
@@ -4030,7 +4030,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             tvTier.setPadding(dp(6), dp(2), dp(6), dp(2));
             GradientDrawable tierBg = new GradientDrawable();
             tierBg.setShape(GradientDrawable.RECTANGLE);
-            tierBg.setCornerRadius(0);
+            tierBg.setCornerRadius(UiKit.dp(this, 8));
             tierBg.setColor(0x22FFFFFF);
             tvTier.setBackground(tierBg);
             row.addView(tvTier);

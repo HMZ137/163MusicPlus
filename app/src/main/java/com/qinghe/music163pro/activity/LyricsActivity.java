@@ -738,7 +738,7 @@ public class LyricsActivity extends BaseWatchActivity {
         android.graphics.drawable.GradientDrawable background =
                 new android.graphics.drawable.GradientDrawable();
         background.setColor(LyricSettings.getBackdropColor());
-        background.setCornerRadius(0);
+        background.setCornerRadius(0);  // 整屏背景不参与圆角化（圆角会让四角露出下层底色）
         return background;
     }
 

@@ -28,6 +28,7 @@ import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.UiKit;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -213,7 +214,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
 
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(COLOR_INPUT_BG);
-        inputBg.setCornerRadius(0);
+        inputBg.setCornerRadius(UiKit.cardRadiusPx(this));
         inputField.setBackground(inputBg);
         inputField.setPadding(px(8), px(6), px(8), px(6));
 
@@ -345,7 +346,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
 
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(COLOR_PARENT_BG);
-        bg.setCornerRadius(0);
+        bg.setCornerRadius(UiKit.cardRadiusPx(this));
         item.setBackground(bg);
 
         long commentId = comment.optLong("commentId", 0);

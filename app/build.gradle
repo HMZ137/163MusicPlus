@@ -82,4 +82,7 @@ dependencies {
     // ExoPlayer / Media3
     implementation 'androidx.media3:media3-exoplayer:1.4.1'
     implementation 'androidx.media3:media3-ui:1.4.1'
+    // ViewPager2：用于「收藏列表 / 我的歌单 / 搜索 / 本地音乐管理」的左右滑动切页。
+    // Fragment 本身已随 appcompat 传递引入，此处只补 ViewPager2 本体。
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
 }

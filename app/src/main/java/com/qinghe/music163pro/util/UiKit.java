@@ -14,15 +14,19 @@ import android.widget.TextView;
  * 不要再各自 new 一个 {@link GradientDrawable} 写死颜色和圆角 ——
  * 之前弹窗底色出现两套、列表行样式各写各的，就是这么来的。</p>
  *
- * <p>令牌（用户拍板）：**页面（背景/卡片/行/Tab/索引格/弹窗）一律直角；
- * 按钮一律统一圆角 10dp（{@link #DP_BUTTON_RADIUS}），不允许各页面自定圆角。**</p>
+ * <p>令牌（2026-10-16 改版）：**全 App 圆角化**。卡片 / 列表行 / Tab 统一
+ * {@link #DP_CARD_RADIUS}，弹窗与浮层统一 {@link #DP_DIALOG_RADIUS}，
+ * 按钮统一 {@link #DP_BUTTON_RADIUS}，不允许各页面自定圆角。</p>
+ *
+ * <p>圆角取值来自参考图实测（{@code 界面_1.png} / {@code Local_1.png} / {@code Local_2.png}
+ * 三张图一致）：卡片左上角圆弧水平跨度 19px，本机 density=2.0 ⇒ 约 10dp。</p>
  * <ul>
- *   <li>页面底色 {@code #121212}（维持原样）；</li>
- *   <li>卡片 {@code #1E1F24}、直角（圆角 0）；</li>
- *   <li>列表行即卡片：直角、内边距 8dp；选中态由 {@code bg_card_row} 的涟漪表现；</li>
- *   <li>主按钮：主色实心、统一圆角 10dp、高 44dp；次按钮：透明底 + 1dp 描边；</li>
- *   <li>弹窗底色 {@code #1E1F24}、直角（把原先两套底色归成一套）；</li>
- *   <li>字号阶梯：标题 15 / 正文 13 / 次要 11。</li>
+ *   <li>页面底色 {@code #121212}（维持原样；**整屏背景不参与圆角**）；</li>
+ *   <li>卡片 / 列表行 {@code #1E1F24}、圆角 10dp；列表行内边距 8dp，选中态由
+ *       {@code bg_card_row} 的涟漪表现；</li>
+ *   <li>主按钮：主色实心、圆角 10dp、高 44dp；次按钮：透明底 + 1dp 描边；</li>
+ *   <li>弹窗 / 浮层 {@code #1E1F24}、圆角 14dp；</li>
+ *   <li>字号阶梯：标题 15 / 正文 13 / 次要 11（尺寸放大将在该基准上统一上调）。</li>
  * </ul>
  */
 public final class UiKit {
@@ -38,12 +42,22 @@ public final class UiKit {
     /** 标签行高度（与「收藏」页一致）。 */
     public static final int DP_TAB_ROW_HEIGHT = 32;
 
-    public static final int DP_CARD_RADIUS = 0;
-    public static final int DP_ROW_RADIUS = 0;
-    public static final int DP_DIALOG_RADIUS = 0;
-    /** 按钮统一圆角（全 App 唯一值）：页面直角、按钮圆角 10dp。 */
+    public static final int DP_CARD_RADIUS = 10;
+    public static final int DP_ROW_RADIUS = 10;
+    public static final int DP_DIALOG_RADIUS = 14;
+    /** 按钮统一圆角（全 App 唯一值）：与卡片同值，保持观感一致。 */
     public static final int DP_BUTTON_RADIUS = 10;
     public static final int DP_BUTTON_HEIGHT = 44;
+
+    /** 卡片 / 列表行的圆角像素值。自绘页面直接 new GradientDrawable 时用它取值，别再写 0。 */
+    public static int cardRadiusPx(Context c) {
+        return dp(c, DP_CARD_RADIUS);
+    }
+
+    /** 弹窗 / 浮层的圆角像素值。 */
+    public static int dialogRadiusPx(Context c) {
+        return dp(c, DP_DIALOG_RADIUS);
+    }
 
     private UiKit() {
     }
@@ -55,12 +69,12 @@ public final class UiKit {
         return d;
     }
 
-    /** 卡片背景（圆角 12dp）。 */
+    /** 卡片背景（圆角 {@link #DP_CARD_RADIUS}）。 */
     public static GradientDrawable card(Context c) {
         return rounded(c, COLOR_CARD, DP_CARD_RADIUS);
     }
 
-    /** 弹窗背景（圆角 14dp）。 */
+    /** 弹窗背景（圆角 {@link #DP_DIALOG_RADIUS}）。 */
     public static GradientDrawable dialogCard(Context c) {
         return rounded(c, COLOR_CARD, DP_DIALOG_RADIUS);
     }

@@ -36,6 +36,7 @@ import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.WatchBackButton;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.UiKit;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -279,7 +280,7 @@ public class CommentActivity extends BaseWatchActivity {
 
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(COLOR_INPUT_BG);
-        inputBg.setCornerRadius(0);
+        inputBg.setCornerRadius(UiKit.cardRadiusPx(this));
         inputField.setBackground(inputBg);
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
@@ -498,7 +499,7 @@ public class CommentActivity extends BaseWatchActivity {
 
                     GradientDrawable repliedBg = new GradientDrawable();
                     repliedBg.setColor(0xFF2A2A2A);
-                    repliedBg.setCornerRadius(0);
+                    repliedBg.setCornerRadius(UiKit.cardRadiusPx(this));
                     repliedTv.setBackground(repliedBg);
 
                     LinearLayout.LayoutParams repliedParams = new LinearLayout.LayoutParams(

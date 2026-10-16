@@ -18,6 +18,7 @@ import android.widget.Toast;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.UiKit;
 
 import org.json.JSONObject;
 
@@ -511,7 +512,7 @@ public class ProfileActivity extends BaseWatchActivity {
         row.setPadding(px(12), px(14), px(12), px(14));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xFF1E1E1E);
-        bg.setCornerRadius(0);
+        bg.setCornerRadius(UiKit.cardRadiusPx(this));
         row.setBackground(bg);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
