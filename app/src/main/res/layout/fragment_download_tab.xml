@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「下载」标签页的内容（4-2：由 DownloadListActivity 迁入）。
+
+  结构与迁徙前**逐字对应**：ListView 与空态 TextView 同在一个竖直 LinearLayout 里、
+  都是 0dp + weight=1；`updateEmptyState()` 会切换两者的 visibility，所以不会出现
+  「两个各占一半」的情况（原来的布局也是这个写法，保持一致以免引入行为差异）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical">
+
+    <ListView
+        android:id="@+id/lv_downloads"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp" />
+
+    <TextView
+        android:id="@+id/tv_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/downloads_empty"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_sub"
+        android:visibility="gone" />
+</LinearLayout>

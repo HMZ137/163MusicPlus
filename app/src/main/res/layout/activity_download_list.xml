@@ -106,22 +106,14 @@
         </LinearLayout>
     </LinearLayout>
 
-    <ListView
-        android:id="@+id/lv_downloads"
+    <!--
+      4-1：内容区改为 ViewPager2 容器，承载「下载 / 本地」两页。
+      「下载」页的 ListView 与空态视图已迁入 res/layout/fragment_download_tab.xml（4-2）；
+      「本地」页目前是桥接占位，真实内容由 4-3 迁入。
+    -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vp_download_tabs"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp" />
-
-    <TextView
-        android:id="@+id/tv_empty"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="@string/downloads_empty"
-        android:textColor="@color/text_secondary"
-        android:textSize="@dimen/watch_text_sub"
-        android:visibility="gone" />
+        android:layout_weight="1" />
 </LinearLayout>

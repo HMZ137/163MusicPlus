@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「本地」标签页（4-1 的占位 + 能力桥）。
+
+  为什么现在是个占位而不是真实内容：`LocalMusicActivity` 是一个成熟页面（扫描 / 排序 /
+  搜索 / 局域网传歌 / 两阶段加载，1300 余行），把它迁进 Fragment 是 4-3 的事。
+  在 4-3 之前，这里放一个**桥接按钮**，点击仍走原来那条 `openLocalMusicTab()`，
+  保证「本地」这个能力**一刻都不丢**（4-3 完成后此页会被真实内容替换，桥按钮随之删除）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/local_music_entry"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/watch_text_item"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:text="标签页迁移中（4-3），先点下面进入"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_caption"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/btn_open_local_music"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingStart="14dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="8dp"
+        android:text="打开本机音乐"
+        android:textColor="@color/colorPrimary"
+        android:textSize="@dimen/watch_text_body"
+        android:singleLine="true"
+        android:ellipsize="end" />
+</LinearLayout>

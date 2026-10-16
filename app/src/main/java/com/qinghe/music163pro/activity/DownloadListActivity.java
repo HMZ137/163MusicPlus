@@ -28,6 +28,14 @@ import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.fragment.DownloadTabFragment;
+import com.qinghe.music163pro.fragment.LocalMusicTabFragment;
+
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -38,7 +46,16 @@ import java.util.Map;
  * Download list activity - shows all downloaded songs from /sdcard/163Music/Download/
  * 长按进入多选，可批量收藏 / 批量删除。
  */
-public class DownloadListActivity extends BaseWatchActivity {
+public class DownloadListActivity extends BaseWatchActivity
+        implements DownloadTabFragment.Host, LocalMusicTabFragment.Host {
+
+    /** 4-1：内容区容器 —— 承载「下载 / 本地」两页。 */
+    private ViewPager2 vpDownloadTabs;
+    /**
+     * 「本地」入口是否可见。纯在线模式会把它收起；为 {@code false} 时容器只保留「下载」一页，
+     * 并关掉左右滑动（滑到一页空白没有意义）。
+     */
+    private boolean tabsVisible = true;
 
     private final List<Song> downloadedSongs = new ArrayList<>();
     private ArrayAdapter<Song> adapter;
@@ -113,8 +130,8 @@ public class DownloadListActivity extends BaseWatchActivity {
 
         // Apply keep screen on setting
 
-        lvDownloads = findViewById(R.id.lv_downloads);
-        tvEmpty = findViewById(R.id.tv_empty);
+        // 4-1/4-2：下载列表与空态视图已迁到 ViewPager2 的「下载」页（DownloadTabFragment），
+        // 这里不再直接 findViewById —— 该页视图就绪后由 onDownloadListViewsReady() 回调绑定。
         tvTitle = findViewById(R.id.tv_downloads_title);
 
         // 「整理」：把早期下载固定的 song.mp3 / song.flac 改成「曲名 - 曲师」
@@ -123,25 +140,43 @@ public class DownloadListActivity extends BaseWatchActivity {
             btnTidy.setOnClickListener(v -> confirmTidyFileNames());
         }
 
-        // 页内标签：下载（当前页）/ 本地。
-        // 「本地」原先是动作行里的一个按钮，跳到本机音乐页；现在提成标签，样式与「收藏」页一致。
+        // 页内标签：下载 / 本地。4-1 起标签**不再跨 Activity**，而是切 ViewPager2 的页；
+        // 「本地」页在 4-3 之前是桥接占位（内部按钮仍走原来的 openLocalMusicTab 路径）。
+        vpDownloadTabs = findViewById(R.id.vp_download_tabs);
         TextView tabDownloads = findViewById(R.id.tab_downloads);
         TextView tabLocal = findViewById(R.id.tab_local_music);
         View tabRow = findViewById(R.id.ll_download_tabs);
-        UiKit.setTabSelected(tabDownloads, true);
-        UiKit.setTabSelected(tabLocal, false);
-        if (tabDownloads != null) {
-            tabDownloads.setOnClickListener(v -> { /* 已经在下载标签上，无需动作 */ });
-        }
-        if (tabLocal != null) {
-            tabLocal.setOnClickListener(v -> openLocalMusicTab());
-        }
+
         // 纯在线模式：「本地」入口收起（下载管理本身保留 —— 用户总得有地方管已下到卡里的歌）。
-        // 只剩一个「下载」标签没有意义，整行一起收掉。
-        if (PlaybackMode.isLocalEntryHidden(this) && tabRow != null) {
+        // 只剩一个「下载」标签没有意义，整行一起收掉，容器也只留一页。
+        tabsVisible = !PlaybackMode.isLocalEntryHidden(this);
+        if (!tabsVisible && tabRow != null) {
             tabRow.setVisibility(View.GONE);
         }
+        vpDownloadTabs.setAdapter(new TabsAdapter(this));
+        // 预加载限 1：下一页提前建好够用；多建只会白读盘（4-5 会实测首屏耗时再定值）。
+        vpDownloadTabs.setOffscreenPageLimit(1);
+        vpDownloadTabs.setUserInputEnabled(tabsVisible);
 
+        UiKit.setTabSelected(tabDownloads, true);
+        UiKit.setTabSelected(tabLocal, false);
+        // 双向同步（G4 改动要点 5）：点标签 → 切页；滑动换页 → 回写标签选中态。
+        if (tabDownloads != null) {
+            tabDownloads.setOnClickListener(v -> vpDownloadTabs.setCurrentItem(0, true));
+        }
+        if (tabLocal != null) {
+            tabLocal.setOnClickListener(v -> vpDownloadTabs.setCurrentItem(1, true));
+        }
+        vpDownloadTabs.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                UiKit.setTabSelected(tabDownloads, position == 0);
+                UiKit.setTabSelected(tabLocal, position == 1);
+            }
+        });
+
+        // 适配器在这里就建好（ArrayAdapter 不需要 ListView 即可构造）；
+        // 真正 setAdapter/监听/多选都等「下载」页视图就绪后由 onDownloadListViewsReady() 绑定。
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, downloadedSongs) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -162,14 +197,50 @@ public class DownloadListActivity extends BaseWatchActivity {
                 return view;
             }
         };
+
+        // 这里**不**发请求：列表页的 onResume 会触发一次（见 onDownloadTabResumed），
+        // 首次进入、切回本标签、从别处返回都覆盖得到。
+    }
+
+    /** 4-1：ViewPager2 的页面适配器（第 0 页 = 下载，第 1 页 = 本地）。 */
+    private final class TabsAdapter extends FragmentStateAdapter {
+        TabsAdapter(FragmentActivity activity) {
+            super(activity);
+        }
+
+        @NonNull
+        @Override
+        public Fragment createFragment(int position) {
+            return position == 0 ? new DownloadTabFragment() : new LocalMusicTabFragment();
+        }
+
+        @Override
+        public int getItemCount() {
+            return tabsVisible ? 2 : 1;
+        }
+    }
+
+    // ==================== 4-1 / 4-2：ViewPager2 页面的回调 ====================
+
+    /**
+     * 「下载」页视图就绪：把 ListView / 空态接过来，并完成适配器、点击、多选的绑定。
+     *
+     * <p>页面被重建（ViewPager2 回收再建）时本方法会**再次**触发，所以这里每次都重新绑定 ——
+     * 用新视图覆盖旧引用，避免抱着已销毁的 ListView。</p>
+     */
+    @Override
+    public void onDownloadListViewsReady(ListView listView, TextView emptyView) {
+        lvDownloads = listView;
+        tvEmpty = emptyView;
+        if (lvDownloads == null) {
+            return;
+        }
         lvDownloads.setAdapter(adapter);
         NetworkImageLoader.attachListViewOptimization(lvDownloads, adapter, position ->
                 position >= 0 && position < downloadedSongs.size()
                         ? downloadedSongs.get(position).getCoverUrl() : null);
-
-        lvDownloads.setOnItemClickListener((parent, view, position, id) -> {
-            playDownloadedSong(position);
-        });
+        lvDownloads.setOnItemClickListener((parent, view, position, id) ->
+                playDownloadedSong(position));
 
         // 长按进入多选模式，多选后可通过动作栏批量收藏或批量删除
         multiSelect = MultiSelectController.attach(this, lvDownloads,
@@ -194,20 +265,15 @@ public class DownloadListActivity extends BaseWatchActivity {
         if (multiSelect != null) {
             addBackInterceptor(multiSelect::handleBackPressed);
         }
-
-        // 这里**不**发请求：onCreate 后紧跟着就是 onResume，两处都发会让单线程队列
-        // 白跑一轮（实测读盘 1.9 秒／轮），用户要多等一整轮才看到列表。
-        // 加载统一由 onResume 负责 —— 首次进页面、从别处返回、切标签回来都覆盖得到。
+        updateEmptyState();
     }
 
+    /** 「下载」页成为当前页：这里才是原来的 onResume 干的事。 */
     @Override
-    protected void onResume() {
-        super.onResume();
-        // 列表数据在 onResume 会重新加载，选中下标可能失效，先退出多选。
+    public void onDownloadTabResumed() {
         if (multiSelect != null) {
             multiSelect.exitSelectionMode();
         }
-        // 首屏先用缓存渲染（若有），后台读盘完再静默替换
         applyCachedFirstPaint();
         loadDownloads();
         // 进页面时若还有下载在跑，就跟一下进度
@@ -215,6 +281,27 @@ public class DownloadListActivity extends BaseWatchActivity {
             refreshHandler.removeCallbacks(refreshTick);
             refreshHandler.post(refreshTick);
         }
+    }
+
+    /** 「下载」页离开前台：停掉进度刷新，别白耗电（原 onPause 的职责）。 */
+    @Override
+    public void onDownloadTabPaused() {
+        refreshHandler.removeCallbacks(refreshTick);
+    }
+
+    /** 「本地」页的桥接按钮（4-3 之前保留原有能力）。 */
+    @Override
+    public void onOpenLocalMusicTab() {
+        openLocalMusicTab();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 4-1 起：列表的加载与刷新由「下载」页（DownloadTabFragment）的 onResume 驱动
+        // —— 见 onDownloadTabResumed()。这样「本页是否在前台」的判据由 ViewPager2 天然给出，
+        // 不会再出现「已经切到本地页、后台还在读盘刷新」。
+        updateTitleText();
     }
 
     /** 用上一次的结果先把列表画出来，避免用户盯着「暂无下载」等读盘。 */
@@ -514,6 +601,11 @@ public class DownloadListActivity extends BaseWatchActivity {
     }
 
     private void updateEmptyState() {
+        if (tvEmpty == null || lvDownloads == null) {
+            // 4-1 起列表住在 ViewPager2 的页面里：视图可能尚未建好，或该页已被回收。
+            // 此时没有可更新的空态，直接返回（否则 NPE）。
+            return;
+        }
         if (!downloadedSongs.isEmpty()) {
             tvEmpty.setVisibility(View.GONE);
             lvDownloads.setVisibility(View.VISIBLE);
