@@ -5074,6 +5074,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvSongName.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
         tvSongName.setMarqueeRepeatLimit(-1);
         tvSongName.setSelected(true);   // marquee 需要 selected/聚焦状态才会滚
+        // D7 观测（低噪声金丝雀）：**系统 marquee 只在发生布局时才会把偏移重置回行首**，
+        // 所以这里只在「真的发生布局」时记一行 —— 播放期间若一行都没有，就说明每秒刷新
+        // （进度条 / 时间标签）没有触发布局，歌名不会跳回开头。
+        // 正常情况几首歌下来都不应该出现；一旦出现，说明又有东西在周期性 requestLayout。
+        tvSongName.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, orr, ob) ->
+                com.qinghe.music163pro.util.MusicLog.i("Marquee",
+                        "歌名发生布局（会重置 marquee 偏移）: w=" + (r - l)));
     }
 
     /** 启动跑马灯（进入前台时）。系统 marquee 全靠 selected 状态。 */
