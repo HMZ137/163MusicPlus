@@ -19,6 +19,7 @@ import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.WatchBackButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,11 +76,14 @@ public class AlbumDetailActivity extends BaseWatchActivity {
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
                 android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        titleParams.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         // 右侧要放收藏按钮，标题往左留出占位，避免长专辑名压住按钮
         titleParams.setMargins(0, 0, px(56), 0);
         tvTitle.setLayoutParams(titleParams);
         titleBar.addView(tvTitle);
+        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
+        WatchBackButton.alignTitleStart(this, tvTitle);
 
         // 收藏 / 已收藏（weapi /api/album/sub 与 /api/album/unsub）
         btnAlbumSub = new TextView(this);

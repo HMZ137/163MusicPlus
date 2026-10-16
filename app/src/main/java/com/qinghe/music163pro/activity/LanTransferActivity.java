@@ -74,9 +74,12 @@ public class LanTransferActivity extends BaseWatchActivity {
                 new android.widget.RelativeLayout.LayoutParams(
                         android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                         android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        titleParams.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         title.setLayoutParams(titleParams);
         titleBar.addView(title);
+        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
+        WatchBackButton.alignTitleStart(this, title);
         root.addView(titleBar);
 
         tvStatus = bodyText(0xFFCCCCCC, 13);

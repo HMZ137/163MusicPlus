@@ -85,9 +85,12 @@ public class ListeningRankActivity extends BaseWatchActivity {
                 new android.widget.RelativeLayout.LayoutParams(
                         android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                         android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        titleLp.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+titleLp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleLp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         title.setLayoutParams(titleLp);
         titleBar.addView(title);
+        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
+        WatchBackButton.alignTitleStart(this, title);
         root.addView(titleBar);
 
         // ---- 页内标签：本周 / 全部（等宽平分、纯文字、仅颜色区分选中） ----

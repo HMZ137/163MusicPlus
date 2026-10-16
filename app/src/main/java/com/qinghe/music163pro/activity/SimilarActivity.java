@@ -93,9 +93,12 @@ public class SimilarActivity extends BaseWatchActivity {
                 new android.widget.RelativeLayout.LayoutParams(
                         android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                         android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        titleLp.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+titleLp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleLp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         tvTitle.setLayoutParams(titleLp);
         titleBar.addView(tvTitle);
+        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
+        WatchBackButton.alignTitleStart(this, tvTitle);
         root.addView(titleBar);
 
         // ── 副标题：来自哪首歌 / 哪位歌手 ──

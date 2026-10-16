@@ -23,6 +23,7 @@ import com.qinghe.music163pro.manager.HistoryManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
+import com.qinghe.music163pro.util.WatchBackButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,9 +83,12 @@ public class HistoryActivity extends BaseWatchActivity {
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
                 android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        titleParams.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         title.setLayoutParams(titleParams);
         titleBar.addView(title);
+        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
+        WatchBackButton.alignTitleStart(this, title);
 
         tvEmpty = new TextView(this);
         tvEmpty.setText("暂无播放记录");

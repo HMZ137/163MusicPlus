@@ -145,11 +145,14 @@ public class ArtistDetailActivity extends BaseWatchActivity {
                 new android.widget.RelativeLayout.LayoutParams(
                         android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                         android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        titleCenterLp.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
+titleCenterLp.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleCenterLp.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         titleCenterLp.setMargins(0, 0, px(56), 0);
         tvTitle.setLayoutParams(titleCenterLp);
 
         titleBar.addView(tvTitle);
+        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
+        WatchBackButton.alignTitleStart(this, tvTitle);
         titleBar.addView(btnSubscribe);
         root.addView(titleBar);
 
