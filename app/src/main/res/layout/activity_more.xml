@@ -18,7 +18,7 @@
             android:layout_height="wrap_content"
             android:text="@string/more"
             android:textColor="@color/text_primary"
-            android:textSize="@dimen/watch_title_text_size"
+            android:textSize="@dimen/watch_text_title"
             android:textStyle="bold"
             android:letterSpacing="0.1"
             android:gravity="center"
@@ -53,7 +53,9 @@
                 android:layout_marginStart="12dp"
                 android:text="本机音乐"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -78,7 +80,9 @@
                 android:layout_marginStart="12dp"
                 android:text="收藏列表"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -104,7 +108,9 @@
                 android:layout_marginStart="12dp"
                 android:text="我的歌单"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -130,7 +136,9 @@
                 android:layout_marginStart="12dp"
                 android:text="每日推荐"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -156,7 +164,9 @@
                 android:layout_marginStart="12dp"
                 android:text="雷达歌单"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -182,7 +192,9 @@
                 android:layout_marginStart="12dp"
                 android:text="音乐云盘"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -207,7 +219,9 @@
                 android:layout_marginStart="12dp"
                 android:text="搜索"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -233,7 +247,9 @@
                 android:layout_marginStart="12dp"
                 android:text="听歌识曲"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -258,7 +274,9 @@
                 android:layout_marginStart="12dp"
                 android:text="@string/downloads"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -283,7 +301,9 @@
                 android:layout_marginStart="12dp"
                 android:text="@string/bilibili_entry"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -308,7 +328,9 @@
                 android:layout_marginStart="12dp"
                 android:text="铃声管理"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -333,7 +355,9 @@
                 android:layout_marginStart="12dp"
                 android:text="排行榜"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -358,7 +382,9 @@
                 android:layout_marginStart="12dp"
                 android:text="历史记录"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -384,7 +410,9 @@
                 android:layout_marginStart="12dp"
                 android:text="个人中心"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -410,7 +438,9 @@
                 android:layout_marginStart="12dp"
                 android:text="私人漫游"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -435,7 +465,9 @@
                 android:layout_marginStart="12dp"
                 android:text="登录"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
         <LinearLayout
@@ -460,7 +492,9 @@
                 android:layout_marginStart="12dp"
                 android:text="设置"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="@dimen/watch_text_body" android:singleLine="true"
+ android:ellipsize="end"
+ />
         </LinearLayout>
 
     </LinearLayout>
