@@ -29,6 +29,7 @@ import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.LocalLibraryCache;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.PlaybackStats;
@@ -481,6 +482,7 @@ public class MusicPlayerManager {
                 return true;
             });
             mediaPlayer.prepareAsync();
+            probeLoudnessFeasibility(false);   // F5/R4 探针
         } catch (Exception e) {
             if (callback != null) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
@@ -558,6 +560,7 @@ public class MusicPlayerManager {
                 return true;
             });
             mediaPlayer.prepareAsync();
+            probeLoudnessFeasibility(false);   // F5/R4 探针
         } catch (Exception e) {
             if (callback != null) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
@@ -574,6 +577,68 @@ public class MusicPlayerManager {
             mediaPlayer.pause();
             isPlaying = false;
             notifyPlayStateChanged(false);
+        }
+    }
+
+    // ==================== F5 限音器可行性探针（文档风险 R4） ====================
+    // R4：实时增益需要播放器的 audio session，文档要求「优先验证 LoudnessEnhancer」。
+    // 一次性探针：挂上 LoudnessEnhancer、读回增益、立刻释放 —— 只写日志，不改播放行为。
+    private boolean loudnessProbedMediaPlayer = false;
+    private boolean loudnessProbedExoPlayer = false;
+
+    /** 供限音器（F5）后续使用：当前播放器的 audio session id；拿不到时返回 0。 */
+    public int getAudioSessionId() {
+        try {
+            if (usingExoPlayer && exoPlayer != null) {
+                return exoPlayer.getAudioSessionId();
+            }
+            if (mediaPlayer != null) {
+                return mediaPlayer.getAudioSessionId();
+            }
+        } catch (Throwable t) {
+            MusicLog.w("Loudness", "取 audio session 失败: " + t);
+        }
+        return 0;
+    }
+
+    /** 一次性探针：双路各探一次，便于分别下结论。 */
+    private void probeLoudnessFeasibility(boolean exoPath) {
+        if (exoPath ? loudnessProbedExoPlayer : loudnessProbedMediaPlayer) {
+            return;
+        }
+        if (exoPath) {
+            loudnessProbedExoPlayer = true;
+        } else {
+            loudnessProbedMediaPlayer = true;
+        }
+        int session = getAudioSessionId();
+        MusicLog.i("Loudness", "探针(" + (exoPath ? "ExoPlayer" : "MediaPlayer")
+                + "): audioSession=" + session + " usingExo=" + usingExoPlayer);
+        if (session == 0) {
+            MusicLog.w("Loudness", "探针结论: 拿不到 audio session => 该路无法用 LoudnessEnhancer");
+            return;
+        }
+        android.media.audiofx.LoudnessEnhancer enh = null;
+        try {
+            enh = new android.media.audiofx.LoudnessEnhancer(session);
+            enh.setTargetGain(600);
+            float readBack = enh.getTargetGain();
+            enh.setEnabled(true);
+            MusicLog.i("Loudness", "探针结论: LoudnessEnhancer 可用 OK setTargetGain(600mB) 读回=" + readBack
+                    + " enabled=" + enh.getEnabled() + " => 风险 R4 解除（该路可做实时增益）");
+        } catch (Throwable t) {
+            MusicLog.w("Loudness", "探针结论: LoudnessEnhancer 挂载失败 => 该路不可用: " + t);
+        } finally {
+            if (enh != null) {
+                try {
+                    enh.setEnabled(false);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    enh.release();
+                } catch (Throwable ignored) {
+                }
+            }
         }
     }
 
@@ -1297,6 +1362,7 @@ public class MusicPlayerManager {
 
             exoPlayer.setMediaItem(MediaItem.fromUri(url));
             exoPlayer.prepare();
+            probeLoudnessFeasibility(true);   // F5/R4 探针
 
             if (resumePositionMs > 0) {
                 exoPlayer.seekTo(resumePositionMs);
