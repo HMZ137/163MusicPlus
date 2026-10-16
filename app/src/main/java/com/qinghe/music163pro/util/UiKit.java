@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -135,6 +136,67 @@ public final class UiKit {
     public static int iconSizePx(Context c) { return dp(c, DP_ICON_SIZE); }
 
     public static int touchMinPx(Context c) { return dp(c, DP_TOUCH_MIN); }
+
+    // ==================== 说明文字：过长先省略 → 点击展开 ====================
+
+    /** 「过长先省略、点击展开」的说明文字在布局里的 tag 值（用 tag 免去逐条写 id）。 */
+    public static final String TAG_COLLAPSIBLE_DESC = "collapsible_desc";
+
+    /**
+     * 把一段说明文字做成「过长先省略、点击展开 / 再点收起」。
+     *
+     * <p>设置项下方的说明常常比一行宽（例如「隐藏本地音乐 / 本地歌单 / 局域网传歌…」）。
+     * 直接多行显示会把行撑得很高、整页显得啰嗦；强行截断又看不到全文。统一约定为：
+     * <b>默认折叠成单行 + 结尾省略（…），点一下展开显示全文，再点一下收起。</b></p>
+     *
+     * <p><b>状态不持久化</b>：展开态不写 SharedPreferences，因此重新进入页面（或页面被重建）
+     * 会自然回到折叠态 —— 这正是需求方要的「重进再次折叠」。状态本身直接用
+     * {@code getMaxLines()} 表达（1 = 折叠），不额外存字段，也就不存在漏改清理的问题。</p>
+     *
+     * <p>用法：布局里给说明 {@code TextView} 加 {@code android:tag="collapsible_desc"}
+     * 与 {@code android:singleLine="true"}（折叠态默认值），再在 Activity 里调用
+     * {@link #makeDescriptionsCollapsible(View)} 传根容器即可。</p>
+     */
+    public static void makeDescriptionCollapsible(final TextView tv) {
+        if (tv == null) {
+            return;
+        }
+        tv.setClickable(true);
+        tv.setFocusable(true);
+        setDescriptionCollapsed(tv, true);
+        tv.setOnClickListener(v -> setDescriptionCollapsed(tv, tv.getMaxLines() != 1));
+    }
+
+    /**
+     * 折叠 / 展开一段说明文字。
+     *
+     * <p>{@code setSingleLine(true)} 会把 maxLines 设为 1 并置于结尾省略；
+     * {@code setSingleLine(false)} 会把 maxLines 放开为 {@code Integer.MAX_VALUE}。</p>
+     */
+    public static void setDescriptionCollapsed(TextView tv, boolean collapsed) {
+        if (tv == null) {
+            return;
+        }
+        tv.setSingleLine(collapsed);
+        tv.setEllipsize(collapsed ? android.text.TextUtils.TruncateAt.END : null);
+    }
+
+    /** 遍历视图树，把所有 tag 为 {@link #TAG_COLLAPSIBLE_DESC} 的 TextView 接上折叠行为。 */
+    public static void makeDescriptionsCollapsible(View root) {
+        if (root == null) {
+            return;
+        }
+        if (root instanceof TextView && TAG_COLLAPSIBLE_DESC.equals(root.getTag())) {
+            makeDescriptionCollapsible((TextView) root);
+            return;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                makeDescriptionsCollapsible(group.getChildAt(i));
+            }
+        }
+    }
 
     /** 卡片 / 列表行的圆角像素值。自绘页面直接 new GradientDrawable 时用它取值，别再写 0。 */
     public static int cardRadiusPx(Context c) {

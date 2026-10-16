@@ -80,6 +80,11 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
                 this, findViewById(R.id.tv_toggle_settings_title));
 
+        // 设置项下方的说明：过长先省略（…），点一下展开全文、再点收起。
+        // 状态不持久化 ⇒ 重新进入本页自动回到折叠态（需求方要求「重进再次折叠」）。
+        com.qinghe.music163pro.util.UiKit.makeDescriptionsCollapsible(
+                findViewById(R.id.layout_toggle_settings_content));
+
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Apply keep screen on setting
