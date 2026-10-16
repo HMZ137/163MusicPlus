@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S3：搜索框底。
+  原先是 `@color/surface_elevated` **平涂（直角）**，与 G1 之后全站的圆角风格不一致
+  （其余卡片用 bg_card_row / bg_card_tile，圆角 10dp）。
+  圆角取 10dp，与 `UiKit.DP_CARD_RADIUS` 同一量级（G1 的实测基准）。
+
+  这里不需要 inset：搜索框不在 ListView 里，不受 AbsListView 丢弃 layout_margin 的影响。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/surface_elevated" />
+    <corners android:radius="10dp" />
+</shape>

@@ -25,7 +25,7 @@
             android:layout_width="0dp"
             android:layout_height="30dp"
             android:layout_weight="1"
-            android:background="@color/surface_elevated"
+            android:background="@drawable/bg_search_box"
             android:hint="@string/search_hint"
             android:inputType="text"
             android:paddingStart="10dp"
@@ -33,7 +33,7 @@
             android:singleLine="true"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_disabled"
-            android:textSize="13sp" />
+            android:textSize="@dimen/watch_text_sub" />
 
         <!--
           高度 30dp 与左侧输入框一致；MaterialButton 自带上下 6dp inset（XML 的
