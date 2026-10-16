@@ -8,51 +8,59 @@
     <!-- M3：左上角歌单按钮已移除（能力迁到「更多功能」菜单的「播放列表」项） -->
 
     <!--
-      M4 顶栏：**左标题 + 右侧预制菜单区** 两栏等高结构（参考 Main1.png：左上歌名、
-      下方小字曲师、右上汉堡按钮）。
-
-      高度 48dp 是**刻意沿用**原来的几何（8dp 根内边距 + 40dp 按钮），
-      在本机密度下正好等于 `WatchBackButton.applyTitleBarInset()` 的 94px 占位约定，
-      这样二级页与主界面的顶栏高度一致（M4 第 4 点）。
+      M4 顶栏（2026-10-17 按需求方口径调整）：自上而下 =
+        **时间（居中、小字）** → **标题行（左标题 + 右侧预制菜单区）** → **分隔线** → **作者**。
 
       ⚠️ 跑马灯硬约束（M4 第 3 点，改这里前务必读）：
       歌名用的是**系统 marquee**（见 `setupMarquee()`），偏移量由 TextView 内部持有，
       **一旦发生布局就会被重置回行首**。所以：
-        1. 歌名所在栏宽度必须**只随屏幕/密度变化、不随文本变化** ——
-           左栏用 0dp + weight=1（吸收伸缩），歌名再 match_parent，
-           右栏是固定宽度（52dp 时间 + 40dp 按钮），因此歌名宽度是恒定的；
-        2. 每秒刷新的时间必须**避免触发布局** —— 时间用**固定宽度 + tnum**
-           （等宽数字），这样 setText 只重绘、不冒泡布局。
+        1. 歌名宽度必须**只随屏幕/密度变化、不随文本变化** —— 这里用 0dp + weight=1
+           （右侧菜单区固定 40dp ⇒ 歌名宽度恒定）；
+        2. 时间必须**等宽（tnum）+ 固定字号** ⇒ 宽度不随数字变化 ⇒ 自走时不触发布局。
       这两条一旦破坏，表现就是「歌名滚一小段就跳回开头」。
     -->
     <LinearLayout
         android:id="@+id/main_top_bar"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical">
 
-        <!-- 左栏：标题（歌名）+ 小字曲师，两行左对齐 -->
+        <!--
+          时间：**标题之上、水平居中、字号不大**（12sp = watch_text_caption）。
+          match_parent + gravity=center ⇒ 居中；`tnum`（等宽数字）保证宽度不随数字变化，
+          配合固定字号 ⇒ 自走时不触发布局（否则会把歌名 marquee 冲回行首，见下）。
+        -->
+        <TextClock
+            android:id="@+id/tv_clock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:format24Hour="HH:mm"
+            android:format12Hour="HH:mm"
+            android:gravity="center"
+            android:letterSpacing="0.06"
+            android:textColor="#B3FFFFFF"
+            android:textSize="@dimen/watch_text_caption" />
+
+        <!-- 标题行：左标题 + 右侧预制菜单区（等高、居中） -->
         <LinearLayout
-            android:id="@+id/main_top_bar_title"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="8dp">
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <!--
-              歌名：**系统 marquee**（`setupMarquee()` 里 setSelected(true) 驱动）。
-              左对齐（`gravity="start"`）符合 Main1.png 的目标形态。
-              宽度 match_parent（父栏宽度恒定）⇒ 不随文本变化。
+              歌名：**系统 marquee**（`setupMarquee()` 里 setSelected(true) 驱动），左对齐。
+              宽度用 0dp + weight=1 ⇒ 由「父宽 − 菜单按钮宽」决定，**不随文本变化**，
+              这样 marquee 的偏移才不会被布局重置回行首（M4 第 3 点硬约束）。
             -->
             <TextView
                 android:id="@+id/tv_song_name"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingStart="16dp"
                 android:ellipsize="marquee"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
@@ -65,61 +73,10 @@
                 android:textSize="@dimen/watch_text_title"
                 android:textStyle="bold" />
 
-            <!--
-              第二行：曲师（左，小字号）+ 时间（右，固定宽度 + tnum）。
-              曲师用 0dp + weight=1 ⇒ 宽度只随屏幕变化、不随文本变化；
-              时间固定 46dp + 等宽数字 ⇒ 每秒自走时宽度恒定。
-              两者都不触发布局，因此**不会把歌名的 marquee 冲回行首**（M4 第 3 点）。
-            -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:id="@+id/tv_artist"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="start"
-                    android:includeFontPadding="false"
-                    android:singleLine="true"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/watch_text_sub" />
-
-                <!--
-                  时间：**固定宽度 56dp + `tnum`（等宽数字）**。
-
-                  为什么必须是「固定宽度」而**不能**用 `wrap_content`：
-                  `TextView.checkForRelayout()` 在宽度是 `wrap_content` 时，
-                  只要 `setText` 就会走 `requestLayout()`；而**一次布局就会把歌名的
-                  marquee 偏移重置回行首**（M4 第 3 点点名的坑）。
-                  宽度固定 + 文本放得下时，`checkForRelayout()` 只重绘、不请求布局。
-                  `tnum` 则保证不同数字宽度一致，避免"到点变宽"。
-
-                  56dp ≈ 109px：实测 `HH:mm` 在 15sp 粗体下需要约 101px，
-                  故 56dp 有余量。**46dp（89px）会裁掉最后一位**（截图曾是「03:0」）。
-                -->
-                <TextClock
-                    android:id="@+id/tv_clock"
-                    android:layout_width="56dp"
-                    android:layout_height="wrap_content"
-                    android:fontFeatureSettings="tnum"
-                    android:format24Hour="HH:mm"
-                    android:format12Hour="HH:mm"
-                    android:gravity="center"
-                    android:textStyle="bold"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="15sp" />
-            </LinearLayout>
-        </LinearLayout>
+            <!-- （时间已上提到标题之上；曲师移到分隔线之下） -->
 
         <!--
-          右栏：预制菜单区（与左栏等高 = match_parent）。
-          这里**只放菜单按钮**；「数量与内容由配置决定」（M4 第 1 点），
-          以后要加预制菜单按钮直接往这一栏加即可。
+          右侧：预制菜单区（与标题行等高）。「数量与内容由配置决定」（M4 第 1 点）。
         -->
         <LinearLayout
             android:id="@+id/main_top_bar_menu"
@@ -139,6 +96,31 @@
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>
+        </LinearLayout>
+
+        <!-- 分隔线（参考图：标题下方整宽一条） -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="2dp"
+            android:background="@color/divider" />
+
+        <!-- 作者：小字，分隔线之下、左对齐 -->
+        <TextView
+            android:id="@+id/tv_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:ellipsize="end"
+            android:gravity="start"
+            android:includeFontPadding="false"
+            android:singleLine="true"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/watch_text_sub" />
     </LinearLayout>
 
     <!--
@@ -332,43 +314,53 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <!--
+              M1：原来左右两个音量键（btn_vol_down / btn_vol_up）**合并为这一个入口**，
+              点击弹出**可拖拽/可点击**的音量条（MainActivity#showVolumeIndicator）。
+            -->
             <ImageView
-                android:id="@+id/btn_vol_down"
+                android:id="@+id/btn_volume"
                 android:layout_width="46dp"
                 android:layout_height="34dp"
                 android:padding="8dp"
-                android:src="@drawable/ic_volume_down"
+                android:src="@drawable/ic_volume_up"
                 android:alpha="0.6"
                 android:clickable="true"
                 android:focusable="true" />
 
-            <!-- 弹性留白：把音量-推到最左、音量+推到最右 -->
+            <!-- 弹性留白：三个入口均匀分布 -->
             <View
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
+            <!--
+              播放模式切换：单曲循环 / 列表循环 / 随机播放。
+              图标随当前模式变化（见 MainActivity#updatePlayModeIcon），点击循环切换。
+              —— 对应参考图底部中间那个箭头图标（**不是分享**）。
+            -->
+            <ImageView
+                android:id="@+id/btn_play_mode"
+                android:layout_width="46dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
+                android:src="@drawable/ic_repeat"
+                android:alpha="0.85"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- 菜单（⋯）：保留原 id `btn_favorite`，避免牵连其它引用 -->
             <ImageView
                 android:id="@+id/btn_favorite"
                 android:layout_width="46dp"
                 android:layout_height="34dp"
                 android:padding="8dp"
                 android:src="@drawable/ic_more_horiz"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <ImageView
-                android:id="@+id/btn_vol_up"
-                android:layout_width="46dp"
-                android:layout_height="34dp"
-                android:padding="8dp"
-                android:src="@drawable/ic_volume_up"
-                android:alpha="0.6"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>

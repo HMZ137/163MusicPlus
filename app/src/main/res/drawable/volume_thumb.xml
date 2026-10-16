@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M1：可拖拽音量条的拖柄（拇指）。
+  参考图里进度条上就是一个圆点 —— 这里用 colorPrimary 实心圆 + 深色描边，
+  保证在任意背景上都能看清。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <size
+                android:width="16dp"
+                android:height="16dp" />
+            <solid android:color="@color/colorPrimary" />
+            <stroke
+                android:width="2dp"
+                android:color="#CC000000" />
+        </shape>
+    </item>
+</layer-list>

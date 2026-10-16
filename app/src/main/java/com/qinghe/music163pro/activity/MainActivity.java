@@ -81,6 +81,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final int VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP = 152;
     private static final int VOLUME_INDICATOR_MAX_WIDTH_DP = 208;
     private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
+    /** M1：音量浮层自动收起延时（浮层升级为可交互后，比原来的 1500ms 放宽）。 */
+    private static final long VOLUME_DISMISS_DELAY_MS = 2500L;
     private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
     private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
     private static final int SAFE_VOLUME_PERCENT = 60;
@@ -114,6 +116,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // Volume indicator
     private View volumeIndicator;
+    /** M1：底部「播放模式」按钮（图标随当前模式变化）。 */
+    private ImageView btnPlayMode;
     private ProgressBar volumeProgressBar;
     private TextView volumePercentView;
     private final Handler volumeHandler = new Handler();
@@ -357,8 +361,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvTotalTime = findViewById(R.id.tv_total_time);
         ImageView btnPrev = findViewById(R.id.btn_prev);
         ImageView btnNext = findViewById(R.id.btn_next);
-        ImageView btnVolDown = findViewById(R.id.btn_vol_down);
-        ImageView btnVolUp = findViewById(R.id.btn_vol_up);
+        // M1：两个音量键（btn_vol_down / btn_vol_up）已合并为一个入口 `btn_volume`；
+        // 底部中间新增「播放模式」按钮（对应参考图底部中间那个箭头，**不是分享**）。
+        ImageView btnVolume = findViewById(R.id.btn_volume);
+        btnPlayMode = findViewById(R.id.btn_play_mode);
+        // 注意：这里**不能**立刻 updatePlayModeIcon() —— 此时 playerManager 还没初始化
+        // （实测 NPE：getPlayMode() on a null object reference）。图标在 onCreate 末尾统一刷新。
+        if (btnVolume != null) {
+            btnVolume.setOnClickListener(v -> showVolumeIndicator());
+        }
+        if (btnPlayMode != null) {
+            btnPlayMode.setOnClickListener(v -> {
+                onFuncCyclePlayMode();
+                updatePlayModeIcon();
+            });
+        }
         ImageView btnMore = findViewById(R.id.btn_more);
         mainContentBlock = findViewById(R.id.main_content_block);
         // 圆角屏：顶栏两端图标避让物理圆角（原 4dp 边距会落进圆角切除区被切掉）
@@ -423,36 +440,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPrev.setOnClickListener(v -> playerManager.previous());
         btnNext.setOnClickListener(v -> playerManager.next());
 
-        btnVolDown.setOnClickListener(v -> {
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
-                        AudioManager.ADJUST_LOWER, AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE);
-                showVolumeIndicator();
-        });
-
-        btnVolUp.setOnClickListener(v -> {
-                if (!isHeadphonesConnected()) {
-                    volumeSafeConfirmed = false;
-                    adjustVolumeUp();
-                    return;
-                }
-                int current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-                int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-                int percent = max > 0 ? Math.round(current * 100f / max) : 0;
-                if (percent < SAFE_VOLUME_PERCENT) {
-                    volumeSafeConfirmed = false;
-                    adjustVolumeUp();
-                } else if (!volumeSafeConfirmed) {
-                    WatchConfirmDialog.show(this, "音量保护",
-                            "当前音量已达 " + percent + "%，继续调大可能损伤听力。确定继续调大吗？",
-                            () -> {
-                                volumeSafeConfirmed = true;
-                                adjustVolumeUp();
-                            },
-                            WatchConfirmDialog.Options.defaultOptions());
-                } else {
-                    adjustVolumeUp();
-                }
-        });
+        // M1：音量不再有「-」「+」两个键 —— 统一由 `btn_volume` 弹出可拖拽音量条完成，
+        // 安全音量保护移到音量条里（见 applyUserVolume）。
 
         // Changed: "more functions" overlay instead of toggle favorite
         btnFuncMore.setOnClickListener(v -> showFunctionsOverlay());
@@ -500,6 +489,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         updateUI();
 
+        // M1：底部「播放模式」按钮的图标 —— 到这里 playerManager 已初始化、模式也已还原，
+        // 是唯一安全的刷新点（放在前面的 findViewById 附近会 NPE，实测过）。
+        updatePlayModeIcon();
 
         // Request storage permission for saving favorites to /sdcard/163Music/
         requestStoragePermission();
@@ -1444,6 +1436,31 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
     }
 
+    /**
+     * M1：按当前播放模式刷新底部「播放模式」按钮的图标。
+     *
+     * <p>与浮层里那一项的图标口径保持一致（单曲循环 / 随机播放 / 列表循环）。</p>
+     */
+    private void updatePlayModeIcon() {
+        if (btnPlayMode == null || playerManager == null) {
+            return;
+        }
+        int icon;
+        switch (playerManager.getPlayMode()) {
+            case SINGLE_REPEAT:
+                icon = R.drawable.ic_repeat_one;
+                break;
+            case RANDOM:
+                icon = R.drawable.ic_shuffle;
+                break;
+            case LIST_LOOP:
+            default:
+                icon = R.drawable.ic_repeat;
+                break;
+        }
+        btnPlayMode.setImageResource(icon);
+    }
+
     private void adjustVolumeUp() {
         audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
                 AudioManager.ADJUST_RAISE, AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE);
@@ -1457,9 +1474,56 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int percent = hasVolumeInfo ? Math.round(current * 100f / max) : 0;
         ensureVolumeIndicator(hasVolumeInfo, current, max, percent);
         updateVolumeIndicator(hasVolumeInfo, current, max, percent);
+        // M1：浮层已升级为**可交互**（拖动 / 点击改音量），故给足收起时间；
+        // 拖动期间由 onStartTrackingTouch 暂停计时，不会在手指按着时消失。
+        scheduleVolumeDismiss();
+    }
 
+    /** M1：延时自动收起音量浮层（拖动中不调用它）。 */
+    private void scheduleVolumeDismiss() {
         volumeHandler.removeCallbacksAndMessages(null);
-        volumeHandler.postDelayed(this::dismissVolumeIndicator, 1500);
+        volumeHandler.postDelayed(this::dismissVolumeIndicator, VOLUME_DISMISS_DELAY_MS);
+    }
+
+    /**
+     * M1：用户拖动 / 点击音量条后**写入系统音量**。
+     *
+     * <p>保留原有耳机安全音量保护：超过 {@code SAFE_VOLUME_PERCENT} 且插着耳机、尚未确认过时，
+     * 先把浮层回滚到当前系统值，再弹确认框；确认后才真正调大。</p>
+     */
+    private void applyUserVolume(int value, int max) {
+        int target = Math.max(0, Math.min(value, Math.max(max, 1)));
+        int percent = max > 0 ? Math.round(target * 100f / max) : 0;
+        if (percent >= SAFE_VOLUME_PERCENT && isHeadphonesConnected() && !volumeSafeConfirmed) {
+            // 回滚显示，避免"条已经拉到那么大"的错觉
+            applyVolumeToSystem(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
+            WatchConfirmDialog.show(this, "音量保护",
+                    "当前音量已达 " + percent + "%，继续调大可能损伤听力。确定继续调大吗？",
+                    () -> {
+                        volumeSafeConfirmed = true;
+                        applyVolumeToSystem(target);
+                    },
+                    WatchConfirmDialog.Options.defaultOptions());
+            return;
+        }
+        if (percent < SAFE_VOLUME_PERCENT) {
+            volumeSafeConfirmed = false;
+        }
+        applyVolumeToSystem(target);
+    }
+
+    /** 把音量写进系统，并把浮层刷新到最新值。 */
+    private void applyVolumeToSystem(int value) {
+        int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int target = Math.max(0, Math.min(value, Math.max(max, 1)));
+        try {
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0);
+        } catch (Exception e) {
+            com.qinghe.music163pro.util.MusicLog.w("Volume", "setStreamVolume 失败: " + e);
+        }
+        int percent = max > 0 ? Math.round(target * 100f / max) : 0;
+        updateVolumeIndicator(max > 0, target, max, percent);
+        scheduleVolumeDismiss();
     }
 
     private void ensureVolumeIndicator(boolean hasVolumeInfo, int current, int max, int percent) {
@@ -1484,13 +1548,35 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         card.setClickable(false);
         card.setFocusable(false);
 
-        ProgressBar progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        // M1：由「只读进度条」升级为**可拖拽 / 可点击**的 SeekBar（拖动即改音量）。
+        SeekBar progressBar = new SeekBar(this);
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
-                0, dp(8), 1f);
+                0, dp(24), 1f);
         progressBar.setLayoutParams(progressParams);
         progressBar.setProgressDrawable(ContextCompat.getDrawable(this, R.drawable.progress_volume_indicator));
-        progressBar.setMax(hasVolumeInfo ? max : 1);
+        progressBar.setThumb(ContextCompat.getDrawable(this, R.drawable.volume_thumb));
+        progressBar.setPadding(dp(8), 0, dp(8), 0);
+        progressBar.setMax(hasVolumeInfo ? Math.max(max, 1) : 1);
         progressBar.setProgress(hasVolumeInfo ? current : 0);
+        progressBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+                if (fromUser) {
+                    applyUserVolume(value, bar.getMax());
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+                // 手指按着时不允许自动收起
+                volumeHandler.removeCallbacksAndMessages(null);
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                scheduleVolumeDismiss();
+            }
+        });
 
         TextView percentView = new TextView(this);
         LinearLayout.LayoutParams percentParams = new LinearLayout.LayoutParams(
@@ -1513,12 +1599,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         card.setLayoutParams(params);
 
         rootView.addView(card);
-        card.setAlpha(0f);
+        // ⚠️ 原来这里是 `setAlpha(0f)` 起做淡入 —— 实测在本机（手表）上**浮层会永远停在透明状态**：
+        // 视图树里查得到（dumpsys 里 SeekBar 由 1 变 2），但截图与 uiautomator 都看不到。
+        // 改成「直接可见 + 只做缩放动画」，不再拿 alpha 当入场。
+        card.setAlpha(1f);
         card.setScaleX(VOLUME_INDICATOR_INITIAL_SCALE);
         card.setScaleY(VOLUME_INDICATOR_INITIAL_SCALE);
-        card.animate().alpha(1f).scaleX(1f).scaleY(1f)
+        card.animate().scaleX(1f).scaleY(1f)
                 .setDuration(VOLUME_INDICATOR_ANIM_DURATION_MS)
                 .start();
+        com.qinghe.music163pro.util.MusicLog.i("Volume",
+                "音量浮层已加入 content: w=" + popupWidth + " hasInfo=" + hasVolumeInfo);
 
         volumeIndicator = card;
         volumeProgressBar = progressBar;
