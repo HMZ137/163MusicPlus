@@ -19,7 +19,7 @@
             android:layout_height="wrap_content"
             android:text="开关选项"
             android:textColor="@color/text_primary"
-            android:textSize="@dimen/watch_title_text_size"
+            android:textSize="@dimen/watch_text_title"
             android:textStyle="bold"
             android:letterSpacing="0.1"
             android:gravity="center"
@@ -34,7 +34,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -53,13 +53,17 @@
                     android:layout_height="wrap_content"
                     android:text="本地播放模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="只看本机音乐，隐藏云端功能"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
@@ -72,7 +76,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -90,13 +94,17 @@
                     android:layout_height="wrap_content"
                     android:text="纯在线模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="隐藏本地音乐 / 本地歌单 / 局域网传歌，只留在线功能与下载管理"
+                    android:text="隐藏本地/局域网，保留在线与下载"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switch_online_only_mode"
@@ -108,7 +116,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -127,13 +135,17 @@
                     android:layout_height="wrap_content"
                     android:text="屏幕常亮"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="保持屏幕不熄灭"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
@@ -146,7 +158,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -165,13 +177,17 @@
                     android:layout_height="wrap_content"
                     android:text="OLED 防烧屏"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="主页面内容每 30 秒轻微移位"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
@@ -183,7 +199,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -202,13 +218,17 @@
                     android:layout_height="wrap_content"
                     android:text="定时结束退出应用"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="定时关闭时停止播放并退出"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
@@ -222,7 +242,7 @@
             android:id="@+id/row_fav_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -241,13 +261,17 @@
                     android:layout_height="wrap_content"
                     android:text="收藏模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_fav_mode_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
@@ -262,7 +286,7 @@
             android:id="@+id/row_sleep_timer_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -281,13 +305,17 @@
                     android:layout_height="wrap_content"
                     android:text="定时关闭模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_sleep_timer_mode_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
@@ -302,7 +330,7 @@
             android:id="@+id/row_speed_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -321,13 +349,17 @@
                     android:layout_height="wrap_content"
                     android:text="变速模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_speed_mode_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
@@ -342,7 +374,7 @@
             android:id="@+id/row_lyric_scroll_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -361,13 +393,17 @@
                     android:layout_height="wrap_content"
                     android:text="歌词滚动模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_lyric_scroll_mode_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
@@ -382,7 +418,7 @@
             android:id="@+id/row_lyric_offset"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -398,13 +434,17 @@
                     android:layout_height="wrap_content"
                     android:text="歌词偏移"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_lyric_offset_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <TextView
@@ -443,7 +483,7 @@
             android:id="@+id/row_lyric_resume_interval"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -462,13 +502,17 @@
                     android:layout_height="wrap_content"
                     android:text="歌词恢复间隔"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_lyric_resume_interval_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
@@ -482,7 +526,7 @@
             android:id="@+id/row_recognition_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="56dp"
+            android:minHeight="@dimen/watch_row_min_height"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
@@ -501,13 +545,17 @@
                     android:layout_height="wrap_content"
                     android:text="听歌识曲模式"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/watch_text_body"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
                 <TextView
                     android:id="@+id/tv_recognition_mode_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/colorPrimary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/watch_text_sub"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <ImageView
