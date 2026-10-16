@@ -2,6 +2,7 @@ package com.qinghe.music163pro.activity;
 
 import android.os.Bundle;
 import android.view.View;
+import com.qinghe.music163pro.util.MusicLog;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
@@ -23,6 +24,45 @@ import java.util.List;
  * 把「右滑」映射成返回键，只靠手势的页面会没有返回入口。</p>
  */
 public abstract class BaseWatchActivity extends AppCompatActivity {
+
+    /** F1：表冠事件探针只打前 5 条，避免刷屏。 */
+    private static int sCrownProbeLogged = 0;
+
+    /**
+     * F1：表冠旋转。
+     *
+     * <p>Wear 上表冠以 {@code ACTION_SCROLL} + {@code AXIS_SCROLL} 送达（源为
+     * {@code SOURCE_ROTARY_ENCODER}）。这里只观察 + 分发，不改变既有行为；
+     * 子类通过 {@link #onCrownScroll(float)} 决定是否消费。</p>
+     *
+     * <p>前 5 条打日志（TAG=Crown）—— 这是给「表冠到底送不送事件」留的**可观测探针**：
+     * adb 无法模拟表冠旋转，只能由人转一下表冠来确认。</p>
+     */
+    @Override
+    public boolean onGenericMotionEvent(android.view.MotionEvent event) {
+        if (event != null) {
+            boolean rotary = event.isFromSource(android.view.InputDevice.SOURCE_ROTARY_ENCODER);
+            boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
+            float axis = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
+            if ((rotary || scroll) && sCrownProbeLogged < 5) {
+                sCrownProbeLogged++;
+                MusicLog.i("Crown", "表冠/滚动事件 #" + sCrownProbeLogged
+                        + ": action=" + event.getAction()
+                        + " source=0x" + Integer.toHexString(event.getSource())
+                        + " rotary=" + rotary + " AXIS_SCROLL=" + axis
+                        + " 页面=" + getClass().getSimpleName());
+            }
+            if ((rotary || scroll) && Math.abs(axis) > 0.01f && onCrownScroll(axis)) {
+                return true;
+            }
+        }
+        return super.onGenericMotionEvent(event);
+    }
+
+    /** F1：子类实现「表冠滚动」；返回 true 表示已消费。默认不消费。 */
+    protected boolean onCrownScroll(float delta) {
+        return false;
+    }
 
     /**
      * 返回动作拦截器。页面（例如多选模式）可以先于 Activity 的默认返回逻辑

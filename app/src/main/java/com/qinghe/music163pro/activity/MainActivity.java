@@ -1468,6 +1468,58 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         showVolumeIndicator();
     }
 
+    /**
+     * F1：表冠滚动调音量（一格一步），复用 M1 的落地函数与指示条 ——
+     * 因而**继承原有的耳机安全音量保护**（超过 
+     * {@link #SAFE_VOLUME_PERCENT}% 且插着耳机时仍会先确认）。
+     */
+    /** F1：表冠事件探针只打前 5 条（MainActivity 不继承 BaseWatchActivity，故自持一份分发）。 */
+    private static int sCrownProbeLogged = 0;
+
+    /**
+     * F1：表冠旋转。Wear 上以 {@code ACTION_SCROLL} + {@code AXIS_SCROLL} 送达
+     * （源为 {@code SOURCE_ROTARY_ENCODER}）；前 5 条打日志（TAG=Crown）作为
+     * 「表冠到底送不送事件」的**可观测探针** —— adb 无法模拟表冠旋转，只能人工确认。
+     */
+    @Override
+    public boolean onGenericMotionEvent(android.view.MotionEvent event) {
+        if (event != null) {
+            boolean rotary = event.isFromSource(android.view.InputDevice.SOURCE_ROTARY_ENCODER);
+            boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
+            float axis = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
+            if ((rotary || scroll) && sCrownProbeLogged < 5) {
+                sCrownProbeLogged++;
+                MusicLog.i("Crown", "表冠/滚动事件 #" + sCrownProbeLogged
+                        + ": action=" + event.getAction()
+                        + " source=0x" + Integer.toHexString(event.getSource())
+                        + " rotary=" + rotary + " AXIS_SCROLL=" + axis + " 页面=MainActivity");
+            }
+            if ((rotary || scroll) && Math.abs(axis) > 0.01f && handleCrownScroll(axis)) {
+                return true;
+            }
+        }
+        return super.onGenericMotionEvent(event);
+    }
+
+    /** F1：表冠调音量本体（return true = 已消费）。 */
+    private boolean handleCrownScroll(float delta) {
+        android.media.AudioManager am =
+                (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
+        if (am == null) {
+            return false;
+        }
+        int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+        int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+        int target = Math.max(0, Math.min(max, cur + (delta > 0 ? 1 : -1)));
+        MusicLog.i("Crown", "表冠调音量: axis=" + delta + " 音量 " + cur + " -> " + target
+                + " (max=" + max + ")");
+        if (target != cur) {
+            applyUserVolume(target, max);   // 复用 M1：含耳机安全音量确认
+        }
+        showVolumeIndicator();
+        return true;
+    }
+
     private void showVolumeIndicator() {
         int current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
