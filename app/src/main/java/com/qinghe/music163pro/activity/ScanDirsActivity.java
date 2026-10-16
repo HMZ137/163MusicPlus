@@ -37,6 +37,8 @@ public class ScanDirsActivity extends BaseWatchActivity {
     /** 判定左划的最小横向位移（dp）。 */
     private static final int SWIPE_MIN_DP = 32;
 
+    private static final String TAG = "ScanDirs";
+
     private ListView listView;
     private TextView emptyView;
     private final List<String> dirs = new ArrayList<>();
@@ -175,11 +177,17 @@ public class ScanDirsActivity extends BaseWatchActivity {
                 case MotionEvent.ACTION_DOWN:
                     downX = event.getX();
                     downY = event.getY();
+                    MusicLog.i(TAG, "行触摸 DOWN x=" + downX + " y=" + downY + " path=" + path);
                     return true;
                 case MotionEvent.ACTION_MOVE: {
                     float dx = event.getX() - downX;
                     float dy = Math.abs(event.getY() - downY);
                     int min = (int) (SWIPE_MIN_DP * getResources().getDisplayMetrics().density + 0.5f);
+                    // 低噪声诊断：只在横向位移明显时打（定位"左划到底有没有送到这一行"）
+                    if (Math.abs(dx) > 20f) {
+                        MusicLog.i(TAG, "行触摸 MOVE dx=" + dx + " dy=" + dy + " 阈值=" + min
+                                + " 判定=" + (dx < -min && dy < min));
+                    }
                     if (dx < -min && dy < min) {
                         remove(path);
                     }
