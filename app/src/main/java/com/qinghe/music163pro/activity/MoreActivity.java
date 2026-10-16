@@ -221,7 +221,11 @@ public class MoreActivity extends BaseWatchActivity {
     private void applyMenuOrder() {
         if (btnFavorites == null || btnFavorites.getParent() == null) return;
         ViewGroup parent = (ViewGroup) btnFavorites.getParent();
-        View titleView = parent.getChildAt(0);
+        // ⚠️ G3 起，标题栏已移出本容器（固定在滚动容器之外，见布局的固定标题栏结构），
+        // 所以这里**不能**再「取 child[0] 当标题、removeAllViews 之后再把它加回来」：
+        // 现在 child[0] 就是第一个菜单行，把它当标题重加会与后面的循环重复 addView，
+        // 直接抛 IllegalStateException（"The specified child already has a parent"）。
+        // 本容器现在只装菜单行，removeAllViews() 后按顺序重排即可。
 
         java.util.Map<String, View> viewByKey = new java.util.LinkedHashMap<>();
         viewByKey.put(MoreMenuPreferences.KEY_FAVORITES, btnFavorites);
@@ -242,7 +246,6 @@ public class MoreActivity extends BaseWatchActivity {
 
         java.util.List<String> order = MoreMenuPreferences.getOrder(prefs);
         parent.removeAllViews();
-        parent.addView(titleView);
         // 本地播放列表（本机音乐）与在线「我的歌单」是同一类入口，排到它前面紧挨着，
         // 让本地 / 在线两个播放列表在菜单里并排出现（「挪到和在线的播放列表按钮一样的地方」）。
         // 注意：本机音乐不在 order 列表里（显隐由播放模式决定），必须显式补回，否则
@@ -258,10 +261,12 @@ public class MoreActivity extends BaseWatchActivity {
             View view = viewByKey.get(key);
             if (view != null) parent.addView(view);
         }
-        // 兜底：用户排序里没有「我的歌单」的极端情况，本地音乐回到原先的置顶位置（标题之后）
+        // 兜底：用户排序里没有「我的歌单」的极端情况，本地音乐回到**置顶**位置。
+        // 索引由 1 改为 0：本容器里已经没有标题了（标题固定在滚动容器之外），
+        // 原来的 1 是「标题之后 = 第一行」，现在 1 会排到第一行后面去。
         if (!localInserted && btnLocalMusic != null
                 && btnLocalMusic.getVisibility() == View.VISIBLE) {
-            parent.addView(btnLocalMusic, 1);
+            parent.addView(btnLocalMusic, 0);
         }
         parent.addView(btnSettings);
     }
