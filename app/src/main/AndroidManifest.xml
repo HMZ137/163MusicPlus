@@ -36,6 +36,8 @@
         <activity android:name=".activity.SearchActivity" android:exported="false" />
         <!-- F3：本地黑名单管理页（入口在「设置 → 黑名单」） -->
         <activity android:name=".activity.HiddenTracksActivity" android:exported="false" />
+        <!-- T1：本地歌曲设置页（黑名单 / 响度 / 后续扫描范围） -->
+        <activity android:name=".activity.LocalMusicSettingsActivity" android:exported="false" />
         <activity android:name=".activity.FavoritesListActivity" android:exported="false" />
         <activity android:name=".activity.DownloadListActivity" android:exported="false" />
         <activity android:name=".activity.LocalMusicActivity" android:exported="false" />

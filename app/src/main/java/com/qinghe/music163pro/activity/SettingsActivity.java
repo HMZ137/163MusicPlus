@@ -48,54 +48,11 @@ public class SettingsActivity extends BaseWatchActivity {
 
         View btnToggle = findViewById(R.id.btn_settings_toggle);
         View btnEditMore = findViewById(R.id.btn_settings_edit_more);
-        // F5：响度平衡总开关（默认关；关闭时播放路径完全不变）
-        com.google.android.material.switchmaterial.SwitchMaterial swLoudnessBalance =
-                findViewById(R.id.switch_loudness_balance);
-        if (swLoudnessBalance != null) {
-            swLoudnessBalance.setChecked(com.qinghe.music163pro.util.LoudnessBalance.isEnabled(this));
-            swLoudnessBalance.setOnCheckedChangeListener((buttonView, isChecked) ->
-                    com.qinghe.music163pro.util.LoudnessBalance.setEnabled(this, isChecked));
-        }
-        // F5：响度分析（限音器）—— 手动触发一次；已在跑则再点一次=中断（符合文档「不得进入页面即全量分析」）
-        View btnLoudness = findViewById(R.id.btn_settings_loudness);
-        final TextView tvLoudnessValue = findViewById(R.id.tv_settings_loudness_value);
-        if (btnLoudness != null) {
-            btnLoudness.setOnClickListener(v -> {
-                if (com.qinghe.music163pro.util.LoudnessScan.isRunning()) {
-                    com.qinghe.music163pro.util.LoudnessScan.cancel();
-                    Toast.makeText(this, "正在中断（已完成的部分已保存）", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                boolean started = com.qinghe.music163pro.util.LoudnessScan.start(getApplicationContext(),
-                        new com.qinghe.music163pro.util.LoudnessScan.Listener() {
-                            @Override
-                            public void onProgress(int done, int total, int analyzed, int cached, int skipped, String name) {
-                                runOnUiThread(() -> {
-                                    if (isFinishing() || tvLoudnessValue == null) return;
-                                    tvLoudnessValue.setText(done + "/" + total);
-                                });
-                            }
-
-                            @Override
-                            public void onFinished(int analyzed, int cached, int skipped, boolean cancelled, long ms) {
-                                runOnUiThread(() -> {
-                                    if (isFinishing()) return;
-                                    if (tvLoudnessValue != null) tvLoudnessValue.setText("");
-                                    Toast.makeText(SettingsActivity.this,
-                                            (cancelled ? "已中断：" : "完成：") + "新分析 " + analyzed
-                                                    + " 首，命中缓存 " + cached + " 首，跳过 " + skipped + " 首",
-                                            Toast.LENGTH_LONG).show();
-                                });
-                            }
-                        });
-                Toast.makeText(this, started ? "开始分析响度（后台）…" : "已有分析在跑", Toast.LENGTH_SHORT).show();
-            });
-        }
-        // F3：本地黑名单入口 —— 列出被「移出列表」的曲目，左划可恢复（不删文件的语义见 LocalMusicHides）
-        View btnHiddenTracks = findViewById(R.id.btn_settings_hidden);
-        if (btnHiddenTracks != null) {
-            btnHiddenTracks.setOnClickListener(v ->
-                    startActivity(new android.content.Intent(this, HiddenTracksActivity.class)));
+        // T1：「本地歌曲设置」页 —— 只影响本地文件的设置（黑名单 / 响度分析 / 响度平衡 / 后续扫描范围）
+        View btnLocalMusicSettings = findViewById(R.id.btn_settings_local_music_settings);
+        if (btnLocalMusicSettings != null) {
+            btnLocalMusicSettings.setOnClickListener(v ->
+                    startActivity(new android.content.Intent(this, LocalMusicSettingsActivity.class)));
         }
         // 高级歌词翻译：与「开关选项」同级的独立设置页（AI 词性着色 / 翻译）
         findViewById(R.id.btn_settings_advanced_lyrics).setOnClickListener(v ->
