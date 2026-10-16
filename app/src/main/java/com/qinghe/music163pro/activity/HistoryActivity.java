@@ -83,12 +83,10 @@ public class HistoryActivity extends BaseWatchActivity {
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
                 android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
                 android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
+        titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         titleParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         title.setLayoutParams(titleParams);
         titleBar.addView(title);
-        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
-        WatchBackButton.alignTitleStart(this, title);
 
         tvEmpty = new TextView(this);
         tvEmpty.setText("暂无播放记录");
@@ -109,6 +107,10 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
 
         setContentView(root);
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar);
+        // G5：标题居左。**必须在 applyTitleBarInset 之后**调用 —— 该入口会把标题栏的 start
+        // 内边距撑到「返回按钮占位」，此时累计内缩已经够了，这里不会再追加 margin。
+        // 反序（先调用本方法）会把避让计两次：标题被推到 2×占位（实测 x=188），看着偏右。
+        WatchBackButton.alignTitleStart(this, title);
 
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, displayList) {
             @Override

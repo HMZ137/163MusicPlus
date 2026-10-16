@@ -296,7 +296,21 @@ public final class WatchBackButton {
         alignInTree(activity, titleBar, titleBar);
     }
 
-    /** 显式版：已知标题视图时直接指定（自绘页面用；不需要标题栏容器）。 */
+    /**
+     * 显式版：已知标题视图时直接指定（自绘页面用；不需要标题栏容器）。
+     *
+     * <p><b>⚠️ 调用时机是硬约束：必须在该页面的
+     * {@link #applyTitleBarInset} / {@link #applyTitleBarTopInset} <u>之后</u>调用。</b>
+     * 原因：这两个入口会把标题栏的 {@code paddingStart} 撑到
+     * {@link #getReservedStartPadding}，而本方法补的 margin 是
+     * 「{@code needed} 减去当前累计内缩」的<b>差值</b>。若在入口之前调用，
+     * 当时标题栏还没有左内边距 ⇒ 差值 = 整个占位 ⇒ 本方法加一份 margin、
+     * 入口再加一份 padding，避让被计两次，标题被推到 {@code 2 × 占位}
+     * （本机实测 x=188，看起来「没有居左」甚至偏右）。
+     *
+     * <p>已在「专辑详情」与「历史记录」两页踩到并修复（2026-10-17）：两页原本都在
+     * {@code applyTitleBarInset} 之前调用本方法。
+     */
     public static void alignTitleStart(Activity activity, TextView title) {
         if (activity == null || title == null) {
             return;

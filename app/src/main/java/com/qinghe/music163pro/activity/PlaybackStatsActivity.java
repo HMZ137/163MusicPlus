@@ -31,6 +31,15 @@ public class PlaybackStatsActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_playback_stats);
+        // G5：标题居左 + 返回按钮占位。
+        // 本页标题在布局里原本没有 id，WatchBackButton 的遍历式识别（id 名含 "title"）认不出来，
+        // 所以 G5 的统一切点覆盖不到它 —— 标题一直是居中的。这里显式把标题 TextView 当「标题栏」
+        // 传入（与 MoreActivity / EditMoreActivity 同款做法）：既把标题行撑到返回按钮的占位高度，
+        // 又让它对齐到左侧。改布局时请勿删掉 tv_stats_title 这个 id。
+        TextView tvStatsTitle = findViewById(R.id.tv_stats_title);
+        if (tvStatsTitle != null) {
+            com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, tvStatsTitle);
+        }
 
         contentLayout = findViewById(R.id.layout_stats_content);
         View btnClear = findViewById(R.id.btn_clear_stats);
