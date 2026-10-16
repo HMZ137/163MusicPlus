@@ -85,6 +85,49 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- L6：自定义扫描目录管理（文档 L6 改动要点 3：入口就在本页之下） -->
+            <LinearLayout
+                android:id="@+id/btn_local_settings_scan_dirs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_volume_up"
+                    android:alpha="0.7" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/scan_dirs_title"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/scan_dirs_hint"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_caption"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- F5：响度分析（限音器）入口 —— 手动触发一次；后台、可中断、有进度 -->
             <LinearLayout
                 android:id="@+id/btn_settings_loudness"

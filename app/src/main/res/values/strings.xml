@@ -93,6 +93,11 @@
     <string name="hidden_tracks_title">黑名单</string>
     <string name="hidden_tracks_hint">左划可移出黑名单（不会删除文件）</string>
     <string name="hidden_tracks_empty">黑名单为空</string>
+    <string name="scan_dirs_title">扫描范围</string>
+    <string name="scan_dirs_hint">左划可移除；不可用目录会跳过并提示</string>
+    <string name="scan_dirs_empty">暂无自定义目录</string>
+    <string name="scan_dirs_add">添加目录</string>
+    <string name="scan_dirs_add_prompt">输入要扫描的完整绝对路径，例如 /sdcard/我的音乐</string>
     <string name="settings_local_music">本地歌曲设置</string>
     <string name="settings_local_music_desc">黑名单 / 响度平衡 / 扫描范围</string>
     <string name="settings_hidden_tracks">黑名单</string>

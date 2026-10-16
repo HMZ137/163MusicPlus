@@ -85,6 +85,13 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
             });
         }
 
+
+        // ==================== L6：自定义扫描目录管理 ====================
+        View btnScanDirs = findViewById(R.id.btn_local_settings_scan_dirs);
+        if (btnScanDirs != null) {
+            btnScanDirs.setOnClickListener(v ->
+                    startActivity(new android.content.Intent(this, ScanDirsActivity.class)));
+        }
         // ==================== F3：本地黑名单 ====================
         View btnHiddenTracks = findViewById(R.id.btn_settings_hidden);
         if (btnHiddenTracks != null) {

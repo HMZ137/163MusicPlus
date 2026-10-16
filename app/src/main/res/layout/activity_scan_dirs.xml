@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  L6 改动要点 3：自定义扫描目录的管理界面（位于「本地歌曲设置」页之下）。
+  行 id 与结构沿用项目既有列表页（黑名单页同款）：标题栏 + 添加入口 + 列表 + 空态。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <LinearLayout
+        android:id="@+id/layout_scan_dirs_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/tv_scan_dirs_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="start"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="@string/scan_dirs_title"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/watch_text_title"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="@string/scan_dirs_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/watch_text_caption" />
+    </LinearLayout>
+
+    <!-- 添加目录：点开输入完整路径 -->
+    <LinearLayout
+        android:id="@+id/btn_scan_add"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/watch_row_min_height"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="@drawable/bg_card_tile">
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_add_box"
+            android:alpha="0.7" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="@string/scan_dirs_add"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/watch_text_body"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/lv_scan_dirs"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp" />
+
+    <TextView
+        android:id="@+id/tv_scan_dirs_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/scan_dirs_empty"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_sub"
+        android:visibility="gone" />
+</LinearLayout>
