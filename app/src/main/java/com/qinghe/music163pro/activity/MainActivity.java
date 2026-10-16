@@ -50,6 +50,7 @@ import com.qinghe.music163pro.manager.RingtoneManagerHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.service.MusicPlaybackService;
+import com.qinghe.music163pro.util.LyricsTint;
 import com.qinghe.music163pro.util.MusicLog;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.UpdateChecker;
@@ -2370,7 +2371,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Song name at top (leave right padding for the toggle button)
         tvLyricsSongLabel = new TextView(this);
         tvLyricsSongLabel.setText(song.getDisplayName() + " - " + song.getArtist());
-        tvLyricsSongLabel.setTextColor(0xFFFFFFFF);
+        tvLyricsSongLabel.setTextColor(LyricsTint.textColor(0xFF));   // F2
         tvLyricsSongLabel.setTextSize(13);
         tvLyricsSongLabel.setGravity(Gravity.CENTER);
         tvLyricsSongLabel.setPadding(dp(10), dp(6), dp(6), dp(4));
@@ -2435,7 +2436,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         tvLyricsTimeRef = new TextView(this);
-        tvLyricsTimeRef.setTextColor(0x80FFFFFF);
+        tvLyricsTimeRef.setTextColor(LyricsTint.textColor(0x80));   // F2
         tvLyricsTimeRef.setTextSize(10);
         tvLyricsTimeRef.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         tvLyricsTimeRef.setPadding(dp(2), 0, dp(8), 0);
@@ -2511,7 +2512,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsContainer.removeAllViews();
         TextView tvLoading = new TextView(this);
         tvLoading.setText("加载歌词中...");
-        tvLoading.setTextColor(0xB3FFFFFF);
+        tvLoading.setTextColor(LyricsTint.textColor(0xB3));   // F2
         tvLoading.setTextSize(13);
         tvLoading.setGravity(Gravity.CENTER);
         lyricsContainer.addView(tvLoading);
@@ -2813,7 +2814,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         btn.setText(text);
         btn.setBackground(null);
-        btn.setTextColor(on ? UiKit.COLOR_ACCENT : 0x80FFFFFF);
+        btn.setTextColor(on ? UiKit.COLOR_ACCENT : LyricsTint.textColor(0x80));   // F2
     }
 
     private android.graphics.drawable.Drawable buildLyricBackdrop() {
@@ -2863,11 +2864,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             TextView tv = new TextView(this);
             if (aiLine != null) {
                 tv.setText(com.qinghe.music163pro.util.LyricRichText.buildOriginal(
-                        line.text, aiLine, 0xB3FFFFFF, originalFontSize, this));
+                        line.text, aiLine, LyricsTint.textColor(0xB3), originalFontSize, this));   // F2
             } else {
                 tv.setText(line.text);
             }
-            tv.setTextColor(0xB3FFFFFF);
+            tv.setTextColor(LyricsTint.textColor(0xB3));   // F2
             tv.setTextSize(originalFontSize);
             tv.setGravity(Gravity.CENTER);
             lineLayout.addView(tv);
@@ -2900,7 +2901,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 } else {
                     tvTrans.setText(effectiveTranslation);
                 }
-                tvTrans.setTextColor(0x61FFFFFF);
+                tvTrans.setTextColor(LyricsTint.textColor(0x61));   // F2
                 tvTrans.setTextSize(translationFontSize);
                 tvTrans.setGravity(Gravity.CENTER);
                 tvTrans.setPadding(0, dp(1), 0, 0);
@@ -3143,7 +3144,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
         TextView currentView = lyricViews.get(currentHighlightIndex);
-        currentView.setTextColor(0xFFFFFFFF);
+        currentView.setTextColor(LyricsTint.textColor(0xFF));   // F2
         // 高亮行文字放大 1sp：词块底衬里的字要一起放大，否则会显得比旁边的字小
         currentView.setTextSize(LyricSettings.getOriginalFontSize(this) + 1);
         rebuildAiLineText(currentView, currentHighlightIndex, true);
@@ -3158,7 +3159,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricViews.clear();
         TextView tv = new TextView(this);
         tv.setText("暂无歌词");
-        tv.setTextColor(0xB3FFFFFF);
+        tv.setTextColor(LyricsTint.textColor(0xB3));   // F2
         tv.setTextSize(14);
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, dp(40), 0, 0);
@@ -3201,7 +3202,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                         currentHighlightIndex = newIndex;
                         if (currentHighlightIndex < lyricViews.size()) {
                             TextView currentView = lyricViews.get(currentHighlightIndex);
-                            currentView.setTextColor(0xFFFFFFFF);
+                            currentView.setTextColor(LyricsTint.textColor(0xFF));   // F2
                             // 高亮行比常态大 1sp，跟着用户设定的原文字号走
                             currentView.setTextSize(
                                     LyricSettings.getOriginalFontSize(MainActivity.this) + 1);

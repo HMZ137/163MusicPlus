@@ -303,13 +303,17 @@ public final class BackgroundUtil {
         String mode = getMode(context);
         if (MODE_DEFAULT.equals(mode)) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
+            LyricsTint.useDefault();
             return;
         }
         if (MODE_COVER.equals(mode)) {
             if (sCoverBg != null) {
                 root.setBackground(new CenterCropDrawable(sCoverBg));
+                LyricsTint.refresh(sCoverBg);   // F2：封面背景 ⇒ 按主色决定歌词颜色
             } else {
                 root.setBackgroundColor(DEFAULT_BG_COLOR);
+                LyricsTint.useDefault();
+            LyricsTint.useDefault();
             }
             return;
         }
@@ -317,6 +321,7 @@ public final class BackgroundUtil {
             // 有封面用封面；封面还没到位 / 获取失败时回退到自定义图，再不行用默认。
             if (sCoverBg != null) {
                 root.setBackground(new CenterCropDrawable(sCoverBg));
+                LyricsTint.refresh(sCoverBg);   // F2：封面背景 ⇒ 按主色决定歌词颜色
             } else {
                 applyCustomOrDefault(context, root);
             }
@@ -333,6 +338,7 @@ public final class BackgroundUtil {
     private static void applyCustomOrDefault(Context context, View root) {
         if (!hasCustomBackground(context)) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
+            LyricsTint.useDefault();
             return;
         }
         try {
@@ -346,12 +352,16 @@ public final class BackgroundUtil {
             Bitmap src = BitmapFactory.decodeFile(getBackgroundFile(context).getAbsolutePath(), opts);
             if (src == null) {
                 root.setBackgroundColor(DEFAULT_BG_COLOR);
+                LyricsTint.useDefault();
+            LyricsTint.useDefault();
                 return;
             }
             Bitmap dimmed = dimBitmap(src, context);
+            LyricsTint.refresh(dimmed);   // F2：自定义背景（已加深）⇒ 按主色决定歌词颜色
             root.setBackground(new CenterCropDrawable(dimmed));
         } catch (Exception ignored) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
+            LyricsTint.useDefault();
         }
     }
 
