@@ -27,6 +27,8 @@ public class SettingsActivity extends BaseWatchActivity {
     private TextView tvCacheValue;
     /** 「导出下载的音乐」那一行的进度文案。 */
     private TextView tvExportValue;
+    /** F6：强制覆盖（一次性行为选项，用后自动复位）。 */
+    private boolean exportForceOverwrite = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -152,16 +154,29 @@ public class SettingsActivity extends BaseWatchActivity {
     /** 先选目标文件夹：给几个常见位置，也允许自定义完整路径。 */
     private void chooseExportTarget() {
         java.io.File external = android.os.Environment.getExternalStorageDirectory();
+        // F6：新增「直接导出到 Music 文件夹」；Environment 的公共 Music 目录（API30 旧存储模型下可直接写）
+        String musicDir = android.os.Environment
+                .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MUSIC)
+                .getAbsolutePath();
         final String[] targets = {
+                musicDir,
                 new java.io.File(external, "Music/163Music导出").getAbsolutePath(),
                 new java.io.File(external, "Download/163Music导出").getAbsolutePath(),
                 new java.io.File(external, "163Music/导出").getAbsolutePath(),
         };
-        String[] labels = {"Music/163Music导出", "Download/163Music导出", "163Music/导出", "自定义…"};
+        String[] labels = {"Music 文件夹（直接）", "Music/163Music导出", "Download/163Music导出",
+                "163Music/导出",
+                exportForceOverwrite ? "强制覆盖同名文件：已开" : "强制覆盖同名文件：已关",
+                "自定义…"};
         Runnable[] actions = {
                 () -> confirmExport(targets[0]),
                 () -> confirmExport(targets[1]),
                 () -> confirmExport(targets[2]),
+                () -> confirmExport(targets[3]),
+                () -> {
+                    exportForceOverwrite = !exportForceOverwrite;   // F6：一次性行为选项
+                    chooseExportTarget();                          // 重画菜单以显示新状态
+                },
                 this::promptCustomExportTarget
         };
         WatchConfirmDialog.showChoice(this, "导出到文件夹",
@@ -192,7 +207,8 @@ public class SettingsActivity extends BaseWatchActivity {
 
     private void confirmExport(final String targetDir) {
         WatchConfirmDialog.show(this, "导出下载的音乐",
-                "导出到：\n" + targetDir + "\n\n同名文件会跳过，不会被覆盖。",
+                "导出到：\n" + targetDir + "\n\n"
+                        + (exportForceOverwrite ? "同名文件会被**覆盖**。" : "同名文件会跳过，不会被覆盖。"),
                 () -> runExport(targetDir), WatchConfirmDialog.Options.defaultOptions());
     }
 
@@ -201,7 +217,9 @@ public class SettingsActivity extends BaseWatchActivity {
         if (tvExportValue != null) {
             tvExportValue.setText("导出中…");
         }
-        new Thread(() -> ExportManager.exportAll(getApplicationContext(), targetDir,
+        final boolean force = exportForceOverwrite;
+        exportForceOverwrite = false;   // 一次性：下次进来回到默认关
+        new Thread(() -> ExportManager.exportAll(getApplicationContext(), targetDir, force,
                 new ExportManager.ExportCallback() {
                     @Override
                     public void onProgress(int done, int total, String currentName) {
