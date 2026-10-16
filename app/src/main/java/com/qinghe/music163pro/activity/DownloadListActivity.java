@@ -118,11 +118,16 @@ public class DownloadListActivity extends BaseWatchActivity
         // 与本地音乐页同理：占位加在**整个标题栏**上。若只加给上面的动作行，那一行会被撑到
         // 返回按钮的高度，再叠一行标题，头部会白吃掉几十像素的列表空间。
         View titleBar = findViewById(R.id.layout_downloads_title_bar);
-        // 只有「动作行 + 标题」避让左上角的返回按钮；标题栏里的「下载 / 本地」标签行
+        // 只有「动作行」避让左上角的返回按钮；标题栏里的「下载 / 本地」标签行
         // 要占满整行宽度（用户明确要求），所以走 applyTitleBarInset 的变体。
+        //
+        // ⚠️ D8 修复：**标题不再交给这个方法**。原先把标题也列为 insetChild，
+        // 该方法会给它同时留左、右两侧占位（右侧是当年为了让**居中**标题保持居中的）；
+        // 而 G5 之后标题一律**左对齐**，右侧占位纯属浪费 —— 实测把「本地音乐管理」6 个字
+        // 的可用宽压到 222px（需要约 241px），于是被省略成「本地音乐…」。
+        // 这里改成：标题只留**左侧**（返回按钮）占位，右侧归零，可用宽回到约 272px。
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar,
-                findViewById(R.id.layout_downloads_action_row),
-                findViewById(R.id.tv_downloads_title));
+                findViewById(R.id.layout_downloads_action_row));
         // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
         // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
         com.qinghe.music163pro.util.WatchBackButton.addTitleBarExtraHeight(
@@ -133,6 +138,9 @@ public class DownloadListActivity extends BaseWatchActivity
         // 4-1/4-2：下载列表与空态视图已迁到 ViewPager2 的「下载」页（DownloadTabFragment），
         // 这里不再直接 findViewById —— 该页视图就绪后由 onDownloadListViewsReady() 回调绑定。
         tvTitle = findViewById(R.id.tv_downloads_title);
+        // D8：把标题从上面那个方法的 insetChildren 里摘出来了（不再要**右侧**占位）。
+        // 左侧（返回按钮）避让由 G5 的统一机制自己在标题上处理，这里**不要再加 padding** ——
+        // 实测叠加会变成双重缩进：盒子 260px、文字区只剩 166px，标题被截得更短（「本地音…」）。
 
         // 「整理」：把早期下载固定的 song.mp3 / song.flac 改成「曲名 - 曲师」
         View btnTidy = findViewById(R.id.btn_tidy_downloads);
