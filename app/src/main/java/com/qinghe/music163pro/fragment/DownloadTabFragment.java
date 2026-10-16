@@ -50,6 +50,8 @@ public class DownloadTabFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        // 4-5 埋点：page0 何时建好（低噪声，每次开页一行）
+        com.qinghe.music163pro.util.MusicLog.i("Vp2", "page0 下载页 onViewCreated");
         ListView listView = view.findViewById(R.id.lv_downloads);
         TextView emptyView = view.findViewById(R.id.tv_empty);
         host().onDownloadListViewsReady(listView, emptyView);

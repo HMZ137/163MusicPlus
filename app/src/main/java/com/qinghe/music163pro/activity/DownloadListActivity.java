@@ -113,6 +113,9 @@ public class DownloadListActivity extends BaseWatchActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_download_list);
+        // 4-5 埋点：本页起点。与下面「下载页视图就绪」以及 page1 预加载的时间戳一起，
+        // 用来判断 ViewPager2 的预加载是否落在首屏关键路径上（低噪声，每次开页一行）。
+        com.qinghe.music163pro.util.MusicLog.i("Vp2", "DownloadListActivity.onCreate 开始");
 
         // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
         // 与本地音乐页同理：占位加在**整个标题栏**上。若只加给上面的动作行，那一行会被撑到
@@ -238,6 +241,7 @@ public class DownloadListActivity extends BaseWatchActivity
      */
     @Override
     public void onDownloadListViewsReady(ListView listView, TextView emptyView) {
+        com.qinghe.music163pro.util.MusicLog.i("Vp2", "下载页视图就绪（首屏可用）");
         lvDownloads = listView;
         tvEmpty = emptyView;
         if (lvDownloads == null) {

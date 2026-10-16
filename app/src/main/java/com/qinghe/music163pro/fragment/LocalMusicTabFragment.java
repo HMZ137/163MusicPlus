@@ -31,6 +31,9 @@ public class LocalMusicTabFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                             @Nullable Bundle savedInstanceState) {
+        // 4-5 埋点：这一页是**预加载**出来的（offscreenPageLimit=1）——
+        // 它的时间戳相对 page0 就能看出预加载是否落在首屏关键路径上。
+        com.qinghe.music163pro.util.MusicLog.i("Vp2", "page1 本地页 onCreateView（预加载）");
         return inflater.inflate(R.layout.fragment_local_music_tab, container, false);
     }
 
