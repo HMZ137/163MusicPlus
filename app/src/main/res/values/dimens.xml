@@ -1,5 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 子页面顶栏标题统一字号：圆角小屏原 14sp 偏小，统一放大到 16sp -->
+    <!-- 子页面顶栏标题统一字号：圆角小屏原 14sp 偏小，统一放大到 16sp。
+         注意：这是**历史遗留的单点令牌**，G2 的新阶梯是下面的 watch_text_title；
+         逐页替换完成后本项应改为引用 watch_text_title（见技术文档 [1-5] / [1-9]）。 -->
     <dimen name="watch_title_text_size">16sp</dimen>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         G2 字号阶梯（sp）—— 全 App 唯一字号来源（技术文档 [1-5]）
+         ──────────────────────────────────────────────────────────────────
+         为什么需要：字号原本是散的。XML 写 13/14/11sp，而代码自绘页面写
+         setTextSize(COMPLEX_UNIT_PX, px(15))。这两套**不同源**：
+             XML 的 sp  → density × fontScale
+             px(n)      → 屏幕宽/320 × 用户缩放（**不含 density**）
+         本机实测 14sp 的字高约 31px，而 px(14) 只有约 19px —— 同一个「14」差一大截，
+         这就是「有的页面字大、有的页面字小」的根因。
+
+         取值依据：对参考图 界面_1.png / Local_1.png / Local_2.png 做墨迹高度实测后
+         换算回标称 sp（过程见技术文档 [1-5]）。数值刻意按**默认 100% 缩放**定标：
+         100% 时就达到参考图比例，115% / 130% 只会更大（验收口径是「不小于」）。
+
+         自绘页面请用 UiKit.text*Px(context) 取同一档位，不要再用 px(n) 当字号。 -->
+    <dimen name="watch_text_hero">21sp</dimen>
+    <!-- 页面标题：替换 watch_title_text_size 的目标值 -->
+    <dimen name="watch_text_title">18sp</dimen>
+    <!-- 列表项主标题 -->
+    <dimen name="watch_text_item">17sp</dimen>
+    <!-- 行标签 / 正文 -->
+    <dimen name="watch_text_body">16sp</dimen>
+    <!-- 列表项副标题 -->
+    <dimen name="watch_text_sub">13sp</dimen>
+    <!-- 次要数值 / 说明 -->
+    <dimen name="watch_text_caption">12sp</dimen>
+    <!-- 小徽章 -->
+    <dimen name="watch_text_badge">11sp</dimen>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         G2 尺寸阶梯（dp）—— 放大字号必须同步放宽这些，否则「字大了、留白没变」
+         会挤在一起甚至压成 0px（见技术文档 1.6 高频踩坑） -->
+    <!-- 列表项最小高度（含内边距） -->
+    <dimen name="watch_row_min_height">56dp</dimen>
+    <dimen name="watch_row_padding_v">6dp</dimen>
+    <dimen name="watch_row_padding_h">12dp</dimen>
+    <dimen name="watch_card_padding">12dp</dimen>
+    <!-- 列表项封面 / 圆形图标徽章 -->
+    <dimen name="watch_cover_size">40dp</dimen>
+    <!-- 行内小图标 -->
+    <dimen name="watch_icon_size">24dp</dimen>
+    <!-- 触控目标下限 -->
+    <dimen name="watch_touch_min">40dp</dimen>
 </resources>

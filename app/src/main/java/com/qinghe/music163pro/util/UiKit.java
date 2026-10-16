@@ -26,7 +26,8 @@ import android.widget.TextView;
  *       {@code bg_card_row} 的涟漪表现；</li>
  *   <li>主按钮：主色实心、圆角 10dp、高 44dp；次按钮：透明底 + 1dp 描边；</li>
  *   <li>弹窗 / 浮层 {@code #1E1F24}、圆角 14dp；</li>
- *   <li>字号阶梯：标题 15 / 正文 13 / 次要 11（尺寸放大将在该基准上统一上调）。</li>
+ *   <li>字号阶梯：见下方 {@code SP_TEXT_*}（G2 建立，XML 侧对应 dimens.xml 的
+ *       {@code watch_text_*}；两套世界必须取同一档，别再写 px(n) 当字号）。</li>
  * </ul>
  */
 public final class UiKit {
@@ -48,6 +49,92 @@ public final class UiKit {
     /** 按钮统一圆角（全 App 唯一值）：与卡片同值，保持观感一致。 */
     public static final int DP_BUTTON_RADIUS = 10;
     public static final int DP_BUTTON_HEIGHT = 44;
+
+    // ==================== G2 字号与尺寸令牌（技术文档 [1-5]） ====================
+    //
+    // 背景：全 App 的字号原本是散的 —— XML 里写 13/14/11sp，代码自绘页面却写
+    // setTextSize(COMPLEX_UNIT_PX, px(15))。这两套**不同源**：
+    //     XML 的 sp → density × fontScale
+    //     px(n)     → 屏幕宽/320 × 用户缩放，**完全不含 density**
+    // 本机实测 14sp 渲染字高约 31px，而 px(14) 只有约 19px —— 同一个「14」差一大截，
+    // 这正是「有的页面字大、有的页面字小」的根因。
+    //
+    // 所以令牌只定义**一套标称值**（sp 语义），两套世界共用：
+    //     XML  → res/values/dimens.xml 的 watch_text_* / watch_*
+    //     自绘 → 本类的 text*Px(context) / *Px(context)
+    // 自绘页面**不要**再拿 COMPLEX_UNIT_PX + px(n) 当字号，改用 sp(c, n) 或下面的取值器。
+    //
+    // 取值依据：参考图 界面_1.png / Local_1.png / Local_2.png 的墨迹高度实测后换算
+    // （见技术文档 [1-5]）。刻意按**默认 100% 缩放**定标 —— 100% 即达参考图比例，
+    // 115%/130% 只会更大（验收口径是「不小于」）。
+
+    /** 字号阶梯（标称 sp；与 dimens.xml 的 watch_text_* 一一对应）。 */
+    public static final float SP_TEXT_HERO = 21f;
+    /** 页面标题（原 XML 16sp / 自绘 px(15)）。 */
+    public static final float SP_TEXT_TITLE = 18f;
+    /** 列表项主标题（原 13sp）。 */
+    public static final float SP_TEXT_ITEM = 17f;
+    /** 行标签 / 正文（原 14sp）。 */
+    public static final float SP_TEXT_BODY = 16f;
+    /** 列表项副标题（原 11sp）。 */
+    public static final float SP_TEXT_SUB = 13f;
+    /** 次要数值 / 说明（原 11sp）。 */
+    public static final float SP_TEXT_CAPTION = 12f;
+    /** 小徽章（原自绘 8~10px）。 */
+    public static final float SP_TEXT_BADGE = 11f;
+
+    /** 尺寸阶梯（标称 dp；与 dimens.xml 的 watch_* 一一对应）。 */
+    public static final int DP_ROW_MIN_HEIGHT = 56;
+    public static final int DP_ROW_PADDING_V = 6;
+    public static final int DP_ROW_PADDING_H = 12;
+    public static final int DP_CARD_PADDING = 12;
+    public static final int DP_COVER_SIZE = 40;
+    public static final int DP_ICON_SIZE = 24;
+    /** 触控目标下限（与 {@code WatchBackButton.MIN_SIZE_DP} 同值，避免两处漂移）。 */
+    public static final int DP_TOUCH_MIN = 40;
+
+    /**
+     * sp → px：**走系统 sp 度量**，与 XML 里的 {@code sp} 同源。
+     *
+     * <p>自绘页面要设字号请用它，不要再写
+     * {@code setTextSize(COMPLEX_UNIT_PX, px(n))} —— 那条路不含 density，会明显偏小。</p>
+     */
+    public static int sp(Context c, float spValue) {
+        if (c == null) {
+            return Math.round(spValue);
+        }
+        return Math.round(android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_SP, spValue,
+                c.getResources().getDisplayMetrics()));
+    }
+
+    public static int textHeroPx(Context c) { return sp(c, SP_TEXT_HERO); }
+
+    public static int textTitlePx(Context c) { return sp(c, SP_TEXT_TITLE); }
+
+    public static int textItemPx(Context c) { return sp(c, SP_TEXT_ITEM); }
+
+    public static int textBodyPx(Context c) { return sp(c, SP_TEXT_BODY); }
+
+    public static int textSubPx(Context c) { return sp(c, SP_TEXT_SUB); }
+
+    public static int textCaptionPx(Context c) { return sp(c, SP_TEXT_CAPTION); }
+
+    public static int textBadgePx(Context c) { return sp(c, SP_TEXT_BADGE); }
+
+    public static int rowMinHeightPx(Context c) { return dp(c, DP_ROW_MIN_HEIGHT); }
+
+    public static int rowPaddingVPx(Context c) { return dp(c, DP_ROW_PADDING_V); }
+
+    public static int rowPaddingHPx(Context c) { return dp(c, DP_ROW_PADDING_H); }
+
+    public static int cardPaddingPx(Context c) { return dp(c, DP_CARD_PADDING); }
+
+    public static int coverSizePx(Context c) { return dp(c, DP_COVER_SIZE); }
+
+    public static int iconSizePx(Context c) { return dp(c, DP_ICON_SIZE); }
+
+    public static int touchMinPx(Context c) { return dp(c, DP_TOUCH_MIN); }
 
     /** 卡片 / 列表行的圆角像素值。自绘页面直接 new GradientDrawable 时用它取值，别再写 0。 */
     public static int cardRadiusPx(Context c) {
