@@ -73,6 +73,10 @@ public class EditMoreActivity extends BaseWatchActivity {
         title.setPadding(0, 0, 0, px(8));
         root.addView(title);
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
+        // G5：本页标题是代码自绘的 TextView（没有资源 id），遍历式识别命中不了，
+        // 所以必须显式调用；**顺序硬约束**：必须在 applyTitleBarInset 之后，
+        // 否则避让会被计两次（见技术文档 [1-11] 缺陷 1 与 [1-12]）。
+        com.qinghe.music163pro.util.WatchBackButton.alignTitleStart(this, title);
 
         enabledContainer = new LinearLayout(this);
         enabledContainer.setOrientation(LinearLayout.VERTICAL);

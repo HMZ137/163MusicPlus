@@ -35,6 +35,9 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_open_share_link);
+        // G5：标题居左 + 返回按钮占位（标题原先无 id，识别不到，见技术文档 [1-12]）。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_open_share_title));
 
         tvStatus = findViewById(R.id.tv_status);
         errorContainer = findViewById(R.id.error_container);

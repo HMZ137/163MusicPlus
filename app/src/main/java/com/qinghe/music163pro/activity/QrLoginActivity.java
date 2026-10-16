@@ -38,6 +38,9 @@ public class QrLoginActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_qr_login);
+        // G5：标题居左 + 返回按钮占位（标题原先无 id，识别不到，见技术文档 [1-12]）。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_qr_login_title));
 
         ivQrCode = findViewById(R.id.iv_qr_code);
         tvStatus = findViewById(R.id.tv_qr_status);

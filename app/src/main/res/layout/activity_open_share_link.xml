@@ -15,12 +15,13 @@
         android:paddingBottom="12dp">
 
         <TextView
+            android:id="@+id/tv_open_share_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="分享链接"
             android:textColor="@color/text_primary"
-            android:textSize="16sp"
+            android:textSize="@dimen/watch_text_title"
             android:textStyle="bold" />
 
         <TextView

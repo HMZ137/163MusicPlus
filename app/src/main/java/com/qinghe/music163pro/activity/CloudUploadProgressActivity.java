@@ -31,6 +31,10 @@ public class CloudUploadProgressActivity extends BaseWatchActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cloud_upload_progress);
+        // G5：标题居左 + 返回按钮占位。该标题原先在布局里没有 id，
+        // WatchBackButton 的遍历式识别命中不了，所以一直居中（见技术文档 [1-12]）。
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
+                this, findViewById(R.id.tv_cloud_upload_title));
 
         progressBar = findViewById(R.id.progress_upload);
         tvProgress = findViewById(R.id.tv_upload_progress);
