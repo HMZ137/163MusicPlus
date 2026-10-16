@@ -147,6 +147,9 @@ public final class WatchBackButton {
         }
         // 横向不避让，但标题过长时仍要单行 + 省略（与 applyTitleBarInset 保持一致）
         forceSingleLineTitles(titleBar);
+        // 标题居左（G5）。本方法**故意不做整行横向避让**（那两个页面的标签行要占满整行），
+        // 但标题居左后会顶到浮动返回按钮上，所以只给标题本身补 start 间距 —— 见 alignTitleStart。
+        alignTitleStart(activity, titleBar);
     }
 
     /**
@@ -257,6 +260,120 @@ public final class WatchBackButton {
         // TextView 默认换行 —— 中文会被折成一列竖排（本项目已实测多例：我的歌单、本地音乐管理…）。
         // 统一单行 + END 截断后，超长文本退化为结尾「…」，不会再竖排。
         forceSingleLineTitles(titleBar);
+        // 标题居左（G5）：与「整行横向避让」同一个时机统一施加。
+        alignTitleStart(activity, titleBar);
+    }
+
+    // ==================== 标题居左（G5） ====================
+
+    /**
+     * 把标题栏里的「标题」改为**居左**对齐，并保证不被左上角浮动返回按钮遮挡。
+     *
+     * <p><b>为什么在这里统一做</b>：全 App 的标题栏有两套来源 —— XML 里的
+     * {@code android:gravity="center"} 与自绘页面的 {@code CENTER_IN_PARENT}。
+     * 逐个页面改既容易漏、也容易不一致。而标题栏本来就有「统一处理时机」
+     * （{@link #forceSingleLineTitles} 就是同款遍历），把左对齐挂进同一时机，
+     * 所有走 {@link #applyTitleBarInset} / {@link #applyTitleBarTopInset} 的页面一次性生效。</p>
+     *
+     * <p><b>识别规则</b>：遍历标题栏，把<b>资源 id 名含 {@code title}</b> 的 {@link TextView}
+     * 视为标题。本仓库所有页面标题都命名为 {@code tv_*_title}（共 22 处），规则在此代码库内是确定的；
+     * 标题栏里的动作按钮（如歌手页的「收藏」）id 不含 {@code title}，因此不会被误改。</p>
+     *
+     * <p><b>避让</b>：左对齐后标题会顶到浮动返回按钮上，故按
+     * 「标题栏到标题之间的累计 start 内缩（各级 padding + margin）」与
+     * {@link #getReservedStartPadding} 的差值补齐。差值动态计算，<b>不写死像素</b>。
+     * 本方法**幂等**：重复调用不会把间距叠加第二次。</p>
+     *
+     * <p><b>不要改的地方</b>：主界面顶部的居中时钟（{@code tv_clock}）不属于标题栏标题，
+     * 其 id 不含 {@code title}，天然不会被本方法命中。</p>
+     *
+     * @param titleBar 页面自绘或 XML 的标题行。null 时静默返回。
+     */
+    public static void alignTitleStart(Activity activity, View titleBar) {
+        if (activity == null || titleBar == null) {
+            return;
+        }
+        alignInTree(activity, titleBar, titleBar);
+    }
+
+    /** 显式版：已知标题视图时直接指定（自绘页面用；不需要标题栏容器）。 */
+    public static void alignTitleStart(Activity activity, TextView title) {
+        if (activity == null || title == null) {
+            return;
+        }
+        View parent = (title.getParent() instanceof View) ? (View) title.getParent() : title;
+        applyTitleStart(activity, parent, title);
+    }
+
+    private static void alignInTree(Activity activity, View titleBar, View node) {
+        if (node instanceof TextView) {
+            if (looksLikeTitle(node)) {
+                applyTitleStart(activity, titleBar, (TextView) node);
+            }
+            return;
+        }
+        if (node instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) node;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                alignInTree(activity, titleBar, g.getChildAt(i));
+            }
+        }
+    }
+
+    /** 资源 id 名含 "title" 即视为标题。取不到名字（无 id / 动态创建）时不算标题。 */
+    private static boolean looksLikeTitle(View v) {
+        int id = v.getId();
+        if (id == View.NO_ID) {
+            return false;
+        }
+        try {
+            String name = v.getResources().getResourceEntryName(id);
+            return name != null && name.toLowerCase(java.util.Locale.ROOT).contains("title");
+        } catch (android.content.res.Resources.NotFoundException e) {
+            return false;
+        }
+    }
+
+    private static void applyTitleStart(Activity activity, View titleBar, TextView title) {
+        // 1) 居左（竖直仍居中，避免标题在撑高的标题栏里贴顶）
+        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+
+        // 2) 补足到「返回按钮占位」：累计 start 内缩 = 各级 padding + 各级 margin
+        int have = accumulatedStartInset(titleBar, title);
+        int needed = getReservedStartPadding(activity);
+        int fix = needed - have;
+        if (fix <= 0) {
+            return;
+        }
+        ViewGroup.LayoutParams raw = title.getLayoutParams();
+        if (raw instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
+            lp.setMarginStart(lp.getMarginStart() + fix);
+            title.setLayoutParams(lp);
+        } else if (raw != null) {
+            // 没有 margin 能力的 LayoutParams（例如 ListView 的 AbsListView.LayoutParams）：
+            // 退化为给标题自身加内边距，效果等价且不会破坏类型。
+            title.setPadding(title.getPaddingStart() + fix,
+                    title.getPaddingTop(), title.getPaddingEnd(), title.getPaddingBottom());
+        }
+    }
+
+    /** 从 titleBar 到 title 之间的累计 start 内缩（含 title 自身 padding 与各级 margin）。 */
+    private static int accumulatedStartInset(View titleBar, View title) {
+        int inset = 0;
+        View v = title;
+        while (v != null) {
+            ViewGroup.LayoutParams lp = v.getLayoutParams();
+            if (lp instanceof ViewGroup.MarginLayoutParams) {
+                inset += ((ViewGroup.MarginLayoutParams) lp).getMarginStart();
+            }
+            inset += v.getPaddingStart();
+            if (v == titleBar || !(v.getParent() instanceof View)) {
+                break;
+            }
+            v = (View) v.getParent();
+        }
+        return inset;
     }
 
     /**
