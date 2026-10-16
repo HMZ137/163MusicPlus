@@ -39,6 +39,8 @@ public final class LocalPlaylistManager {
     private static final String TAG = "LocalPlaylistManager";
     private static final String DIR_163 = "163Music";
     private static final String PLAYLISTS_SUBDIR = "Playlists";
+    /** 歌单导入的约定目录（与 Playlists 同级）：用户把待导入的 json 放这里。 */
+    private static final String IMPORT_SUBDIR = "Import";
     private static final String EXT = ".json";
     private static final String KEY_LIST = "list";
 
@@ -50,6 +52,21 @@ public final class LocalPlaylistManager {
         File dir = new File(new File(Environment.getExternalStorageDirectory(), DIR_163), PLAYLISTS_SUBDIR);
         if (!dir.exists() && !dir.mkdirs()) {
             Log.w(TAG, "无法创建歌单目录: " + dir.getAbsolutePath());
+        }
+        return dir;
+    }
+
+    /**
+     * 歌单**导入**约定目录 {@code /sdcard/163Music/Import/}，不存在时自动创建。
+     *
+     * <p>与 {@link #getPlaylistsDir()} 同级，符合项目已有的 {@code 163Music/} 目录约定。
+     * 导入功能只扫这一层（见 {@link #findImportCandidates()}），不再触碰
+     * {@code Music/}、{@code Download/}、{@code 163Music/} 全树。</p>
+     */
+    public static File getImportDir() {
+        File dir = new File(new File(Environment.getExternalStorageDirectory(), DIR_163), IMPORT_SUBDIR);
+        if (!dir.exists() && !dir.mkdirs()) {
+            Log.w(TAG, "无法创建导入目录: " + dir.getAbsolutePath());
         }
         return dir;
     }
@@ -301,43 +318,35 @@ public final class LocalPlaylistManager {
     }
 
     /**
-     * 扫描可导入的候选文件：在 {@code Music/}、{@code Download/}、{@code 163Music/}
-     * （跳过 {@code 163Music/Playlists} 子树）里找后缀为 .json 且内容是歌单格式的文件，
-     * 并排除已经是本地歌单的那些（按文件名去重）。
+     * 扫描可导入的候选文件：**只扫约定目录 {@code /sdcard/163Music/Import/} 的一层**
+     * （不递归，也不再触碰 {@code Music/}、{@code Download/}、{@code 163Music/} 全树），
+     * 找出后缀为 .json 且内容是歌单格式的文件，并排除已经是本地歌单的那些（按文件名去重）。
+     *
+     * <p><b>为什么必须改成约定目录</b>：旧实现递归遍历三棵目录树，并对**每一个** json 调用
+     * {@link #isPlaylistJson}(File) —— 而它会用 {@link #readList}(File) 把文件**完整读入并解析**
+     * 才能判断格式。等于把这三棵树下的所有 json 全部读一遍，实机表现为「扫描全部文件、极慢、
+     * 完全不可用」（需求方原话）。改成只扫一层约定目录后，开销只与本目录内文件数成正比。</p>
+     *
+     * <p><b>行为变更（需求方明确要求）</b>：原先散落在 {@code Music/}、{@code Download/} 等处的
+     * 歌单 json <b>不再被自动发现</b>，必须先移动到约定目录。</p>
      */
     public static List<File> findImportCandidates() {
         List<File> candidates = new ArrayList<>();
         Set<String> existing = new HashSet<>();
         for (String n : listPlaylistNames()) existing.add(n.toLowerCase());
-        File external = Environment.getExternalStorageDirectory();
-        File playlistsDir = getPlaylistsDir();
-        String playlistsPath = playlistsDir.getAbsolutePath();
-        for (File root : new File[]{new File(external, "Music"), new File(external, "Download"),
-                new File(external, DIR_163)}) {
-            collectCandidates(root, playlistsPath, existing, candidates);
+        File[] children = getImportDir().listFiles();
+        if (children == null) {
+            return candidates;
         }
-        return candidates;
-    }
-
-    private static void collectCandidates(File dir, String playlistsPath,
-                                         Set<String> existing, List<File> out) {
-        if (dir == null || !dir.isDirectory()) return;
-        File[] children = dir.listFiles();
-        if (children == null) return;
         for (File child : children) {
-            if (child == null) continue;
-            if (child.isDirectory()) {
-                String cp = child.getAbsolutePath();
-                if (cp.equals(playlistsPath) || cp.startsWith(playlistsPath + File.separator)) {
-                    continue; // 不递归进 Playlists 目录本身
-                }
-                if (out.size() < 200) collectCandidates(child, playlistsPath, existing, out);
-            } else if (child.getName().toLowerCase().endsWith(EXT)) {
-                String base = stripExt(child.getName());
-                if (existing.contains(base.toLowerCase())) continue;
-                if (isPlaylistJson(child)) out.add(child);
-            }
+            if (child == null || !child.isFile()) continue; // 只扫一层，不递归
+            if (!child.getName().toLowerCase().endsWith(EXT)) continue;
+            String base = stripExt(child.getName());
+            if (existing.contains(base.toLowerCase())) continue; // 已是本地歌单，跳过
+            if (isPlaylistJson(child)) candidates.add(child);
         }
+        Collections.sort(candidates, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        return candidates;
     }
 
     /** 文件内容是否是歌单格式（含 list 数组）。 */

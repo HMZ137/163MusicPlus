@@ -989,11 +989,20 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         }
     }
 
-    /** 导入：扫描常见目录里符合格式的 json 歌单文件，让用户挑一个读进来。 */
+    /**
+     * 导入：只扫描**约定目录** {@code /sdcard/163Music/Import/} 里符合格式的 json 歌单文件，
+     * 让用户挑一个读进来。
+     *
+     * <p>约定目录不存在时由 {@link LocalPlaylistManager#getImportDir()} 自动创建；候选为空时
+     * 把目录路径直接提示出来，方便用户把 json 放进去（不再扫描 Music / Download 全树 ——
+     * 那是旧实现「极慢、完全不可用」的根因）。</p>
+     */
     private void onImportClicked() {
         List<File> candidates = LocalPlaylistManager.findImportCandidates();
         if (candidates.isEmpty()) {
-            Toast.makeText(this, "未找到可导入的歌单文件（请先把 json 放到 Music / Download 目录）",
+            Toast.makeText(this,
+                    "未找到可导入的歌单\n请把 json 放到："
+                            + LocalPlaylistManager.getImportDir().getAbsolutePath(),
                     Toast.LENGTH_LONG).show();
             return;
         }
