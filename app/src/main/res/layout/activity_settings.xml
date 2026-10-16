@@ -91,6 +91,44 @@
                     android:ellipsize="end" />
             </LinearLayout>
 
+            <!-- F5：响度平衡总开关（默认关；关闭时播放路径完全不变） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:background="@drawable/bg_card_tile">
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_loudness_balance"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_loudness_balance_desc"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_caption"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_loudness_balance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
             <!-- F5：响度分析（限音器）入口 —— 手动触发一次；后台、可中断、有进度 -->
             <LinearLayout
                 android:id="@+id/btn_settings_loudness"

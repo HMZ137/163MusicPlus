@@ -46,6 +46,14 @@ public class SettingsActivity extends BaseWatchActivity {
 
         View btnToggle = findViewById(R.id.btn_settings_toggle);
         View btnEditMore = findViewById(R.id.btn_settings_edit_more);
+        // F5：响度平衡总开关（默认关；关闭时播放路径完全不变）
+        com.google.android.material.switchmaterial.SwitchMaterial swLoudnessBalance =
+                findViewById(R.id.switch_loudness_balance);
+        if (swLoudnessBalance != null) {
+            swLoudnessBalance.setChecked(com.qinghe.music163pro.util.LoudnessBalance.isEnabled(this));
+            swLoudnessBalance.setOnCheckedChangeListener((buttonView, isChecked) ->
+                    com.qinghe.music163pro.util.LoudnessBalance.setEnabled(this, isChecked));
+        }
         // F5：响度分析（限音器）—— 手动触发一次；已在跑则再点一次=中断（符合文档「不得进入页面即全量分析」）
         View btnLoudness = findViewById(R.id.btn_settings_loudness);
         final TextView tvLoudnessValue = findViewById(R.id.tv_settings_loudness_value);

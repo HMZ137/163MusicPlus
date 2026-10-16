@@ -95,6 +95,8 @@
     <string name="hidden_tracks_empty">黑名单为空</string>
     <string name="settings_hidden_tracks">黑名单</string>
     <string name="settings_hidden_tracks_desc">已从本地列表移除的曲目</string>
+    <string name="settings_loudness_balance">响度平衡</string>
+    <string name="settings_loudness_balance_desc">按曲目响度自动增减，范围 ±6dB</string>
     <string name="settings_loudness">响度分析（限音器）</string>
     <string name="settings_loudness_desc">后台分析并按曲目平衡音量，可中断</string>
 </resources>

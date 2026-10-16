@@ -143,6 +143,7 @@ public final class LoudnessScan {
                 } catch (Throwable t) {
                     MusicLog.w(TAG, "响度分析异常退出", t);
                 } finally {
+                    com.qinghe.music163pro.util.LoudnessBalance.invalidateCache();   // 新结果立刻对播放生效
                     sRunning = false;
                     long ms = SystemClock.elapsedRealtime() - t0;
                     MusicLog.i(TAG, "响度分析结束: 新分析 " + analyzed + " 首、命中缓存 " + cached

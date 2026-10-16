@@ -148,6 +148,10 @@ public class MusicPlayerManager {
     // ExoPlayer for Bilibili audio (better seek/buffering than MediaPlayer)
     private ExoPlayer exoPlayer;
     private boolean usingExoPlayer = false;
+    /** F5：当前播放源路径（本地歌曲即文件绝对路径），用于查响度索引。 */
+    private String currentSourcePath;
+    /** F5：实时响度增益；未启用时为 null（原路径完全不变）。 */
+    private android.media.audiofx.LoudnessEnhancer loudnessEnhancer;
 
     // Bilibili CDN URL pre-refresh timer (URLs expire after ~30 min)
     private static final long BILIBILI_REFRESH_INTERVAL_MS = 25 * 60 * 1000; // 25 minutes
@@ -408,6 +412,7 @@ public class MusicPlayerManager {
                             .setUsage(AudioAttributes.USAGE_MEDIA)
                             .build());
             mediaPlayer.setDataSource(url);
+            currentSourcePath = url;
             mediaPlayer.setOnPreparedListener(mp -> {
                 // 已经被替换掉的旧播放器的迟到回调，直接忽略。
                 // 少了这个判断会出现：新歌已经起播，旧实例的 onPrepared 才回来，
@@ -482,7 +487,8 @@ public class MusicPlayerManager {
                 return true;
             });
             mediaPlayer.prepareAsync();
-            probeLoudnessFeasibility(false);   // F5/R4 探针
+            probeLoudnessFeasibility(false);   // F5/R4 探针
+            applyLoudnessBalance();
         } catch (Exception e) {
             if (callback != null) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
@@ -514,6 +520,7 @@ public class MusicPlayerManager {
                             .setUsage(AudioAttributes.USAGE_MEDIA)
                             .build());
             mediaPlayer.setDataSource(localPath);
+            currentSourcePath = localPath;
             mediaPlayer.setOnPreparedListener(mp -> {
                 // 已经被替换掉的旧播放器的迟到回调，直接忽略。
                 // 少了这个判断会出现：新歌已经起播，旧实例的 onPrepared 才回来，
@@ -560,7 +567,8 @@ public class MusicPlayerManager {
                 return true;
             });
             mediaPlayer.prepareAsync();
-            probeLoudnessFeasibility(false);   // F5/R4 探针
+            probeLoudnessFeasibility(false);   // F5/R4 探针
+            applyLoudnessBalance();
         } catch (Exception e) {
             if (callback != null) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
@@ -642,6 +650,54 @@ public class MusicPlayerManager {
         }
     }
 
+    /** F5：释放响度增益（换歌/停止/关闭开关时都要走到）。 */
+    private void releaseLoudnessEnhancer() {
+        if (loudnessEnhancer == null) {
+            return;
+        }
+        try {
+            loudnessEnhancer.setEnabled(false);
+        } catch (Throwable ignored) {
+        }
+        try {
+            loudnessEnhancer.release();
+        } catch (Throwable ignored) {
+        }
+        loudnessEnhancer = null;
+    }
+
+    /**
+     * F5：按当前曲目施加响度增益。
+     *
+     * <p>开关关闭 / 无索引 / 无该曲目条目时增益为 0 ⇒ **直接返回，播放路径完全不变**
+     * （文档 F5 改动要点 5：关闭后行为恢复原状）。</p>
+     */
+    private void applyLoudnessBalance() {
+        releaseLoudnessEnhancer();
+        float gainDb = com.qinghe.music163pro.util.LoudnessBalance.gainDbFor(appContext, currentSourcePath);
+        if (gainDb == 0f) {
+            MusicLog.i("Loudness", "本曲不施加增益（未启用/无有效索引）: " + currentSourcePath);
+            return;
+        }
+        int session = getAudioSessionId();
+        if (session == 0) {
+            MusicLog.w("Loudness", "无 audio session，无法施加增益");
+            return;
+        }
+        try {
+            loudnessEnhancer = new android.media.audiofx.LoudnessEnhancer(session);
+            int mB = Math.round(gainDb * 100f);
+            loudnessEnhancer.setTargetGain(mB);
+            loudnessEnhancer.setEnabled(true);
+            String name = currentSourcePath == null ? "?" : new java.io.File(currentSourcePath).getName();
+            MusicLog.i("Loudness", "已施加响度增益 " + String.format(java.util.Locale.US, "%+.2f", gainDb)
+                    + "dB (targetGain=" + mB + "mB) session=" + session + " 曲目=" + name);
+        } catch (Throwable t) {
+            MusicLog.w("Loudness", "施加增益失败（保持原样）: " + t);
+            releaseLoudnessEnhancer();
+        }
+    }
+
     public void resume() {
         cancelPendingSleepStopOnManualAction();
         if (usingExoPlayer && exoPlayer != null) {
@@ -656,6 +712,7 @@ public class MusicPlayerManager {
     }
 
     public void stop() {
+        releaseLoudnessEnhancer();
         cancelBilibiliRefreshTimer();
         if (exoPlayer != null) {
             ExoPlayer player = exoPlayer;
@@ -1362,7 +1419,8 @@ public class MusicPlayerManager {
 
             exoPlayer.setMediaItem(MediaItem.fromUri(url));
             exoPlayer.prepare();
-            probeLoudnessFeasibility(true);   // F5/R4 探针
+            probeLoudnessFeasibility(true);   // F5/R4 探针
+            applyLoudnessBalance();
 
             if (resumePositionMs > 0) {
                 exoPlayer.seekTo(resumePositionMs);
