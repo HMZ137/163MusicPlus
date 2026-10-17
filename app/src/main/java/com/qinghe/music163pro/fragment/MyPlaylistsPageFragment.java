@@ -222,13 +222,25 @@ public abstract class MyPlaylistsPageFragment extends Fragment {
         }
     }
 
-    /** 把当前列表的加载结果同步成「N 个歌单 / 暂无」的状态文案。 */
+    /**
+     * 把当前列表的加载结果同步到状态行。
+     *
+     * <p><b>数量不写在这里</b>：标题下的独立信息行已经显示「页名 · N 个」
+     * （{@link Host#onMyPlaylistsPageSummary} 回写），状态行再写一遍「N 个歌单」就是重复
+     * —— 需求方 2026-10-17 指出本地歌单页有两个数量指示。现在状态行只负责「空列表提示 /
+     * 未登录 / 加载失败」这类信息，列表非空时整行隐藏。</p>
+     */
     protected final void updateCountStatus(CharSequence emptyText) {
-        int count = realItemCount();
-        if (count == 0) {
+        if (realItemCount() == 0) {
+            if (tvStatus != null) {
+                tvStatus.setVisibility(View.VISIBLE);
+            }
             setStatus(emptyText, false);
         } else {
-            setStatus(count + " 个歌单", true);
+            if (tvStatus != null) {
+                tvStatus.setVisibility(View.GONE);
+            }
+            setStatus("", true);
         }
     }
 
