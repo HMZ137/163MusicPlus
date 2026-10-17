@@ -107,18 +107,71 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
     public void setContentView(int layoutResID) {
         super.setContentView(layoutResID);
         attachBackButton();
+        applyScrollBottomInset();
     }
 
     @Override
     public void setContentView(View view) {
         super.setContentView(view);
         attachBackButton();
+        applyScrollBottomInset();
     }
 
     @Override
     public void setContentView(View view, ViewGroup.LayoutParams params) {
         super.setContentView(view, params);
         attachBackButton();
+        applyScrollBottomInset();
+    }
+
+    /**
+     * D15：115% 界面缩放下，用**手势**把页面滚到底时最后一行常常仍露不全
+     * （实测：设置页「导出下载的音乐」、本地歌曲设置页「黑名单」、更多页「设置」行都被切掉一截）。
+     *
+     * <p><b>实测结论</b>（2026-10-17 探针）：滚动数学本身没问题 —— 程序化
+     * {@code fullScroll(FOCUS_DOWN)} 能到 {@code scrollY == 内容高 - 视口高}，
+     * 最后一行可完整露出；但手势连续上滑只能到「程序化 max 少约 78px」的位置就停住
+     * （每次手势能滚动的量被吞掉一截，疑似标题栏收起/触摸处理的连带影响）。
+     * 于是最后一行恰好差这一段。</p>
+     *
+     * <p><b>修复</b>：内容挂载完成后，给每个 {@code ScrollView} 的内容容器补一段底部留白
+     * （≥48dp ≈ 93px &gt; 78px），把「手势可达位置」整体上移，最后一项即可完整露出。
+     * 只在缩放 &gt; 100% 时启用 —— 100% 缩放下没有这个现象，不必平白多出空白。</p>
+     */
+    private void applyScrollBottomInset() {
+        if (UiScale.getPercent(this) <= 100) {
+            return;
+        }
+        final View content = findViewById(android.R.id.content);
+        if (content == null) {
+            return;
+        }
+        final int pad = Math.round(48 * getResources().getDisplayMetrics().density);
+        // 等 XML 内容真正挂到 content 上（setContentView 的同一帧内完成后）再遍历
+        content.post(() -> insetScrollables(content, pad));
+    }
+
+    private void insetScrollables(View view, int pad) {
+        if (view instanceof android.widget.ScrollView) {
+            android.widget.ScrollView scroll = (android.widget.ScrollView) view;
+            if (scroll.getChildCount() == 1) {
+                View child = scroll.getChildAt(0);
+                if (child instanceof ViewGroup) {
+                    int want = Math.max(child.getPaddingBottom(), pad);
+                    if (child.getPaddingBottom() != want) {
+                        child.setPadding(child.getPaddingLeft(), child.getPaddingTop(),
+                                child.getPaddingRight(), want);
+                    }
+                }
+            }
+            return;   // 内容留白已加，不必再往 ScrollView 内部找
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                insetScrollables(group.getChildAt(i), pad);
+            }
+        }
     }
 
     private void attachBackButton() {
