@@ -22,7 +22,6 @@ import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.util.MultiSelectController;
 import com.qinghe.music163pro.util.BatchFavoriteHelper;
 import com.qinghe.music163pro.util.PlaybackMode;
-import com.qinghe.music163pro.util.UiKit;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -133,10 +132,8 @@ public class DownloadListActivity extends BaseWatchActivity
         // 这里改成：标题只留**左侧**（返回按钮）占位，右侧归零，可用宽回到约 272px。
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar,
                 findViewById(R.id.layout_downloads_action_row));
-        // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
-        // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
-        com.qinghe.music163pro.util.WatchBackButton.addTitleBarExtraHeight(
-                this, titleBar, UiKit.dp(this, UiKit.DP_TAB_ROW_HEIGHT + 4));
+        // L2：迁移 VP2 后标签行已删除（只留 返回/标题/更多），标题栏不再需要为标签行补高度 ——
+        // 原先这笔 addTitleBarExtraHeight 会把标题栏撑高约一行 32dp，白吃掉列表空间。
 
         // Apply keep screen on setting
 
