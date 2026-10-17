@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -136,22 +137,16 @@ public final class AudioTagEmbedder {
 
         int embedded = 0;
         for (File audio : audios) {
-            byte[] original = readAll(audio);
-            String name = audio.getName().toLowerCase(java.util.Locale.ROOT);
-            byte[] updated;
-            if (name.endsWith(".mp3")) {
-                updated = embedMp3(original, cover, lyrics);
-            } else if (name.endsWith(".flac")) {
-                updated = embedFlac(original, cover, lyrics);
-            } else {
-                continue;
+            try {
+                // 2026-10-17 修：原来 readAll 整文件进内存（64MB FLAC 直接 OOM 崩进程），
+                // 改成流式写临时文件；同时保留原标签里的标题/歌手等帧。
+                if (embedOneStreaming(audio, cover, lyrics) == 1) {
+                    embedded++;
+                }
+            } catch (Throwable t) {
+                // 单文件失败不能把整批内嵌打崩
+                Log.w(TAG, "内嵌失败（跳过）: " + audio.getAbsolutePath() + " — " + t);
             }
-            if (updated == null) {
-                continue;
-            }
-            backupOnce(audio);
-            writeAll(audio, updated);
-            embedded++;
         }
         if (embedded == 0) {
             return -1;
@@ -175,24 +170,366 @@ public final class AudioTagEmbedder {
             return 0;
         }
         String name = audio.getName().toLowerCase(java.util.Locale.ROOT);
+        if (!name.endsWith(".mp3") && !name.endsWith(".flac")) {
+            return 0;   // 其它格式暂不支持内嵌歌词标签
+        }
         try {
-            byte[] original = readAll(audio);
-            byte[] updated;
-            if (name.endsWith(".mp3")) {
-                updated = embedMp3(original, null, lyrics);
-            } else if (name.endsWith(".flac")) {
-                updated = embedFlac(original, null, lyrics);
+            return embedOneStreaming(audio, null, lyrics);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    // ── 流式内嵌（2026-10-17 修 OOM） ────────────────────────────────────────
+
+    /**
+     * 把封面/歌词写进单个音频文件（流式，内存占用与文件大小无关）。
+     *
+     * <p>步骤：写临时文件 → 备份原文件（流式）→ 删除原文件 → 临时文件改名占位。</p>
+     *
+     * @return 1=成功；0=跳过（格式不支持/没有素材）；-1=失败
+     */
+    private static int embedOneStreaming(File audio, byte[] cover, String lyrics) throws IOException {
+        if (audio == null || !audio.isFile()) {
+            return 0;
+        }
+        if ((cover == null || cover.length == 0) && (lyrics == null || lyrics.isEmpty())) {
+            return 0;
+        }
+        String lower = audio.getName().toLowerCase(java.util.Locale.ROOT);
+        boolean isMp3 = lower.endsWith(".mp3");
+        boolean isFlac = lower.endsWith(".flac");
+        if (!isMp3 && !isFlac) {
+            return 0;
+        }
+        File tmp = new File(audio.getParentFile(), audio.getName() + ".embedtmp");
+        boolean wrote = false;
+        try {
+            if (isMp3) {
+                wrote = writeMp3Streaming(audio, tmp, cover, lyrics);
             } else {
-                return 0;   // 其它格式暂不支持内嵌歌词标签
+                wrote = writeFlacStreaming(audio, tmp, cover, lyrics);
             }
-            if (updated == null) {
+            if (!wrote) {
                 return -1;
             }
             backupOnce(audio);
-            writeAll(audio, updated);
+            if (!audio.delete()) {
+                Log.w(TAG, "删除原文件失败: " + audio.getAbsolutePath());
+                return -1;
+            }
+            if (!tmp.renameTo(audio)) {
+                Log.w(TAG, "临时文件改名失败: " + tmp.getAbsolutePath());
+                return -1;
+            }
             return 1;
-        } catch (Exception e) {
+        } finally {
+            if (tmp.exists()) {
+                tmp.delete();
+            }
+        }
+    }
+
+    // ── MP3：保留原 ID3 帧，替换 USLT/APIC，音频数据流式拷贝 ────────────────
+
+    private static boolean writeMp3Streaming(File src, File dst, byte[] cover, String lyrics)
+            throws IOException {
+        byte[] head = new byte[10];
+        long fileLen = src.length();
+        long audioStart = 0;
+        byte[] oldTag = null;
+        try (RandomAccessFile in = new RandomAccessFile(src, "r")) {
+            if (fileLen < 10) {
+                return false;
+            }
+            in.readFully(head);
+            if (head[0] == 'I' && head[1] == 'D' && head[2] == '3') {
+                int size = ((head[6] & 0x7F) << 21) | ((head[7] & 0x7F) << 14)
+                        | ((head[8] & 0x7F) << 7) | (head[9] & 0x7F);
+                audioStart = 10L + size;
+                if (audioStart >= fileLen) {
+                    return false;
+                }
+                // 旧标签最多读 8MB（保留标题/歌手等帧；超大封面帧会被丢弃但不影响音频）
+                if (size <= 8 * 1024 * 1024) {
+                    oldTag = new byte[(int) size + 10];
+                    in.seek(0);
+                    in.readFully(oldTag);
+                }
+            }
+            byte[] newTag = rebuildId3v24(oldTag, cover, lyrics);
+            try (FileOutputStream out = new FileOutputStream(dst)) {
+                out.write(newTag, 0, newTag.length);
+                copyRange(in, audioStart, fileLen - audioStart, out);
+                out.flush();
+            }
+        }
+        return true;
+    }
+
+    /** 重建 ID3v2.4：保留旧标签里除 USLT/APIC 外的帧，再写新的歌词/封面帧。 */
+    private static byte[] rebuildId3v24(byte[] oldTag, byte[] cover, String lyrics) {
+        ByteArrayOutputStream frames = new ByteArrayOutputStream();
+        if (oldTag != null && oldTag.length >= 10
+                && oldTag[0] == 'I' && oldTag[1] == 'D' && oldTag[2] == '3') {
+            int ver = oldTag[3] & 0xFF;
+            if (ver == 3 || ver == 4) {
+                int flags = oldTag[5] & 0xFF;
+                int off = 10;
+                if ((flags & 0x40) != 0) {   // extended header：跳过
+                    if (oldTag.length >= 14) {
+                        int eh = ver == 4
+                                ? (((oldTag[10] & 0x7F) << 21) | ((oldTag[11] & 0x7F) << 14)
+                                   | ((oldTag[12] & 0x7F) << 7) | (oldTag[13] & 0x7F))
+                                : (((oldTag[10] & 0xFF) << 24) | ((oldTag[11] & 0xFF) << 16)
+                                   | ((oldTag[12] & 0xFF) << 8) | (oldTag[13] & 0xFF));
+                        off += (ver == 4 ? 4 : 4) + Math.max(0, eh);
+                    }
+                }
+                while (off + 10 <= oldTag.length) {
+                    boolean empty = true;
+                    for (int i = 0; i < 4; i++) {
+                        if (oldTag[off + i] != 0) {
+                            empty = false;
+                            break;
+                        }
+                    }
+                    if (empty) {
+                        break;   // 进入 padding
+                    }
+                    String id = new String(oldTag, off, 4, StandardCharsets.ISO_8859_1);
+                    int size;
+                    if (ver == 4) {
+                        size = ((oldTag[off + 4] & 0x7F) << 21) | ((oldTag[off + 5] & 0x7F) << 14)
+                                | ((oldTag[off + 6] & 0x7F) << 7) | (oldTag[off + 7] & 0x7F);
+                    } else {
+                        size = ((oldTag[off + 4] & 0xFF) << 24) | ((oldTag[off + 5] & 0xFF) << 16)
+                                | ((oldTag[off + 6] & 0xFF) << 8) | (oldTag[off + 7] & 0xFF);
+                    }
+                    if (size < 0 || off + 10 + size > oldTag.length) {
+                        break;
+                    }
+                    if (!"USLT".equals(id) && !"APIC".equals(id)) {
+                        // 统一写成 v2.4 帧头（size 用 syncsafe），避免 v2.3→v2.4 尺寸解释错位
+                        byte[] data = new byte[size];
+                        System.arraycopy(oldTag, off + 10, data, 0, size);
+                        writeFrame(frames, id, data, true);
+                    }
+                    off += 10 + size;
+                }
+            }
+        }
+        // 新歌词/封面帧（沿用原有 writeFrame）
+        if (lyrics != null && !lyrics.isEmpty()) {
+            ByteArrayOutputStream d = new ByteArrayOutputStream();
+            d.write(0x03);
+            d.write('e'); d.write('n'); d.write('g');
+            d.write(0x00);
+            byte[] text = lyrics.getBytes(StandardCharsets.UTF_8);
+            d.write(text, 0, text.length);
+            writeFrame(frames, "USLT", d.toByteArray());
+        }
+        if (cover != null && cover.length > 0) {
+            ByteArrayOutputStream d = new ByteArrayOutputStream();
+            d.write(0x03);
+            byte[] mime = "image/jpeg".getBytes(StandardCharsets.ISO_8859_1);
+            d.write(mime, 0, mime.length);
+            d.write(0x00);
+            d.write(0x03);
+            d.write(0x00);
+            d.write(cover, 0, cover.length);
+            writeFrame(frames, "APIC", d.toByteArray());
+        }
+        byte[] body = frames.toByteArray();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write('I'); out.write('D'); out.write('3');
+        out.write(0x04); out.write(0x00); out.write(0x00);
+        int size = body.length;
+        out.write((size >> 21) & 0x7F);
+        out.write((size >> 14) & 0x7F);
+        out.write((size >> 7) & 0x7F);
+        out.write(size & 0x7F);
+        out.write(body, 0, body.length);
+        return out.toByteArray();
+    }
+
+    /** 只写 frame 头 + 数据（跨版本统一 v2.4 头）。 */
+    private static void writeFrame(ByteArrayOutputStream out, String id, byte[] data, boolean v24) {
+        byte[] idBytes = id.getBytes(StandardCharsets.ISO_8859_1);
+        out.write(idBytes, 0, Math.min(4, idBytes.length));
+        int size = data.length;
+        out.write((size >> 21) & 0x7F);
+        out.write((size >> 14) & 0x7F);
+        out.write((size >> 7) & 0x7F);
+        out.write(size & 0x7F);
+        out.write(0x00);
+        out.write(0x00);
+        out.write(data, 0, data.length);
+    }
+
+    // ── FLAC：保留其它元数据块，合并 VORBIS_COMMENT，音频帧流式拷贝 ──────────
+
+    private static boolean writeFlacStreaming(File src, File dst, byte[] cover, String lyrics)
+            throws IOException {
+        long fileLen = src.length();
+        try (RandomAccessFile in = new RandomAccessFile(src, "r");
+             RandomAccessFile out = new RandomAccessFile(dst, "rw")) {
+            if (fileLen < 8) {
+                return false;
+            }
+            byte[] magic = new byte[4];
+            in.readFully(magic);
+            if (magic[0] != 'f' || magic[1] != 'L' || magic[2] != 'a' || magic[3] != 'C') {
+                return false;
+            }
+            out.write(magic);
+            boolean last = false;
+            boolean firstBlock = true;
+            byte[] oldComment = null;
+            long lastFlagPos = -1;
+            while (!last) {
+                byte[] bh = new byte[4];
+                in.readFully(bh);
+                last = (bh[0] & 0x80) != 0;
+                int type = bh[0] & 0x7F;
+                int len = ((bh[1] & 0xFF) << 16) | ((bh[2] & 0xFF) << 8) | (bh[3] & 0xFF);
+                if (firstBlock && type != 0) {
+                    return false;   // 首块必须是 STREAMINFO
+                }
+                firstBlock = false;
+                boolean keepOldComment = (lyrics == null || lyrics.isEmpty());
+                boolean keepOldPicture = (cover == null || cover.length == 0);
+                if (type == 4 && !keepOldComment) {   // VORBIS_COMMENT：读出来稍后合并（块通常几 KB）
+                    if (len <= 8 * 1024 * 1024) {
+                        byte[] data = new byte[len];
+                        in.readFully(data);
+                        if (oldComment == null) {
+                            oldComment = data;
+                        }
+                    } else {
+                        in.seek(in.getFilePointer() + len);
+                    }
+                } else if (type == 6 && !keepOldPicture) {   // 旧 PICTURE：丢弃，稍后重建
+                    in.seek(in.getFilePointer() + len);
+                } else {
+                    lastFlagPos = out.getFilePointer();
+                    out.write(0x00 | type);
+                    out.write((len >> 16) & 0xFF);
+                    out.write((len >> 8) & 0xFF);
+                    out.write(len & 0xFF);
+                    copyRange(in, in.getFilePointer(), len, out);
+                }
+            }
+            // 追加 VORBIS_COMMENT（歌词）与 PICTURE（封面）
+            if (lyrics != null && !lyrics.isEmpty()) {
+                byte[] data = mergeVorbisComment(oldComment, lyrics);
+                lastFlagPos = out.getFilePointer();
+                out.write(0x04);
+                out.write((data.length >> 16) & 0xFF);
+                out.write((data.length >> 8) & 0xFF);
+                out.write(data.length & 0xFF);
+                out.write(data);
+            }
+            if (cover != null && cover.length > 0) {
+                byte[] data = buildFlacPicture(cover);
+                lastFlagPos = out.getFilePointer();
+                out.write(0x06);
+                out.write((data.length >> 16) & 0xFF);
+                out.write((data.length >> 8) & 0xFF);
+                out.write(data.length & 0xFF);
+                out.write(data);
+            }
+            // 音频帧原样接在后面
+            long pos = in.getFilePointer();
+            copyRange(in, pos, fileLen - pos, out);
+            // 最后把最后一块标记成 last
+            if (lastFlagPos >= 0) {
+                out.seek(lastFlagPos);
+                out.write(0x80);
+            }
+            return true;
+        }
+    }
+
+    /** 合并 VORBIS_COMMENT：保留原有 tag 字段（标题/歌手等），替换 LYRICS/UNSYNCEDLYRICS。 */
+    private static byte[] mergeVorbisComment(byte[] oldComment, String lyrics) {
+        List<byte[]> entries = new ArrayList<>();
+        if (oldComment != null && oldComment.length >= 8) {
+            try {
+                int vendorLen = readLe32(oldComment, 0);
+                int p = 4 + vendorLen;
+                if (vendorLen >= 0 && p + 4 <= oldComment.length) {
+                    int count = readLe32(oldComment, p);
+                    p += 4;
+                    for (int i = 0; i < count && p + 4 <= oldComment.length; i++) {
+                        int len = readLe32(oldComment, p);
+                        p += 4;
+                        if (len < 0 || p + len > oldComment.length) {
+                            break;
+                        }
+                        String s = new String(oldComment, p, len, StandardCharsets.UTF_8);
+                        if (!s.startsWith("LYRICS=") && !s.startsWith("UNSYNCEDLYRICS=")) {
+                            byte[] e = new byte[len];
+                            System.arraycopy(oldComment, p, e, 0, len);
+                            entries.add(e);
+                        }
+                        p += len;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        String l = lyrics.replace("\r\n", "\n");
+        entries.add(("LYRICS=" + l).getBytes(StandardCharsets.UTF_8));
+        entries.add(("UNSYNCEDLYRICS=" + l).getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] vendor = "163MusicPro".getBytes(StandardCharsets.UTF_8);
+        writeLe32(out, vendor.length);
+        out.write(vendor, 0, vendor.length);
+        writeLe32(out, entries.size());
+        for (byte[] e : entries) {
+            writeLe32(out, e.length);
+            out.write(e, 0, e.length);
+        }
+        return out.toByteArray();
+    }
+
+    private static int readLe32(byte[] data, int off) {
+        if (off + 4 > data.length) {
             return -1;
+        }
+        return (data[off] & 0xFF) | ((data[off + 1] & 0xFF) << 8)
+                | ((data[off + 2] & 0xFF) << 16) | ((data[off + 3] & 0xFF) << 24);
+    }
+
+    /** 从输入流当前位置起，把 length 字节流式拷到输出（8KB 缓冲）。 */
+    private static void copyRange(RandomAccessFile in, long start, long length, RandomAccessFile out)
+            throws IOException {
+        in.seek(start);
+        byte[] buf = new byte[8192];
+        long remaining = length;
+        while (remaining > 0) {
+            int n = in.read(buf, 0, (int) Math.min(buf.length, remaining));
+            if (n < 0) {
+                break;
+            }
+            out.write(buf, 0, n);
+            remaining -= n;
+        }
+    }
+
+    private static void copyRange(RandomAccessFile in, long start, long length, FileOutputStream out)
+            throws IOException {
+        in.seek(start);
+        byte[] buf = new byte[8192];
+        long remaining = length;
+        while (remaining > 0) {
+            int n = in.read(buf, 0, (int) Math.min(buf.length, remaining));
+            if (n < 0) {
+                break;
+            }
+            out.write(buf, 0, n);
+            remaining -= n;
         }
     }
 
@@ -456,7 +793,17 @@ public final class AudioTagEmbedder {
         if (bak.exists()) {
             return;
         }
-        writeAll(bak, readAll(file));
+        // 原实现 writeAll(bak, readAll(file)) 会把整个文件读进内存（.bak + 原文件 = 双份），
+        // 大 FLAC 直接 OOM；改成 8KB 缓冲的流式复制。
+        try (FileInputStream in = new FileInputStream(file);
+             FileOutputStream out = new FileOutputStream(bak)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            out.flush();
+        }
     }
 
     /**

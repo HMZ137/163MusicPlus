@@ -148,14 +148,34 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
             tvValue.setText("内嵌中…");
         }
         new Thread(() -> {
-            final com.qinghe.music163pro.util.AudioTagEmbedder.Result result =
-                    com.qinghe.music163pro.util.AudioTagEmbedder.embedAll(
-                            root, force, (done, total, folder) -> runOnUiThread(() -> {
-                                if (isFinishing() || tvValue == null) {
-                                    return;
-                                }
-                                tvValue.setText("内嵌中 " + done + "/" + total);
-                            }));
+            final com.qinghe.music163pro.util.AudioTagEmbedder.Result result;
+            try {
+                result = com.qinghe.music163pro.util.AudioTagEmbedder.embedAll(
+                        root, force, (done, total, folder) -> runOnUiThread(() -> {
+                            if (isFinishing() || tvValue == null) {
+                                return;
+                            }
+                            tvValue.setText("内嵌中 " + done + "/" + total);
+                        }));
+            } catch (Throwable t) {
+                // 2026-10-17：以前 OOM 会直接把进程打崩（表现为「重启并退回上一页」）。
+                // AudioTagEmbedder 已改流式处理，这里再兜一层，任何异常都只提示、不崩。
+                com.qinghe.music163pro.util.MusicLog.w("F4-embed",
+                        "内嵌任务异常终止: " + t);
+                runOnUiThread(() -> {
+                    embedRunning = false;
+                    if (isFinishing()) {
+                        return;
+                    }
+                    if (tvValue != null) {
+                        tvValue.setText("内嵌失败");
+                    }
+                    Toast.makeText(LocalMusicSettingsActivity.this,
+                            "内嵌失败：" + t.getClass().getSimpleName() + "（详见日志）",
+                            Toast.LENGTH_LONG).show();
+                });
+                return;
+            }
             runOnUiThread(() -> {
                 embedRunning = false;
                 if (isFinishing()) {
