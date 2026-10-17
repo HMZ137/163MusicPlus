@@ -20,6 +20,16 @@ import java.util.Locale;
 public class SearchMvsFragment extends SearchListFragment<MvInfo> {
 
     @Override
+    protected int pageIndex() {
+        return 2;
+    }
+
+    @Override
+    protected CharSequence pageName() {
+        return getString(R.string.search_mv);
+    }
+
+    @Override
     protected int itemLayoutRes() {
         return R.layout.item_mv;
     }

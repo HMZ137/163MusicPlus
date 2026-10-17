@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -30,11 +29,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 搜索页（S1：三个结果标签改用 ViewPager2 + Fragment）。
+ * 搜索页（S1：三个结果标签改用 ViewPager2 + Fragment；S1 收尾：按需求方口径去掉多 Tab 标签行）。
  *
- * <p>本类只保留「搜索框 / 搜索历史 / 三个标签头的选中态与翻页」，三个结果列表分别由
+ * <p>本类只保留「搜索框 / 搜索历史 / 结果页信息行 / 翻页」，三个结果列表分别由
  * {@link SearchSongsFragment} / {@link SearchPlaylistsFragment} / {@link SearchMvsFragment} 承载，
  * 它们共用一个分页与滚动加载的基类 {@link SearchListFragment}。</p>
+ *
+ * <p><b>去 Tab 口径</b>（需求方 2026-10-17：其他 ViewPager2 + Fragment 的页面同 收藏页）：
+ * 原「单曲 / 歌单 / MV」标签行删除，结果页靠左右滑切换；当前是哪一页、已加载多少条，
+ * 由搜索框下方的独立信息行显示（`多Tab实例_1.bmp` 的「其他需要展示的内容」）。</p>
  *
  * <p><b>搜索历史</b>不属于标签页（文档 S1 的口径），仍留在本页：未搜索时显示历史列表，
  * 搜索后隐藏；表单与历史键 {@code search_history} 的持久化行为与改造前完全一致。</p>
@@ -49,14 +52,16 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
     private static final int TAB_PLAYLISTS = 1;
     private static final int TAB_MVS = 2;
 
+    /** 信息行里的结果页名字，下标与 ViewPager2 的页一一对应。 */
+    private static final String[] PAGE_NAMES = {"单曲", "歌单", "MV"};
+
     private EditText etSearch;
     private ListView lvHistory;
-    private LinearLayout llSearchTabs;
-    private TextView tabSongs;
-    private TextView tabPlaylists;
-    private TextView tabMvs;
+    private TextView tvSearchInfo;
     private ViewPager2 vpSearchTabs;
     private ArrayAdapter<String> historyAdapter;
+    /** 每个结果页最近一次回写的摘要（切页时直接取用，避免显示上一页的条数）。 */
+    private final String[] pageSummaries = new String[PAGE_NAMES.length];
 
     private final List<String> historyList = new ArrayList<>();
     private MusicPlayerManager playerManager;
@@ -86,10 +91,7 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
 
         etSearch = findViewById(R.id.et_search);
         lvHistory = findViewById(R.id.lv_history);
-        llSearchTabs = findViewById(R.id.ll_search_tabs);
-        tabSongs = findViewById(R.id.tab_songs);
-        tabPlaylists = findViewById(R.id.tab_playlists);
-        tabMvs = findViewById(R.id.tab_mvs);
+        tvSearchInfo = findViewById(R.id.tv_search_info);
         vpSearchTabs = findViewById(R.id.vp_search_tabs);
         TextView btnSearch = findViewById(R.id.btn_search);
         // 归零 MaterialButton 默认上下 inset，让按钮底衬铺满 30dp，与输入框等高
@@ -110,7 +112,7 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
             @Override
             public void onPageSelected(int position) {
                 currentTab = position;
-                updateTabAppearance();
+                updateInfoRow(position);
             }
         });
 
@@ -121,7 +123,7 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
                 R.id.tv_history_text, historyList);
         lvHistory.setAdapter(historyAdapter);
         updateHistoryVisibility();
-        updateTabAppearance();
+        updateInfoRow(currentTab);
 
         loadDefaultKeyword();
     }
@@ -206,16 +208,10 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
         });
 
         btnSearch.setOnClickListener(v -> doSearch());
-        tabSongs.setOnClickListener(v -> vpSearchTabs.setCurrentItem(TAB_SONGS, true));
-        tabPlaylists.setOnClickListener(v -> vpSearchTabs.setCurrentItem(TAB_PLAYLISTS, true));
-        tabMvs.setOnClickListener(v -> vpSearchTabs.setCurrentItem(TAB_MVS, true));
     }
 
-    private void updateTabAppearance() {
-        tabSongs.setTextColor(currentTab == TAB_SONGS ? 0xFFBB86FC : 0xB3FFFFFF);
-        tabPlaylists.setTextColor(currentTab == TAB_PLAYLISTS ? 0xFFBB86FC : 0xB3FFFFFF);
-        tabMvs.setTextColor(currentTab == TAB_MVS ? 0xFFBB86FC : 0xB3FFFFFF);
-    }
+    // 去 Tab 后不再有标签按钮，结果页靠左右滑切换；当前页信息由信息行显示。
+    // 注意：currentTab 仍保留 —— 点搜索时把结果区复位到上次看的那一页（改造前同款行为）。
 
     private void doSearch() {
         String keyword = etSearch.getText().toString().trim();
@@ -233,7 +229,7 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
         currentKeyword = keyword;
         addToSearchHistory(keyword);
 
-        llSearchTabs.setVisibility(View.VISIBLE);
+        tvSearchInfo.setVisibility(View.VISIBLE);
         vpSearchTabs.setVisibility(View.VISIBLE);
         lvHistory.setVisibility(View.GONE);
         vpSearchTabs.setCurrentItem(currentTab, false);
@@ -288,7 +284,7 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
         boolean showHistory = currentKeyword.isEmpty() && !historyList.isEmpty();
         lvHistory.setVisibility(showHistory ? View.VISIBLE : View.GONE);
         if (showHistory) {
-            llSearchTabs.setVisibility(View.GONE);
+            tvSearchInfo.setVisibility(View.GONE);
             vpSearchTabs.setVisibility(View.GONE);
         }
     }
@@ -301,6 +297,32 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
     @Override
     public String getCookie() {
         return playerManager.getCookie();
+    }
+
+    // ==================== 结果页信息行（去 Tab 后的「其他需要展示的内容」） ====================
+
+    @Override
+    public void onSearchPageSummary(int page, CharSequence summary) {
+        if (page < 0 || page >= pageSummaries.length) {
+            return;
+        }
+        pageSummaries[page] = summary == null ? "" : summary.toString();
+        // 只回写当前可见页；其余页的摘要先存着，滑过去时再显示。
+        if (vpSearchTabs != null && vpSearchTabs.getCurrentItem() == page) {
+            updateInfoRow(page);
+        }
+    }
+
+    /** 信息行：显示「结果页 · 已加载条数」；还没结果时先显示页名，不留空白行。 */
+    private void updateInfoRow(int page) {
+        if (tvSearchInfo == null || page < 0 || page >= PAGE_NAMES.length) {
+            return;
+        }
+        String text = pageSummaries[page];
+        if (text == null || text.isEmpty()) {
+            text = PAGE_NAMES[page];
+        }
+        tvSearchInfo.setText(text);
     }
 
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {

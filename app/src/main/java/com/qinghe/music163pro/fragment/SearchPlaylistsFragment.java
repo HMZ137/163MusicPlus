@@ -57,6 +57,16 @@ public class SearchPlaylistsFragment extends SearchListFragment<SearchPlaylistsF
     }
 
     @Override
+    protected int pageIndex() {
+        return 1;
+    }
+
+    @Override
+    protected CharSequence pageName() {
+        return "歌单";
+    }
+
+    @Override
     protected int itemLayoutRes() {
         return R.layout.item_playlist;
     }

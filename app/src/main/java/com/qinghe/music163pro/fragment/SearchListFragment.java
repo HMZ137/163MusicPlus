@@ -32,11 +32,19 @@ import java.util.List;
  */
 public abstract class SearchListFragment<T> extends Fragment {
 
-    /** 宿主（SearchActivity）提供当前关键词与登录态。 */
+    /** 宿主（SearchActivity）提供当前关键词、登录态与结果页信息行回写。 */
     public interface Host {
         String getSearchKeyword();
 
         String getCookie();
+
+        /**
+         * 回写「当前结果页 · 已加载条数」信息行（去 Tab 后由标题栏外的独立行显示）。
+         *
+         * @param page    结果页序号（0 单曲 / 1 歌单 / 2 MV），与 ViewPager2 的页一致
+         * @param summary 形如「单曲 · 40 条」
+         */
+        void onSearchPageSummary(int page, CharSequence summary);
     }
 
     /** 单页请求回调。 */
@@ -56,6 +64,12 @@ public abstract class SearchListFragment<T> extends Fragment {
     private boolean hasMore = true;
     private boolean loadingMore = false;
     private boolean searched = false;
+
+    /** 结果页序号（0 单曲 / 1 歌单 / 2 MV），用于信息行回写与日志。 */
+    protected abstract int pageIndex();
+
+    /** 信息行里的结果页名字（单曲 / 歌单 / MV）。 */
+    protected abstract CharSequence pageName();
 
     /** 条目布局（item_song / item_playlist / item_mv）。 */
     protected abstract int itemLayoutRes();
@@ -135,6 +149,7 @@ public abstract class SearchListFragment<T> extends Fragment {
         offset = 0;
         hasMore = true;
         loadingMore = false;
+        reportLoading();
         fetchPage(0, new PageCallback<T>() {
             @Override
             public void onResult(List<T> page) {
@@ -146,6 +161,7 @@ public abstract class SearchListFragment<T> extends Fragment {
                 adapter.notifyDataSetChanged();
                 offset = page.size();
                 hasMore = page.size() >= PAGE_SIZE;
+                reportSummary();
                 if (page.isEmpty()) {
                     onEmptyFirstPage();
                 }
@@ -177,6 +193,7 @@ public abstract class SearchListFragment<T> extends Fragment {
                 adapter.notifyDataSetChanged();
                 offset += page.size();
                 hasMore = page.size() >= PAGE_SIZE;
+                reportSummary();
             }
 
             @Override
@@ -196,6 +213,22 @@ public abstract class SearchListFragment<T> extends Fragment {
 
     protected Host host() {
         return getActivity() instanceof Host ? (Host) getActivity() : null;
+    }
+
+    /** 回写「结果页 · 已加载 N 条」信息行（首屏、加载更多之后都会刷新）。 */
+    protected final void reportSummary() {
+        Host h = host();
+        if (h != null) {
+            h.onSearchPageSummary(pageIndex(), pageName() + " · " + items.size() + " 条");
+        }
+    }
+
+    /** 搜索结果请求在途时的信息行文案。 */
+    protected final void reportLoading() {
+        Host h = host();
+        if (h != null) {
+            h.onSearchPageSummary(pageIndex(), pageName() + " · 搜索中…");
+        }
     }
 
     protected String keyword() {

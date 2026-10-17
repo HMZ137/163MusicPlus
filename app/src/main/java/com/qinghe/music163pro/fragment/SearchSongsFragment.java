@@ -85,6 +85,16 @@ public class SearchSongsFragment extends SearchListFragment<SearchSongsFragment.
     }
 
     @Override
+    protected int pageIndex() {
+        return 0;
+    }
+
+    @Override
+    protected CharSequence pageName() {
+        return "单曲";
+    }
+
+    @Override
     protected int itemLayoutRes() {
         return R.layout.item_song;
     }

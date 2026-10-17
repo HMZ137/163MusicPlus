@@ -55,54 +55,24 @@
             style="@style/Widget.App.Button" />
     </LinearLayout>
 
-    <!-- S1：搜索类型标签（单曲 / 歌单 / MV）。点击切 ViewPager2 的页；左右滑也会回写选中态。 -->
-    <LinearLayout
-        android:id="@+id/ll_search_tabs"
+    <!--
+      S1 收尾（需求方口径「其他 ViewPager2 + Fragment 的页面同」）：
+      原「单曲 / 歌单 / MV」标签行已删除（参考 去除指示_1.png / 多Tab实例_1.bmp），
+      结果页靠左右滑切换；当前页与已加载条数由下面的独立信息行显示。
+    -->
+    <TextView
+        android:id="@+id/tv_search_info"
         android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:orientation="horizontal"
-        android:layout_marginTop="4dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tab_songs"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="单曲"
-            android:textColor="@color/colorPrimary"
-            android:textSize="13sp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/tab_playlists"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="歌单"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <TextView
-            android:id="@+id/tab_mvs"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="@string/search_mv"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true" />
-    </LinearLayout>
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:paddingStart="10dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="2dp"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_caption"
+        android:visibility="gone" />
 
     <!-- S1：三个结果标签的容器（每页一个 SearchListFragment 子类） -->
     <androidx.viewpager2.widget.ViewPager2
