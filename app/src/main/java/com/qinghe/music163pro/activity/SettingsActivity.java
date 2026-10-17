@@ -46,7 +46,10 @@ public class SettingsActivity extends BaseWatchActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
+        // T1：设置入口页按分区组织（常用 / 页面与外观 / 系统与关于）
         View btnToggle = findViewById(R.id.btn_settings_toggle);
+        addSectionHeader(btnToggle, "常用");
+        addSectionHeader(findViewById(R.id.btn_settings_edit_more), "页面与外观");
         View btnEditMore = findViewById(R.id.btn_settings_edit_more);
         // T1：「本地歌曲设置」页 —— 只影响本地文件的设置（黑名单 / 响度分析 / 响度平衡 / 后续扫描范围）
         View btnLocalMusicSettings = findViewById(R.id.btn_settings_local_music_settings);
@@ -57,6 +60,7 @@ public class SettingsActivity extends BaseWatchActivity {
         // 高级歌词翻译：与「开关选项」同级的独立设置页（AI 词性着色 / 翻译）
         findViewById(R.id.btn_settings_advanced_lyrics).setOnClickListener(v ->
                 startActivity(new android.content.Intent(this, LanguageLearningActivity.class)));
+        addSectionHeader(findViewById(R.id.btn_settings_check_update), "系统与关于");
         View btnCheckUpdate = findViewById(R.id.btn_settings_check_update);
         View btnHelp = findViewById(R.id.btn_settings_help);
         View btnAbout = findViewById(R.id.btn_settings_about);
@@ -227,6 +231,35 @@ public class SettingsActivity extends BaseWatchActivity {
                         + " · " + stat.fileCount + " 个文件");
             });
         }).start();
+    }
+
+
+    /**
+     * T1：设置项归类 —— 在既有页面内插入「分区小标题」（不新建页面、不改任何 prefs 键）。
+     *
+     * <p>需求方口径（0.3-A5）：「分析现有全部设置项，然后分门别类合理归类到各自的页面，
+     * 而不是全部塞到一个页面里」，且「页面不要分的太多」。因此这里按「用户会去哪里找」
+     * 在现有页面里分区，而不是再拆新页。</p>
+     */
+    private void addSectionHeader(android.view.View anchor, String title) {
+        if (anchor == null || !(anchor.getParent() instanceof android.view.ViewGroup)) {
+            return;
+        }
+        android.view.ViewGroup content = (android.view.ViewGroup) anchor.getParent();
+        int index = content.indexOfChild(anchor);
+        if (index < 0) {
+            return;
+        }
+        TextView tv = new TextView(this);
+        tv.setText(title);
+        tv.setTextColor(0x80FFFFFF);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 11));
+        tv.setPadding(com.qinghe.music163pro.util.WatchUiUtils.px(this, 4),
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 10),
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 4),
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 2));
+        content.addView(tv, index);
     }
 
     private void confirmClearCache() {

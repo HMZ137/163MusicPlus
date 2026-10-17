@@ -85,6 +85,13 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         com.qinghe.music163pro.util.UiKit.makeDescriptionsCollapsible(
                 findViewById(R.id.layout_toggle_settings_content));
 
+        // T1：按「用户会去哪里找」分区（页面数量不变，仅加小标题）
+        addSectionHeader((android.view.View) findViewById(R.id.switch_local_only_mode).getParent(), "播放模式");
+        addSectionHeader((android.view.View) findViewById(R.id.switch_keep_screen_on).getParent(), "屏幕与外观");
+        addSectionHeader((android.view.View) findViewById(R.id.switch_sleep_timer_exit_app).getParent(), "播放与定时");
+        addSectionHeader(findViewById(R.id.row_lyric_scroll_mode), "歌词");
+        addSectionHeader(findViewById(R.id.row_recognition_mode), "识别与其它");
+
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Apply keep screen on setting
@@ -634,4 +641,42 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         int seconds = prefs.getInt(PREF_LYRIC_RESUME_INTERVAL, 3);
         tvLyricResumeIntervalValue.setText(seconds + "秒无操作后恢复跟随");
     }
+    /**
+     * T1：设置项归类 —— 在既有页面内插入「分区小标题」（不新建页面、不改任何 prefs 键）。
+     *
+     * <p>需求方口径（0.3-A5）：「分析现有全部设置项，然后分门别类合理归类到各自的页面，
+     * 而不是全部塞到一个页面里」，且「页面不要分的太多」。因此按「用户会去哪里找」
+     * 在现有页面里分区，而不是再拆新页。</p>
+     */
+    private void addSectionHeader(android.view.View anchor, String title) {
+        if (anchor == null) {
+            return;
+        }
+        // 锚点可能是「开关」本身（它在水平行里），也可能就是「整行」；统一换算成排版单元再插标题。
+        android.view.View row = anchor;
+        android.view.ViewParent parent = row.getParent();
+        if (parent instanceof LinearLayout
+                && ((LinearLayout) parent).getOrientation() == LinearLayout.HORIZONTAL) {
+            row = (android.view.View) parent;
+        }
+        if (!(row.getParent() instanceof android.view.ViewGroup)) {
+            return;
+        }
+        android.view.ViewGroup content = (android.view.ViewGroup) row.getParent();
+        int index = content.indexOfChild(row);
+        if (index < 0) {
+            return;
+        }
+        TextView tv = new TextView(this);
+        tv.setText(title);
+        tv.setTextColor(0x80FFFFFF);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 11));
+        tv.setPadding(com.qinghe.music163pro.util.WatchUiUtils.px(this, 4),
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 10),
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 4),
+                com.qinghe.music163pro.util.WatchUiUtils.px(this, 2));
+        content.addView(tv, index);
+    }
+
 }
