@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.text.InputType;
 import android.util.Log;
@@ -1455,46 +1456,90 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * 因而**继承原有的耳机安全音量保护**（超过 
      * {@link #SAFE_VOLUME_PERCENT}% 且插着耳机时仍会先确认）。
      */
-    /** F1：表冠事件探针只打前 5 条（MainActivity 不继承 BaseWatchActivity，故自持一份分发）。 */
-    private static int sCrownProbeLogged = 0;
+    /** F1：表冠事件诊断日志上限（防刷屏）。 */
+    private static int sCrownDiagLogged = 0;
+    private static final int CROWN_DIAG_LIMIT = 500;
+    /** 表冠累积值：每达到 1 单位走一步音量。 */
+    private float crownAccum;
+    /** 上一次真正改音量时刻（节流用）。 */
+    private long crownLastStepMs;
+    /** 两步之间的最小间隔：避免一次甩动/事件突发把音量瞬间拉满（0→6 那种）。 */
+    private static final long CROWN_MIN_STEP_INTERVAL_MS = 120L;
 
     /**
-     * F1：表冠旋转。Wear 上以 {@code ACTION_SCROLL} 送达；前 5 条打日志（TAG=Crown）作为
-     * 「表冠到底送不送事件」的**可观测探针** —— adb 无法模拟表冠旋转，只能人工确认。
+     * F1：表冠旋转（转一下 = 调一格音量）。
      *
-     * <p><b>真机实测（2026-10-17 需求方转动表冠）</b>：本机表冠被系统识别成**鼠标滚轮**
-     * （`source=0x2002` = {@code SOURCE_MOUSE}，`action=ACTION_SCROLL`），增量在
-     * **{@code AXIS_VSCROLL}** 里，而 {@code AXIS_SCROLL} 恒为 0 —— 所以之前只读 AXIS_SCROLL
-     * 时表冠「转了没反应」。这里两个轴都读，取绝对值大的那个。</p>
+     * <p><b>真机事件特征（2026-10-17 实测）</b>：本机表冠被系统识别成**鼠标滚轮**
+     * （`source=0x2002` = {@code SOURCE_MOUSE}、`action=ACTION_SCROLL`），增量在
+     * **{@code AXIS_VSCROLL}**，{@code AXIS_SCROLL} 恒为 0。</p>
+     *
+     * <p>需求方反馈「识别不准确 / 0→6→0 / 转很久才第二步」之后，这里改成：
+     * <b>累积增量 + 每 1 单位走一步 + 两步之间至少 {@link #CROWN_MIN_STEP_INTERVAL_MS}ms</b>，
+     * 并把**每个事件**的原始轴值与实际音量变化都写进日志（`TAG=CrownDiag`，最多 500 条），
+     * 便于按真实事件分布继续调参。</p>
      */
     @Override
     public boolean onGenericMotionEvent(android.view.MotionEvent event) {
-        if (event != null) {
-            boolean rotary = event.isFromSource(android.view.InputDevice.SOURCE_ROTARY_ENCODER);
-            boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
-            float axis = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
-            float vscroll = event.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL);
-            if (Math.abs(axis) < 0.01f && Math.abs(vscroll) > 0.01f) {
-                axis = vscroll;   // 鼠标滚轮/表冠：增量在 AXIS_VSCROLL
-            }
-            if ((rotary || scroll) && sCrownProbeLogged < 5) {
-                sCrownProbeLogged++;
-                MusicLog.i("Crown", "表冠/滚动事件 #" + sCrownProbeLogged
-                        + ": action=" + event.getAction()
-                        + " source=0x" + Integer.toHexString(event.getSource())
-                        + " rotary=" + rotary
-                        + " AXIS_SCROLL=" + event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL)
-                        + " AXIS_VSCROLL=" + vscroll
-                        + " 生效增量=" + axis + " 页面=MainActivity");
-            }
-            if ((rotary || scroll) && Math.abs(axis) > 0.01f && handleCrownScroll(axis)) {
-                return true;
-            }
+        if (event == null) {
+            return super.onGenericMotionEvent(event);
         }
-        return super.onGenericMotionEvent(event);
+        boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
+        if (!scroll) {
+            return super.onGenericMotionEvent(event);
+        }
+        float rawScroll = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
+        float vscroll = event.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL);
+        float hscroll = event.getAxisValue(android.view.MotionEvent.AXIS_HSCROLL);
+        float delta = rawScroll;
+        if (Math.abs(delta) < 0.01f) {
+            delta = vscroll;
+        }
+        if (Math.abs(delta) < 0.01f) {
+            delta = hscroll;
+        }
+        // 单次事件最多记 3 个单位，防止异常大值把累积值顶飞
+        if (delta > 3f) {
+            delta = 3f;
+        } else if (delta < -3f) {
+            delta = -3f;
+        }
+        if (Math.abs(delta) > 0.001f) {
+            crownAccum += delta;
+        }
+
+        boolean stepped = false;
+        long now = SystemClock.uptimeMillis();
+        if (Math.abs(crownAccum) >= 1f && now - crownLastStepMs >= CROWN_MIN_STEP_INTERVAL_MS) {
+            // 一次最多走一格：间隔够了才允许再走（快速甩动会被节流成连续的单格）
+            int dir = crownAccum > 0 ? 1 : -1;
+            crownAccum -= dir;
+            crownLastStepMs = now;
+            stepped = handleCrownScroll(dir);
+        }
+        // 累积值别无限堆积：最多保留 ±3，方向反转时也会自然抵消
+        if (crownAccum > 3f) {
+            crownAccum = 3f;
+        } else if (crownAccum < -3f) {
+            crownAccum = -3f;
+        }
+
+        if (sCrownDiagLogged < CROWN_DIAG_LIMIT) {
+            sCrownDiagLogged++;
+            android.media.AudioManager am =
+                    (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
+            String vol = am == null ? "?" : (am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                    + "/" + am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC));
+            MusicLog.i("CrownDiag", "事件 #" + sCrownDiagLogged
+                    + " t=" + event.getEventTime()
+                    + " src=0x" + Integer.toHexString(event.getSource())
+                    + " S=" + rawScroll + " V=" + vscroll + " H=" + hscroll
+                    + " delta=" + delta + " acc=" + crownAccum
+                    + " stepped=" + stepped + " 音量=" + vol);
+        }
+        return true;   // 表冠事件自己消费，避免再被父类/其它控件当滚轮处理
     }
 
-    /** F1：表冠调音量本体（return true = 已消费）。 */
+    /** F1：表冠调音量本体（一步一格；return true = 已消费）。 */
     private boolean handleCrownScroll(float delta) {
         android.media.AudioManager am =
                 (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
@@ -1504,15 +1549,30 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
         int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
         int target = Math.max(0, Math.min(max, cur + (delta > 0 ? 1 : -1)));
-        MusicLog.i("Crown", "表冠调音量: axis=" + delta + " 音量 " + cur + " -> " + target
-                + " (max=" + max + ")");
         if (target != cur) {
             applyUserVolume(target, max);   // 复用 M1：含耳机安全音量确认
         }
         showVolumeIndicator();
+        MusicLog.i("Crown", "表冠调音量: delta=" + delta + " 音量 " + cur + " -> " + target
+                + " (max=" + max + ")");
         return true;
     }
 
+    /**
+     * F1 诊断：如果固件同时把表冠映射成音量键，这里能看到（TAG=CrownDiag）。
+     * 只记前 100 条，避免刷屏。
+     */
+    @Override
+    public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+        if ((keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
+                || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)
+                && sCrownDiagLogged < CROWN_DIAG_LIMIT) {
+            sCrownDiagLogged++;
+            MusicLog.i("CrownDiag", "音量键事件 #" + sCrownDiagLogged
+                    + " keyCode=" + keyCode + " 来源=" + (event == null ? "?" : event.getDeviceId()));
+        }
+        return super.onKeyDown(keyCode, event);
+    }
     private void showVolumeIndicator() {
         int current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
