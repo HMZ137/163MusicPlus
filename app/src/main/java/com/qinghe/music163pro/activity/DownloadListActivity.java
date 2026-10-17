@@ -29,6 +29,7 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.fragment.DownloadTabFragment;
+import com.qinghe.music163pro.fragment.LocalMusicFragment;
 import com.qinghe.music163pro.fragment.LocalMusicTabFragment;
 
 import androidx.annotation.NonNull;
@@ -222,7 +223,7 @@ public class DownloadListActivity extends BaseWatchActivity
         @NonNull
         @Override
         public Fragment createFragment(int position) {
-            return position == 0 ? new DownloadTabFragment() : new LocalMusicTabFragment();
+            return position == 0 ? new DownloadTabFragment() : new LocalMusicFragment();
         }
 
         @Override

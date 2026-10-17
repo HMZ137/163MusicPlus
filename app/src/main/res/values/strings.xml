@@ -93,6 +93,7 @@
     <string name="hidden_tracks_title">黑名单</string>
     <string name="hidden_tracks_hint">左划可移出黑名单（不会删除文件）</string>
     <string name="hidden_tracks_empty">黑名单为空</string>
+    <string name="local_music_empty">本机没有音乐</string>
     <string name="scan_dirs_title">扫描范围</string>
     <string name="scan_dirs_hint">左划可移除；不可用目录会跳过并提示</string>
     <string name="scan_dirs_empty">暂无自定义目录</string>
