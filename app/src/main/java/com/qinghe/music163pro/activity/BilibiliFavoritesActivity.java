@@ -90,7 +90,7 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         tvTitle.setLayoutParams(titleParams);
-        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setGravity(Gravity.START);
         tvTitle.setText(title);
         tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
         tvTitle.setTextSize(14);

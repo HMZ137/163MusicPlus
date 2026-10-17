@@ -209,7 +209,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         title.setLayoutParams(titleParams);
-        title.setGravity(Gravity.CENTER);
+        title.setGravity(Gravity.START);
         title.setText("搜索视频");
         title.setTextColor(getResources().getColor(R.color.text_primary));
         title.setTextSize(14);

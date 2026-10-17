@@ -179,7 +179,7 @@ public class BilibiliCloudFavoriteVideosActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         title.setLayoutParams(titleParams);
-        title.setGravity(Gravity.CENTER);
+        title.setGravity(Gravity.START);
         title.setText(TextUtils.isEmpty(folderTitle) ? "收藏夹视频" : folderTitle);
         title.setTextColor(getResources().getColor(R.color.text_primary));
         title.setTextSize(14);

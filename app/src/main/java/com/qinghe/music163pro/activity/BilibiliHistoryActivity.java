@@ -92,7 +92,7 @@ public class BilibiliHistoryActivity extends BaseWatchActivity {
         TextView tvTitle = new TextView(this);
         tvTitle.setLayoutParams(new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setGravity(Gravity.START);
         tvTitle.setText("B站历史");
         tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
         tvTitle.setTextSize(14);
