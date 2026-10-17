@@ -55,11 +55,6 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
         return "本地歌单";
     }
 
-    @Override
-    protected boolean hasImportButton() {
-        return true;
-    }
-
     // ── 加载 ────────────────────────────────────────────────────────────────
 
     @Override
@@ -75,7 +70,7 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
             playlists.add(pl);
         }
         applyItems(playlists);
-        updateCountStatus("暂无本地歌单，点「导入歌单」或 ☰ 新建");
+        updateCountStatus("暂无本地歌单，点 ☰ → 导入歌单 / 新建歌单");
     }
 
     @Override
@@ -303,7 +298,7 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
     // ── 导入歌单（约定目录扫描） ─────────────────────────────────────────────
 
     @Override
-    protected void onImportClicked() {
+    public void importPlaylists() {
         List<File> candidates = LocalPlaylistManager.findImportCandidates();
         if (candidates.isEmpty()) {
             toastLong("未找到可导入的歌单\n请把 json 放到："

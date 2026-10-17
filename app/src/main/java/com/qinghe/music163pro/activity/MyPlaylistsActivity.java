@@ -132,15 +132,26 @@ public class MyPlaylistsActivity extends BaseWatchActivity implements MyPlaylist
 
     // ==================== 标题栏菜单 / 信息行 ====================
 
-    /** 单行标题栏右侧 ☰：新建歌单 / A-Z 字母索引（都按当前页语义执行）。 */
+    /**
+     * 单行标题栏右侧 ☰：新建歌单 / A-Z 字母索引，本地歌单页多一项「导入歌单」。
+     *
+     * <p>需求方 2026-10-17：「导入歌单的按钮也放到右上角的菜单按钮中」——原先它占着状态行右侧一块，
+     * 现在收进 ☰，状态行只留「N 个歌单」。</p>
+     */
     private void showMyPlaylistsMenu() {
-        WatchMenuDialog.show(this, "我的歌单", new String[]{"新建歌单", "A-Z 字母索引"}, which -> {
-            MyPlaylistsPageFragment page = currentPage();
-            if (page == null) {
-                return;
-            }
+        final MyPlaylistsPageFragment page = currentPage();
+        if (page == null) {
+            return;
+        }
+        final boolean localPage = page.pageIndex() == MyPlaylistsPageFragment.PAGE_LOCAL;
+        final String[] items = localPage
+                ? new String[]{"新建歌单", "导入歌单", "A-Z 字母索引"}
+                : new String[]{"新建歌单", "A-Z 字母索引"};
+        WatchMenuDialog.show(this, "我的歌单", items, which -> {
             if (which == 0) {
                 page.showCreatePlaylistDialog();
+            } else if (localPage && which == 1) {
+                page.importPlaylists();
             } else {
                 page.openLetterPicker();
             }

@@ -60,7 +60,6 @@ public abstract class MyPlaylistsPageFragment extends Fragment {
     protected final List<PlaylistInfo> items = new ArrayList<>();
     protected ListView listView;
     protected TextView tvStatus;
-    private TextView btnImport;
     private ArrayAdapter<PlaylistInfo> adapter;
 
     private final List<Character> groupLetters = new ArrayList<>();
@@ -99,13 +98,8 @@ public abstract class MyPlaylistsPageFragment extends Fragment {
     /** 顶栏 ☰ 的「新建歌单」：按本页语义创建（在线建云歌单 / 本地建本地歌单）。 */
     public abstract void showCreatePlaylistDialog();
 
-    /** 本页是否显示「导入歌单」按钮（只有本地歌单页有）。 */
-    protected boolean hasImportButton() {
-        return false;
-    }
-
-    /** 「导入歌单」点击。 */
-    protected void onImportClicked() {
+    /** 「导入歌单」：已按需求方口径并入顶栏 ☰ 菜单，由宿主按当前页语义转发（只有本地页实现）。 */
+    public void importPlaylists() {
     }
 
     // ── 生命周期 ────────────────────────────────────────────────────────────
@@ -122,9 +116,6 @@ public abstract class MyPlaylistsPageFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         listView = view.findViewById(R.id.lv_my_playlists);
         tvStatus = view.findViewById(R.id.tv_my_playlists_status);
-        btnImport = view.findViewById(R.id.btn_import_playlist);
-        btnImport.setVisibility(hasImportButton() ? View.VISIBLE : View.GONE);
-        btnImport.setOnClickListener(v -> onImportClicked());
 
         adapter = new ArrayAdapter<PlaylistInfo>(requireContext(),
                 R.layout.item_my_playlist, R.id.tv_name, items) {
