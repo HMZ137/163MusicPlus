@@ -35,6 +35,17 @@ import java.util.List;
  *
  * <p><b>数据侧</b>完全复用步骤①抽出的 {@link LocalMusicLoader}（两阶段加载、索引回写、
  * 隐藏名单跳过、下载子树排除都在里面），本类只做视图与回调。</p>
+ *
+ * <p><b>4-3 步骤③-1：高级能力开关。</b>两条入口共用这一份实现后，能力差异只由
+ * {@link #setAdvanced(boolean)} 决定（默认 {@code false}）：</p>
+ * <ul>
+ *   <li>{@code false}（下载页「本地」标签）：只启用列表 / 点击播放 / 状态行 / 空态；</li>
+ *   <li>{@code true}（More→本机音乐完整页）：在上面基础上启用搜索、排序、A-Z 字母索引、
+ *       长按多选（收藏 / 加入歌单 / 移出列表）、局域网传歌入口；状态行也变成可点按的
+ *       筛选行（清除搜索 / 恢复已移出的曲目）。</li>
+ * </ul>
+ * <p>本开关在步骤③-1 先落地（此时完整页仍是旧 {@code LocalMusicActivity}，行为零变化）；
+ * 步骤③-2 再把完整页改成「薄宿主 + {@code advanced=true} 的本 Fragment」。</p>
  */
 public class LocalMusicFragment extends Fragment {
 
@@ -45,6 +56,11 @@ public class LocalMusicFragment extends Fragment {
     private ArrayAdapter<Song> adapter;
     private int generation = 0;
     private boolean viewDestroyed = false;
+    /**
+     * 高级能力开关（4-3 步骤③-1，默认 {@code false}）。
+     * 见类注释：{@code true} 才启用 搜索 / 排序 / A-Z / 长按多选 / 局域网传歌。
+     */
+    private boolean advanced = false;
 
     @Nullable
     @Override
@@ -64,6 +80,7 @@ public class LocalMusicFragment extends Fragment {
         listView.setAdapter(adapter);
         listView.setOnItemClickListener((parent, v, position, id) -> playFrom(position));
 
+        applyMode();
         startScan();
     }
 
@@ -72,6 +89,39 @@ public class LocalMusicFragment extends Fragment {
         viewDestroyed = true;
         generation++;   // 让仍在跑的加载器立刻作废（避免它往已销毁的视图上回调）
         super.onDestroyView();
+    }
+
+    // ==================== 4-3 步骤③-1：高级能力开关 ====================
+
+    /**
+     * 设置高级能力开关（默认 {@code false}，含义见类注释）。
+     *
+     * <p>可以在 {@code attach} 之前调用（宿主在事务里 add 之前设置），也可以在视图就绪后调用
+     * （会立刻重新应用一遍）。步骤③-1 先只落地开关与模式应用骨架：完整页仍是旧 Activity，
+     * 因此本方法目前对现有体验零影响。</p>
+     */
+    public void setAdvanced(boolean advanced) {
+        this.advanced = advanced;
+        applyMode();
+    }
+
+    /** 当前是否为高级模式（完整页为 {@code true}，下载页「本地」标签为 {@code false}）。 */
+    public boolean isAdvanced() {
+        return advanced;
+    }
+
+    /**
+     * 把当前模式应用到视图上。视图尚未创建时直接返回 —— {@link #onViewCreated} 会再调一次。
+     *
+     * <p>步骤③-1 只有一处可见差异：高级模式下状态行是**可点按**的筛选行（清除搜索 / 恢复已移出），
+     * 轻量模式下它保持纯文本。搜索 / 排序 / A-Z / 多选 / 局域网传歌的接线在步骤③-2 搬入。</p>
+     */
+    private void applyMode() {
+        if (statusView == null) {
+            return;
+        }
+        statusView.setClickable(advanced);
+        statusView.setFocusable(advanced);
     }
 
     private void startScan() {
