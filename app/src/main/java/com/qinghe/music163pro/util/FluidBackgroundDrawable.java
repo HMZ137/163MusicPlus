@@ -41,8 +41,8 @@ public final class FluidBackgroundDrawable extends Drawable {
     /** 底色：略带蓝的近黑，比纯黑更衬色团。 */
     private static final int BASE_COLOR = 0xFF0A0A12;
 
-    /** 色团配色：紫 / 蓝 / 青 / 品红 / 深紫，与 App 主色（#BB86FC）同族。 */
-    private static final int[] COLORS = {
+    /** 默认色团配色（取不到背景色时的回退）：紫 / 蓝 / 青 / 品红 / 深紫。 */
+    private static final int[] DEFAULT_COLORS = {
             0xFF7C4DFF,
             0xFF2F80ED,
             0xFF17C3B2,
@@ -66,6 +66,9 @@ public final class FluidBackgroundDrawable extends Drawable {
 
     /** 每个色团当前的渐变色块与半径（按 bounds 建一次）。 */
     private RadialGradient[] gradients;
+
+    /** 当前色团配色（P9 补充：由背景封面取色；不足 5 个时循环取用）。 */
+    private int[] colors = DEFAULT_COLORS;
     private float[] radii;
 
     private final long startMs = SystemClock.uptimeMillis();
@@ -95,16 +98,33 @@ public final class FluidBackgroundDrawable extends Drawable {
             return;
         }
         float maxR = Math.max(w, h);
-        gradients = new RadialGradient[COLORS.length];
-        radii = new float[COLORS.length];
-        for (int i = 0; i < COLORS.length; i++) {
+        gradients = new RadialGradient[RADIUS.length];
+        radii = new float[RADIUS.length];
+        for (int i = 0; i < RADIUS.length; i++) {
             float r = Math.max(8f, maxR * RADIUS[i]);
             radii[i] = r;
+            int color = colors[i % colors.length];
             // 中心不透明 → 边缘全透明；渐变色块按「圆心在 (0,0)」建，绘制时整体平移
             gradients[i] = new RadialGradient(0f, 0f, r,
-                    new int[]{COLORS[i], COLORS[i] & 0x00FFFFFF},
+                    new int[]{color, color & 0x00FFFFFF},
                     new float[]{0.0f, 1.0f}, Shader.TileMode.CLAMP);
         }
+    }
+
+    /**
+     * P9 补充（需求方 2026-10-17）：色团改成**从当前背景取色**。
+     *
+     * @param newColors 由 {@link PaletteExtractor} 从封面/自定义背景提取的颜色；
+     *                  传 null / 空数组则回退到默认配色。颜色数少于色团数时循环取用。
+     */
+    public void setColors(int[] newColors) {
+        if (newColors == null || newColors.length == 0) {
+            colors = DEFAULT_COLORS;
+        } else {
+            colors = newColors;
+        }
+        gradients = null;   // 下次绘制按新颜色重建渐变
+        invalidateSelf();
     }
 
     @Override

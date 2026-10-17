@@ -70,7 +70,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
 
         TextView hint = new TextView(this);
         hint.setText("背景：跟随专辑封面 / 封面优先（无封面用选定图片）/ 选定图片 / 流体背景 / 默认。"
-                + "封面与图片背景按「模糊强度」自动模糊 + 加深；流体背景是动态色团，不跟封面。");
+                + "封面与图片背景按「模糊强度」自动模糊 + 加深；流体背景＝动态色团，颜色取自当前封面背景。");
         hint.setTextColor(0x80FFFFFF);
         hint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         hint.setGravity(Gravity.CENTER);
@@ -240,7 +240,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
             // P9：流体背景的预览直接用一个动态色团 Drawable（和主界面同一套实现）
             ivPreview.setImageDrawable(null);
             if (!(ivPreview.getBackground() instanceof com.qinghe.music163pro.util.FluidBackgroundDrawable)) {
-                ivPreview.setBackground(new com.qinghe.music163pro.util.FluidBackgroundDrawable());
+                ivPreview.setBackground(BackgroundUtil.buildFluidDrawable(this));
             }
             return;
         }

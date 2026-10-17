@@ -287,9 +287,13 @@ public final class BackgroundUtil {
      * 该模式是否需要加载（并跟随）专辑封面。
      * {@link #MODE_COVER} 与 {@link #MODE_COVER_OR_CUSTOM} 都需要封面在位，
      * 否则前者退化成默认背景、后者退化成选定图片。
+     *
+     * <p>P9 补充：{@link #MODE_FLUID} 也要封面 —— 流体背景的色团是**从背景取色**的
+     * （需求方 2026-10-17），没有封面时退化成选定图片 / 默认配色。</p>
      */
     public static boolean isCoverMode(String mode) {
-        return MODE_COVER.equals(mode) || MODE_COVER_OR_CUSTOM.equals(mode);
+        return MODE_COVER.equals(mode) || MODE_COVER_OR_CUSTOM.equals(mode)
+                || MODE_FLUID.equals(mode);
     }
 
     public static File getBackgroundFile(Context context) {
@@ -493,15 +497,57 @@ public final class BackgroundUtil {
         return out.toByteArray();
     }
 
+    // ==================== P9：流体背景（从背景取色） ====================
+
+    /**
+     * 建一个「流体背景」Drawable，色团颜色**从当前背景取色**（需求方 2026-10-17 补充）。
+     *
+     * <p>取色优先级：封面原图（未模糊未加深，颜色最鲜）→ 自定义图原图 → 封面显示图 → 自定义显示图；
+     * 都没有时回退 {@link FluidBackgroundDrawable} 的默认配色。</p>
+     *
+     * <p>供主界面背景层、歌词页与背景设置页预览共用。</p>
+     */
+    public static FluidBackgroundDrawable buildFluidDrawable(Context context) {
+        FluidBackgroundDrawable drawable = new FluidBackgroundDrawable();
+        drawable.setColors(fluidColors());
+        return drawable;
+    }
+
+    /** 从当前背景位图提取流体色团颜色；没有可用位图时返回 null（调用方回退默认配色）。 */
+    public static int[] fluidColors() {
+        Bitmap source = usable(sCoverRaw);
+        if (source == null) {
+            source = usable(sCustomRaw);
+        }
+        if (source == null) {
+            source = usable(sCoverBg);
+        }
+        if (source == null) {
+            source = usable(sCustomBg);
+        }
+        if (source == null) {
+            return null;
+        }
+        return PaletteExtractor.extract(source, 5);
+    }
+
+    private static Bitmap usable(Bitmap bitmap) {
+        return bitmap != null && !bitmap.isRecycled() && bitmap.getWidth() > 0 ? bitmap : null;
+    }
+
     // ==================== Apply ====================
 
     public static void applyBackground(Context context, View root) {
         if (root == null) return;
         String mode = getMode(context);
         if (MODE_FLUID.equals(mode)) {
-            // P9：流体背景 —— 动态色团，不需要任何图片；歌词用默认白色（深底）。
-            if (!(root.getBackground() instanceof FluidBackgroundDrawable)) {
-                sFluidDrawable = new FluidBackgroundDrawable();
+            // P9 补充（需求方 2026-10-17）：流体背景的色团从当前背景（封面 / 选定图片）取色。
+            // 换歌后 applyBackground 会再进来一次 ⇒ 已有实例就地换色，动画不中断。
+            if (root.getBackground() instanceof FluidBackgroundDrawable) {
+                sFluidDrawable = (FluidBackgroundDrawable) root.getBackground();
+                sFluidDrawable.setColors(fluidColors());
+            } else {
+                sFluidDrawable = buildFluidDrawable(context);
                 root.setBackground(sFluidDrawable);
             }
             LyricsTint.useDefault();
