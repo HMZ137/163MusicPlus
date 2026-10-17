@@ -184,12 +184,18 @@ public class LyricsActivity extends BaseWatchActivity {
     }
 
     private void handleBlockingModeTouch(MotionEvent event) {
-        if (lyricScrollMode != LYRIC_MODE_BLOCK || svLyrics == null || lyricLines.isEmpty()) {
+        if (svLyrics == null || lyricLines.isEmpty()) {
             return;
         }
 
+        // 2026-10-18（需求方）：双击歌词跳进度在任何滚动模式下都要生效 ——
+        // 先把手势喂给 detector，再只为「锁定」模式处理滚动跟踪。
         if (lyricsGestureDetector != null) {
             lyricsGestureDetector.onTouchEvent(event);
+        }
+
+        if (lyricScrollMode != LYRIC_MODE_BLOCK) {
+            return;
         }
 
         float rawX = event.getRawX();

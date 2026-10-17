@@ -2745,8 +2745,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
                     @Override
                     public boolean onDoubleTap(MotionEvent e) {
-                        if (lyricScrollMode != LYRIC_MODE_BLOCK
-                                || !isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
+                        // 2026-10-18（需求方）：双击歌词跳进度不再只限「锁定」滚动模式 ——
+                        // 跟随模式（默认）下双击也能直接跳到对应行的时间点。
+                        if (!isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
                             return false;
                         }
                         int index = findOverlayLyricIndexAtRawY(e.getRawY());
