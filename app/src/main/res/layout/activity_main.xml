@@ -186,41 +186,20 @@
           上下留白会把剩余空间全部吃掉 —— 实测它独占 36px 后，紧挨着的时间行被压成 0px。
           这里显式限定高度，让进度条只拿它该拿的那一份，剩余空间留给时间标签。
         -->
-        <SeekBar
-            android:id="@+id/seek_bar"
-            android:layout_width="match_parent"
-            android:layout_height="20dp"
-            android:maxHeight="20dp"
-            android:minHeight="20dp"
-            android:max="100"
-            android:paddingTop="0dp"
-            android:paddingBottom="0dp"
-            android:progress="0"
-            android:progressTint="@color/colorPrimary"
-            android:thumbTint="@color/colorPrimary" />
-
+        <!--
+          M4b（需求方 2026-10-17）：「进度条改进：将时间标签放在进度条的左右两侧」。
+          一行 = [当前时间] [进度条 weight=1] [总时长]；整行仍由外层「信息区 weight=1 + gravity=center」
+          在其可用高度里竖直居中 —— 原先时间行在进度条下方，视觉上进度条偏上。
+          时间标签保持**固定宽度 44dp + tnum**（否则播放中每秒 setText 会 requestLayout，
+          把主页歌名的 marquee 冲回行首）。
+        -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="18dp"
+            android:minHeight="20dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!--
-              时间标签宽度不再写死 34dp（那是 density=270 时的经验值，320 下会裁掉数字）：
-              改为 wrap_content + minWidth。宽度仍相对稳定（0:00 与 12:34 宽度差极小），
-              不会因为每秒 setText 触发布局把歌名跑马灯冲回行首。
-            -->
-            <!--
-              进度时间：**固定宽度 44dp + tnum**（原为 wrap_content + minWidth=34dp）。
-              为什么必须改成固定宽度：`TextView.checkForRelayout()` 只要宽度是
-              `wrap_content`，`setText` 就会 `requestLayout()`（`minWidth` 只有在与
-              `maxWidth` 相等时才走"静态宽度"那条捷径，这里并不成立）。
-              而这两个标签**播放中每秒都在 setText**（`formatTime` 还会让文本从
-              "9:59" 变 "10:00" 而改变宽度）⇒ 每秒一次布局 ⇒ **把歌名 marquee 冲回行首**。
-              改成固定宽度后，文本放得下时 `checkForRelayout()` 只重绘、不请求布局。
-              44dp ≈ 85px：11sp 下能容纳到 "120:00"，足够覆盖长音频。
-            -->
             <TextView
                 android:id="@+id/tv_current_time"
                 android:layout_width="44dp"
@@ -236,11 +215,19 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
 
-            <!-- 中间弹性留白：把两个时间推到两端 -->
-            <View
+            <SeekBar
+                android:id="@+id/seek_bar"
                 android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
+                android:layout_height="20dp"
+                android:layout_weight="1"
+                android:maxHeight="20dp"
+                android:minHeight="20dp"
+                android:max="100"
+                android:paddingTop="0dp"
+                android:paddingBottom="0dp"
+                android:progress="0"
+                android:progressTint="@color/colorPrimary"
+                android:thumbTint="@color/colorPrimary" />
 
             <TextView
                 android:id="@+id/tv_total_time"
@@ -256,6 +243,7 @@
                 android:text="0:00"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
+
         </LinearLayout>
 
         </LinearLayout>
