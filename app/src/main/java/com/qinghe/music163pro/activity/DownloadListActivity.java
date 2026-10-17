@@ -154,37 +154,15 @@ public class DownloadListActivity extends BaseWatchActivity
         // 页内标签：下载 / 本地。4-1 起标签**不再跨 Activity**，而是切 ViewPager2 的页；
         // 「本地」页在 4-3 之前是桥接占位（内部按钮仍走原来的 openLocalMusicTab 路径）。
         vpDownloadTabs = findViewById(R.id.vp_download_tabs);
-        TextView tabDownloads = findViewById(R.id.tab_downloads);
-        TextView tabLocal = findViewById(R.id.tab_local_music);
-        View tabRow = findViewById(R.id.ll_download_tabs);
 
-        // 纯在线模式：「本地」入口收起（下载管理本身保留 —— 用户总得有地方管已下到卡里的歌）。
-        // 只剩一个「下载」标签没有意义，整行一起收掉，容器也只留一页。
+        // 需求方口径（多Tab实例_1.bmp）：迁移到 ViewPager2 + Fragment 后**不再保留多 Tab 按钮**，
+        // 标题栏只留「返回 / 标题 / 菜单」，两页靠左右滑切换。
+        // 纯在线模式：「本地」页收起（下载管理本身保留），容器只留一页并关掉左右滑。
         tabsVisible = !PlaybackMode.isLocalEntryHidden(this);
-        if (!tabsVisible && tabRow != null) {
-            tabRow.setVisibility(View.GONE);
-        }
         vpDownloadTabs.setAdapter(new TabsAdapter(this));
         // 预加载限 1：下一页提前建好够用；多建只会白读盘（4-5 会实测首屏耗时再定值）。
         vpDownloadTabs.setOffscreenPageLimit(1);
         vpDownloadTabs.setUserInputEnabled(tabsVisible);
-
-        UiKit.setTabSelected(tabDownloads, true);
-        UiKit.setTabSelected(tabLocal, false);
-        // 双向同步（G4 改动要点 5）：点标签 → 切页；滑动换页 → 回写标签选中态。
-        if (tabDownloads != null) {
-            tabDownloads.setOnClickListener(v -> vpDownloadTabs.setCurrentItem(0, true));
-        }
-        if (tabLocal != null) {
-            tabLocal.setOnClickListener(v -> vpDownloadTabs.setCurrentItem(1, true));
-        }
-        vpDownloadTabs.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                UiKit.setTabSelected(tabDownloads, position == 0);
-                UiKit.setTabSelected(tabLocal, position == 1);
-            }
-        });
 
         // 适配器在这里就建好（ArrayAdapter 不需要 ListView 即可构造）；
         // 真正 setAdapter/监听/多选都等「下载」页视图就绪后由 onDownloadListViewsReady() 绑定。
