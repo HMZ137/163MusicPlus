@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  P8：歌手页两页（热门 50 首 / 全部歌曲）共用的「列表 + 空态」布局。
+  两页结构相同（ListView + 空态），不复制两份 XML：
+  列表 id 统一 lv_artist_songs，空态 id 统一 tv_artist_empty。
+  歌手资料（头像 / 名字 / 统计 / 简介）由代码构建后作为 ListView 的 header 随列表滚动。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ListView
+        android:id="@+id/lv_artist_songs"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:divider="@null"
+        android:dividerHeight="0dp" />
+
+    <TextView
+        android:id="@+id/tv_artist_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_sub"
+        android:visibility="gone" />
+</FrameLayout>

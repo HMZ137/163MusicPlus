@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  歌手页（P8）：ViewPager2 + Fragment 迁移后的宿主布局。
+  需求方口径（2026-10-17，同 4-12 / 4-16）：
+    · 迁到 ViewPager2 + Fragment 的页面不再保留多 Tab 按钮（参考 去除指示_1.png）；
+    · 标题与右侧动作在**同一行**、不要错开，「更多」用**矢量图标**（☰）而不是文字；
+    · 「其他需要展示的内容」放到标题栏外的独立行（参考图 多Tab实例_1.bmp）。
+
+  两页（热门 50 首 / 全部歌曲）由 ViewPager2 承载，左右滑切换；
+  歌手资料（头像 / 名字 / 歌曲·专辑数 / 简介）放在各页列表的 header 里随列表滚动，
+  不固定在标题栏下方 —— 固定会把作品列表挤到只剩两三行（378×496 表盘实测）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <!--
+      单行标题栏：左 = 歌手名，右 = ☰ 菜单（收藏歌手 / 相似歌手 / 刷新）。
+      竖直占位与「标题避开浮动返回按钮」由 WatchBackButton.applySingleRowTitleBarInset() 统一处理：
+      它把本行撑到返回按钮底边高度，并给左侧留出返回按钮占位（标题由 G5 机制再自动补齐）。
+    -->
+    <RelativeLayout
+        android:id="@+id/layout_artist_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="2dp">
+
+        <ImageView
+            android:id="@+id/btn_artist_menu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:contentDescription="更多"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_menu"
+            android:tint="@color/colorPrimary" />
+
+        <TextView
+            android:id="@+id/tv_artist_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="44dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:letterSpacing="0.05"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="歌手"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/watch_text_title"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <!-- 「其他需要展示的内容」独立行：当前页 · 数量（滑动切页时跟随，由 Activity 回写） -->
+    <TextView
+        android:id="@+id/tv_artist_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:paddingStart="10dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="2dp"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_caption" />
+
+    <!-- P8：两页容器（热门 50 首 / 全部歌曲），左右滑切页；原「热门 50 首 / 全部歌曲」标签行已删 -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vp_artist_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+</LinearLayout>
