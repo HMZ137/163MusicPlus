@@ -176,32 +176,14 @@ public class OnlinePlaylistsFragment extends MyPlaylistsPageFragment {
             toast("请先登录");
             return;
         }
-        EditText input = new EditText(requireContext());
-        input.setHint("输入歌单名称");
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-
-        LinearLayout container = new LinearLayout(requireContext());
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("创建歌单")
-                .setView(container)
-                .setPositiveButton("创建", (d, w) -> {
-                    String name = input.getText().toString().trim();
+        com.qinghe.music163pro.util.WatchPopup.input(requireActivity(),
+                "创建歌单", null, "输入歌单名称", "", "创建", name -> {
                     if (name.isEmpty()) {
                         toast("请输入歌单名称");
                         return;
                     }
                     createPlaylist(name, cookie);
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     private void createPlaylist(String name, String cookie) {
@@ -272,25 +254,8 @@ public class OnlinePlaylistsFragment extends MyPlaylistsPageFragment {
     }
 
     private void showRenamePlaylistDialog(PlaylistInfo pl, String cookie) {
-        EditText input = new EditText(requireContext());
-        input.setText(pl.getName());
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-        input.setSelectAllOnFocus(true);
-
-        LinearLayout container = new LinearLayout(requireContext());
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("改名")
-                .setView(container)
-                .setPositiveButton("确认", (d, w) -> {
-                    String newName = input.getText().toString().trim();
+        com.qinghe.music163pro.util.WatchPopup.input(requireActivity(),
+                "改名", null, "歌单名称", pl.getName(), "确认", newName -> {
                     if (newName.isEmpty()) {
                         toast("名称不能为空");
                         return;
@@ -317,16 +282,13 @@ public class OnlinePlaylistsFragment extends MyPlaylistsPageFragment {
                                     }
                                 }
                             });
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     private void showDeletePlaylistDialog(PlaylistInfo pl, String cookie) {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("删除歌单")
-                .setMessage("确定删除「" + pl.getName() + "」？此操作不可撤销。")
-                .setPositiveButton("删除", (d, w) -> MusicApiHelper.deletePlaylist(pl.getId(), cookie,
+        com.qinghe.music163pro.util.WatchPopup.confirm(requireActivity(), "删除歌单",
+                "确定删除「" + pl.getName() + "」？此操作不可撤销。", "删除", true,
+                () -> MusicApiHelper.deletePlaylist(pl.getId(), cookie,
                         new MusicApiHelper.PlaylistActionCallback() {
                             @Override
                             public void onResult(boolean success) {
@@ -347,17 +309,14 @@ public class OnlinePlaylistsFragment extends MyPlaylistsPageFragment {
                                     toast("删除失败: " + message);
                                 }
                             }
-                        }))
-                .setNegativeButton("取消", null)
-                .show();
+                        }));
     }
 
     private void showUnsubscribeDialog(PlaylistInfo pl, String cookie) {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("取消收藏")
-                .setMessage("确定取消收藏歌单「" + pl.getName() + "」？")
-                .setPositiveButton("确认", (d, w) -> MusicApiHelper.subscribePlaylist(pl.getId(), false,
-                        cookie, new MusicApiHelper.PlaylistActionCallback() {
+        com.qinghe.music163pro.util.WatchPopup.confirm(requireActivity(), "取消收藏",
+                "确定取消收藏歌单「" + pl.getName() + "」？", "确认", false,
+                () -> MusicApiHelper.subscribePlaylist(pl.getId(), false, cookie,
+                        new MusicApiHelper.PlaylistActionCallback() {
                             @Override
                             public void onResult(boolean success) {
                                 if (!isViewReady()) {
@@ -377,9 +336,7 @@ public class OnlinePlaylistsFragment extends MyPlaylistsPageFragment {
                                     toast("操作失败: " + message);
                                 }
                             }
-                        }))
-                .setNegativeButton("取消", null)
-                .show();
+                        }));
     }
 
     // ── 账号昵称缓存（排行入口副标题用） ─────────────────────────────────────

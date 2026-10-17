@@ -515,50 +515,10 @@ public class LocalMusicFragment extends Fragment {
             toast("正在扫描，稍候再搜");
             return;
         }
-        final Context context = requireContext();
-        final EditText input = new EditText(context);
-        input.setHint("曲名 / 曲师 / 专辑");
-        input.setText(searchQuery);
-        input.setSingleLine(true);
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-        // 输入框吃掉剩余宽度，右侧留给「×」
-        input.setLayoutParams(new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        // 输入框右侧的小「×」：只清空输入框内容。
-        // （要清掉已经生效的搜索，把输入框清空后点「確定」即可 —— 空关键词等价于显示全部）
-        TextView btnClearInput = new TextView(context);
-        btnClearInput.setText("✕");
-        btnClearInput.setTextColor(0xFFAAAAAA);
-        btnClearInput.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-        btnClearInput.setPadding(px(10), px(4), px(2), px(4));
-        btnClearInput.setClickable(true);
-        btnClearInput.setFocusable(true);
-        btnClearInput.setOnClickListener(v -> input.setText(""));
-
-        LinearLayout fieldRow = new LinearLayout(context);
-        fieldRow.setOrientation(LinearLayout.HORIZONTAL);
-        fieldRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        fieldRow.addView(input);
-        fieldRow.addView(btnClearInput);
-
-        LinearLayout container = new LinearLayout(context);
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(fieldRow, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(context)
-                .setTitle("搜索本地音乐")
-                .setView(container)
-                .setPositiveButton(android.R.string.ok, (d, w) ->
-                        applySearch(input.getText().toString().trim()))
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        // P5：统一浮窗（输入栏带 × 清空）
+        com.qinghe.music163pro.util.WatchPopup.input(requireActivity(),
+                "搜索本地音乐", null, "曲名 / 曲师 / 专辑", searchQuery, "确定",
+                text -> applySearch(text));
     }
 
     /** 选择排序方式：曲名 / 曲师 / 专辑（会记住）。 */
@@ -770,10 +730,9 @@ public class LocalMusicFragment extends Fragment {
             return;
         }
         final Context context = requireContext();
-        new AlertDialog.Builder(context)
-                .setTitle("移出列表")
-                .setMessage("把选中的 " + paths.size() + " 首从本地音乐列表移出？\n不会删除卡里的文件。")
-                .setPositiveButton("移出", (d, w) -> {
+        com.qinghe.music163pro.util.WatchPopup.confirm(requireActivity(), "移出列表",
+                "把选中的 " + paths.size() + " 首从本地音乐列表移出？\n不会删除卡里的文件。",
+                "移出", true, () -> {
                     int added = LocalMusicHides.hide(context, paths);
                     if (multiSelect != null) {
                         multiSelect.exitSelectionMode();
@@ -788,9 +747,7 @@ public class LocalMusicFragment extends Fragment {
                     refreshStatus();
                     toast(added > 0 ? "已移出 " + added + " 首（文件未删除）"
                             : "这些曲目已在隐藏名单里");
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     /**
@@ -892,57 +849,18 @@ public class LocalMusicFragment extends Fragment {
         }
         final List<String> paths = new ArrayList<>(hidden);
         final List<String> names = LocalMusicHides.displayNames(paths);
-
-        ListView list = new ListView(context);
-        list.setDivider(null);
-        list.setAdapter(new android.widget.BaseAdapter() {
-            @Override
-            public int getCount() {
-                return names.size();
-            }
-
-            @Override
-            public Object getItem(int position) {
-                return names.get(position);
-            }
-
-            @Override
-            public long getItemId(int position) {
-                return position;
-            }
-
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                TextView tv = convertView instanceof TextView ? (TextView) convertView : null;
-                if (tv == null) {
-                    tv = new TextView(context);
-                    tv.setTextColor(getResources().getColor(R.color.text_primary));
-                    tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-                    tv.setSingleLine(true);
-                    tv.setEllipsize(TextUtils.TruncateAt.MIDDLE);
-                    tv.setPadding(px(18), px(12), px(18), px(12));
-                    tv.setBackgroundResource(android.R.drawable.list_selector_background);
-                }
-                tv.setText(names.get(position));
-                return tv;
-            }
-        });
-        list.setOnItemClickListener((parent, view, position, id) -> {
-            LocalMusicHides.unhide(context, paths.get(position));
-            refreshStatus();
-            rescanAfterHideChange();
-        });
-
-        new AlertDialog.Builder(context)
-                .setTitle("已移出的曲目")
-                .setView(list)
-                .setPositiveButton("全部恢复", (d, w) -> {
-                    LocalMusicHides.unhideAll(context);
+        final List<String> items = new ArrayList<>(names);
+        items.add("全部恢复（" + names.size() + " 首）");
+        com.qinghe.music163pro.util.WatchMenuDialog.show(context, "已移出的曲目",
+                items.toArray(new String[0]), which -> {
+                    if (which == items.size() - 1) {
+                        LocalMusicHides.unhideAll(context);
+                    } else if (which >= 0 && which < paths.size()) {
+                        LocalMusicHides.unhide(context, paths.get(which));
+                    }
                     refreshStatus();
                     rescanAfterHideChange();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     /** 隐藏名单变了以后重新扫一遍，让列表立刻反映出来。 */
@@ -989,26 +907,9 @@ public class LocalMusicFragment extends Fragment {
 
     /** 多选「加入歌单」时选择「新建歌单」的弹窗。 */
     private void showNewPlaylistDialog(final List<Song> targets) {
-        final Context context = requireContext();
-        EditText input = new EditText(context);
-        input.setHint(R.string.playlist_name_hint);
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-
-        LinearLayout container = new LinearLayout(context);
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(context)
-                .setTitle(R.string.create_local_playlist)
-                .setView(container)
-                .setPositiveButton(android.R.string.ok, (d, w) -> {
-                    String name = input.getText().toString().trim();
+        com.qinghe.music163pro.util.WatchPopup.input(requireActivity(),
+                getString(R.string.create_local_playlist), null,
+                getString(R.string.playlist_name_hint), "", "确定", name -> {
                     if (name.isEmpty()) {
                         toast(getString(R.string.playlist_name_empty));
                         return;
@@ -1026,9 +927,7 @@ public class LocalMusicFragment extends Fragment {
                     if (multiSelect != null) {
                         multiSelect.exitSelectionMode();
                     }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     /** 列表 / 空态可见性与空态文案。 */

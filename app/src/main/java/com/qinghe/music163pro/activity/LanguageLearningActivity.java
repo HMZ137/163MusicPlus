@@ -271,54 +271,42 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
     }
 
     private void showKeyDialog() {
-        EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        input.setHint("sk-…");
-        input.setText(AiLyricSettings.getApiKey(this));
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0x66FFFFFF);
-        input.setPadding(px(10), px(8), px(10), px(8));
-        input.setBackgroundColor(0xFF252525);
-
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("DeepSeek API Key")
-                .setView(input)
-                .setPositiveButton("保存", (d, w) -> {
-                    AiLyricSettings.setApiKey(this, input.getText().toString().trim());
-                    refreshValues();
-                    toast("已保存（混淆存储）");
-                })
-                .setNeutralButton("清空", (d, w) -> {
-                    AiLyricSettings.setApiKey(this, "");
-                    refreshValues();
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        // P5：统一浮窗；3 个按钮（保存 / 清空 / 取消）竖排，输入栏带 ×
+        com.qinghe.music163pro.util.WatchPopup popup =
+                com.qinghe.music163pro.util.WatchPopup.create(this)
+                        .title("DeepSeek API Key")
+                        .description("仅保存在本机（混淆存储）")
+                        .input("sk-…", AiLyricSettings.getApiKey(this));
+        popup.cancelButton();
+        popup.button("清空", com.qinghe.music163pro.util.WatchPopup.STYLE_SECONDARY, () -> {
+            AiLyricSettings.setApiKey(this, "");
+            refreshValues();
+        });
+        popup.primaryButton("保存", text -> {
+            AiLyricSettings.setApiKey(this, text == null ? "" : text);
+            refreshValues();
+            toast("已保存（混淆存储）");
+        });
+        popup.show();
     }
 
     private void showModelDialog() {
-        EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        input.setHint(AiLyricSettings.DEFAULT_MODEL);
-        input.setText(AiLyricSettings.getModel(this));
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0x66FFFFFF);
-        input.setPadding(px(10), px(8), px(10), px(8));
-        input.setBackgroundColor(0xFF252525);
-
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("模型名")
-                .setView(input)
-                .setPositiveButton("保存", (d, w) -> {
-                    AiLyricSettings.setModel(this, input.getText().toString());
-                    refreshValues();
-                })
-                .setNeutralButton("恢复默认", (d, w) -> {
-                    AiLyricSettings.setModel(this, AiLyricSettings.DEFAULT_MODEL);
-                    refreshValues();
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        // P5：统一浮窗；3 个按钮（保存 / 恢复默认 / 取消）竖排，输入栏带 ×
+        com.qinghe.music163pro.util.WatchPopup popup =
+                com.qinghe.music163pro.util.WatchPopup.create(this)
+                        .title("模型名")
+                        .description("默认：" + AiLyricSettings.DEFAULT_MODEL)
+                        .input(AiLyricSettings.DEFAULT_MODEL, AiLyricSettings.getModel(this));
+        popup.cancelButton();
+        popup.button("恢复默认", com.qinghe.music163pro.util.WatchPopup.STYLE_SECONDARY, () -> {
+            AiLyricSettings.setModel(this, AiLyricSettings.DEFAULT_MODEL);
+            refreshValues();
+        });
+        popup.primaryButton("保存", text -> {
+            AiLyricSettings.setModel(this, text == null ? "" : text);
+            refreshValues();
+        });
+        popup.show();
     }
 
     private void runTest() {

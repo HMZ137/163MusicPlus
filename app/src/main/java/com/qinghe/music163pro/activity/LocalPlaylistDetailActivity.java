@@ -294,10 +294,8 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
         String message = targets.size() == 1
                 ? "确定将「" + targets.get(0).getName() + "」移出歌单？"
                 : "确定将选中的 " + targets.size() + " 首移出歌单？";
-        new AlertDialog.Builder(this)
-                .setTitle("从歌单移除")
-                .setMessage(message + "\n不会删除卡里的文件。")
-                .setPositiveButton("移除", (d, w) -> {
+        com.qinghe.music163pro.util.WatchPopup.confirm(this, "从歌单移除",
+                message + "\n不会删除卡里的文件。", "移除", true, () -> {
                     // 用「按路径过滤后整体重写」的方式一次落盘，避免逐首重写 json
                     List<Song> remain = new ArrayList<>();
                     for (Song s : allSongs) {
@@ -315,9 +313,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
                     } else {
                         Toast.makeText(this, "移除失败", Toast.LENGTH_SHORT).show();
                     }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     /** 批量加入本地收藏（本地曲目一律进本地收藏库，与单曲收藏口径一致）。 */
@@ -552,29 +548,9 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
     }
 
     private void showSearchDialog() {
-        EditText input = new EditText(this);
-        input.setHint("曲名 / 曲师 / 专辑");
-        input.setText(searchQuery);
-        input.setSingleLine(true);
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-
-        android.widget.LinearLayout container = new android.widget.LinearLayout(this);
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(this)
-                .setTitle("搜索歌单内歌曲")
-                .setView(container)
-                .setPositiveButton(android.R.string.ok, (d, w) ->
-                        applySearch(input.getText().toString().trim()))
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        // P5：统一浮窗（输入栏带 × 清空）
+        com.qinghe.music163pro.util.WatchPopup.input(this, "搜索歌单内歌曲", null,
+                "曲名 / 曲师 / 专辑", searchQuery, "确定", text -> applySearch(text));
     }
 
     @Override

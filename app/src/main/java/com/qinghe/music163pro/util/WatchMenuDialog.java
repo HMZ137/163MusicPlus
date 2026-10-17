@@ -78,7 +78,7 @@ public final class WatchMenuDialog {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(UiKit.dialogCard(context));
 
-        // ── 标题：固定单行，不参与滚动 ──
+        // ── 标题：居中（P5 统一浮窗口径：标题与按钮同一套视觉）、固定单行、不参与滚动 ──
         if (title != null && title.length() > 0) {
             TextView tvTitle = new TextView(context);
             tvTitle.setText(title);
@@ -87,7 +87,7 @@ public final class WatchMenuDialog {
             tvTitle.setTypeface(null, Typeface.BOLD);
             tvTitle.setSingleLine(true);
             tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            tvTitle.setGravity(Gravity.CENTER_VERTICAL);
+            tvTitle.setGravity(Gravity.CENTER);
             int ph = UiKit.dp(context, 12);
             int pv = UiKit.dp(context, 9);
             tvTitle.setPadding(ph, pv, ph, pv);

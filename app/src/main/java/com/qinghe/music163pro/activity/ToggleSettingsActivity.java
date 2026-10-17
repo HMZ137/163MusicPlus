@@ -612,31 +612,22 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     private void editLyricResumeInterval() {
+        // P5：统一浮窗（输入栏带 ×）
         int current = prefs.getInt(PREF_LYRIC_RESUME_INTERVAL, 3);
-        EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setText(String.valueOf(current));
-        input.setSelectAllOnFocus(true);
-        int pad = (int) (8 * getResources().getDisplayMetrics().density);
-        input.setPadding(pad * 3, pad * 2, pad * 3, pad * 2);
-
-        new AlertDialog.Builder(this)
-                .setTitle("歌词恢复间隔（秒）")
-                .setView(input)
-                .setPositiveButton("确定", (dialog, which) -> {
-                    String val = input.getText().toString().trim();
+        com.qinghe.music163pro.util.WatchPopup.input(this, "歌词恢复间隔（秒）",
+                "1~60 秒；无操作超过该时长后恢复跟随", "秒数", String.valueOf(current),
+                "确定", text -> {
                     int seconds = 3;
                     try {
-                        seconds = Integer.parseInt(val);
+                        seconds = Integer.parseInt(text);
                         if (seconds < 1) seconds = 1;
                         if (seconds > 60) seconds = 60;
-                    } catch (NumberFormatException ignored) {}
+                    } catch (NumberFormatException ignored) {
+                    }
                     prefs.edit().putInt(PREF_LYRIC_RESUME_INTERVAL, seconds).apply();
                     updateLyricResumeIntervalValue();
                     Toast.makeText(this, "歌词恢复间隔: " + seconds + "秒", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     private void updateLyricResumeIntervalValue() {

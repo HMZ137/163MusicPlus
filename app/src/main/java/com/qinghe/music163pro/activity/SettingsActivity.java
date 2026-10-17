@@ -142,24 +142,18 @@ public class SettingsActivity extends BaseWatchActivity {
     }
 
     private void promptCustomExportTarget() {
-        final android.widget.EditText input = new android.widget.EditText(this);
-        input.setSingleLine(true);
-        input.setText(new java.io.File(android.os.Environment.getExternalStorageDirectory(),
-                "163Music/导出").getAbsolutePath());
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("目标文件夹")
-                .setMessage("输入完整路径，例如 /sdcard/Music/我的导出")
-                .setView(input)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定", (dialog, which) -> {
-                    String path = input.getText() == null ? "" : input.getText().toString().trim();
+        // P5：统一浮窗（说明在上、输入栏带 ×）
+        String initial = new java.io.File(android.os.Environment.getExternalStorageDirectory(),
+                "163Music/导出").getAbsolutePath();
+        com.qinghe.music163pro.util.WatchPopup.input(this, "目标文件夹",
+                "输入完整路径，例如 /sdcard/Music/我的导出",
+                "/sdcard/…", initial, "确定", path -> {
                     if (path.isEmpty()) {
                         Toast.makeText(this, "路径不能为空", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     confirmExport(path);
-                })
-                .show();
+                });
     }
 
     private void confirmExport(final String targetDir) {

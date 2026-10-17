@@ -116,16 +116,12 @@ public class ScanDirsActivity extends BaseWatchActivity {
     }
 
     private void promptAdd() {
-        final EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setHint("/sdcard/我的音乐");
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(R.string.scan_dirs_title)
-                .setMessage(R.string.scan_dirs_add_prompt)
-                .setView(input)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定", (dialog, which) -> {
-                    String path = input.getText() == null ? "" : input.getText().toString().trim();
+        // P5：统一浮窗（说明在上、输入栏带 ×）
+        final java.util.concurrent.atomic.AtomicReference<String> ignored = null;
+        com.qinghe.music163pro.util.WatchPopup.input(this,
+                getString(R.string.scan_dirs_title),
+                getString(R.string.scan_dirs_add_prompt),
+                "/sdcard/我的音乐", "", "确定", path -> {
                     if (path.isEmpty()) {
                         Toast.makeText(this, "路径不能为空", Toast.LENGTH_SHORT).show();
                         return;
@@ -137,8 +133,7 @@ public class ScanDirsActivity extends BaseWatchActivity {
                                     : (LocalScanScope.isUsableDir(new File(path)) ? "该目录已在列表中" : "已添加，但该目录当前不可用"),
                             Toast.LENGTH_SHORT).show();
                     reload();
-                })
-                .show();
+                });
     }
 
     private void remove(String path) {

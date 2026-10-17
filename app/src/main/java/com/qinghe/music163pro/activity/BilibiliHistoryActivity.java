@@ -180,15 +180,12 @@ public class BilibiliHistoryActivity extends BaseWatchActivity {
     }
 
     private void confirmRemove(final BilibiliHistoryManager.Entry entry) {
-        new AlertDialog.Builder(this)
-                .setTitle("删除这条记录")
-                .setMessage(entry.displayName())
-                .setPositiveButton("删除", (d, w) -> {
+        // P5：统一浮窗（危险动作红色描边按钮）
+        com.qinghe.music163pro.util.WatchPopup.confirm(this, "删除这条记录",
+                entry.displayName(), "删除", true, () -> {
                     BilibiliHistoryManager.remove(this, entry.bvid);
                     renderHistory();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     private void confirmClear() {
@@ -196,15 +193,11 @@ public class BilibiliHistoryActivity extends BaseWatchActivity {
             Toast.makeText(this, "历史已经是空的", Toast.LENGTH_SHORT).show();
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("清空 B 站历史")
-                .setMessage("只清记录，不影响收藏与下载。")
-                .setPositiveButton("清空", (d, w) -> {
+        com.qinghe.music163pro.util.WatchPopup.confirm(this, "清空 B 站历史",
+                "只清记录，不影响收藏与下载。", "清空", true, () -> {
                     BilibiliHistoryManager.clear(this);
                     renderHistory();
                     Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 }

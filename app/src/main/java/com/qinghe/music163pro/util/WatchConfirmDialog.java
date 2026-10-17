@@ -1,29 +1,22 @@
 package com.qinghe.music163pro.util;
 
 import android.app.Activity;
-import android.util.TypedValue;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 /**
- * Shared confirm dialog builder adapted to the watch UI.
+ * 统一确认框（P5 起内部改为 {@link WatchPopup} 渲染，样式跟 `浮窗改进_1.bmp` 一致：
+ * 14dp 大圆角卡片、标题居中、可选说明、分隔线、底部圆角按钮、按钮可多于两个）。
  *
- * <p>提供两种形态，都走同一套样式，避免各页面自己拼弹窗导致风格不一致：</p>
+ * <p>对外 API 保持不变，既有 20+ 调用点无需改动即可获得新样式：</p>
  * <ul>
- *   <li>{@link #show} —— 经典的「取消 / 确定」二选一，用于删除这类需要确认的操作。</li>
- *   <li>{@link #showChoice} —— 取消 + 若干动作按钮（纵向排列），
- *       用于长按之类的「弹出操作菜单」场景。</li>
+ *   <li>{@link #show} —— 「取消 / 确定」二选一；</li>
+ *   <li>{@link #showChoice} —— 取消 + 若干动作按钮（纵向排列，可多于两个）。</li>
  * </ul>
  */
 public final class WatchConfirmDialog {
 
-    private static final int DEFAULT_OVERLAY_COLOR = 0xCC000000;
-    private static final int DEFAULT_TITLE_TEXT_COLOR = 0xFFFFFFFF;
-    private static final int DEFAULT_MESSAGE_TEXT_COLOR = 0xB3FFFFFF;
     private static final int DEFAULT_CANCEL_BUTTON_COLOR = 0xFF2D2D2D;
+    private static final int CONFIRM_COLOR = 0xFFBB86FC;
+    private static final int DESTRUCTIVE_COLOR = 0xFFCF6679;
     private static final String OVERLAY_TAG = "watch_confirm_dialog_overlay";
 
     private WatchConfirmDialog() {
@@ -33,29 +26,13 @@ public final class WatchConfirmDialog {
     public static void show(Activity activity, String title, String message,
                             Runnable onConfirm, Options options) {
         Options resolved = options != null ? options : Options.defaultOptions();
-        FrameLayout overlay = createOverlay(activity, title, message, resolved);
-        if (overlay == null) {
-            return;
-        }
-        LinearLayout dialog = (LinearLayout) overlay.getChildAt(0);
-
-        LinearLayout buttonRow = new LinearLayout(activity);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-        buttonRow.setGravity(Gravity.CENTER);
-        buttonRow.addView(createButton(activity, overlay, "取消",
-                DEFAULT_CANCEL_BUTTON_COLOR, false, null));
-        buttonRow.addView(createButton(activity, overlay, "确定",
-                resolved.confirmButtonColor, true, onConfirm));
-        dialog.addView(buttonRow);
-
-        attach(activity, overlay, resolved.dismissOnOutsideTap);
+        boolean danger = resolved.confirmButtonColor == DESTRUCTIVE_COLOR;
+        WatchPopup.popup(activity, title, null, message, resolved.dismissOnOutsideTap,
+                resolved.confirmButtonColor == CONFIRM_COLOR, danger, onConfirm);
     }
 
     /**
      * 取消 + 多个动作按钮（纵向排列，适配手表的窄屏）。
-     *
-     * <p>用于「长按某项后弹出可选操作」的场景，例如播放队列的
-     * 「移除 / 下一首播放」。动作按钮按传入顺序自上而下排列。</p>
      *
      * @param labels  动作按钮文案
      * @param actions 与 labels 一一对应的动作；为 null 表示只关闭弹窗
@@ -66,194 +43,16 @@ public final class WatchConfirmDialog {
             return;
         }
         Options resolved = options != null ? options : Options.defaultOptions();
-        FrameLayout overlay = createOverlay(activity, title, message, resolved);
-        if (overlay == null) {
-            return;
-        }
-        LinearLayout dialog = (LinearLayout) overlay.getChildAt(0);
-
-        LinearLayout buttonColumn = new LinearLayout(activity);
-        buttonColumn.setOrientation(LinearLayout.VERTICAL);
-        buttonColumn.setGravity(Gravity.CENTER);
-
-        for (int i = 0; i < labels.length; i++) {
-            Runnable action = (actions != null && i < actions.length) ? actions[i] : null;
-            buttonColumn.addView(createStackedButton(activity, overlay, labels[i],
-                    resolved.confirmButtonColor, action));
-        }
-        // 取消放最后，避免误触到危险动作
-        buttonColumn.addView(createStackedButton(activity, overlay, "取消",
-                DEFAULT_CANCEL_BUTTON_COLOR, null));
-
-        dialog.addView(buttonColumn);
-        attach(activity, overlay, resolved.dismissOnOutsideTap);
+        WatchPopup.actions(activity, title, message, labels, actions);
     }
 
-    /**
-     * 搭出「遮罩 + 对话框 + 标题 + 正文」，动作按钮由调用方接着往 dialog 里加。
-     *
-     * @return 遮罩层；activity 不可用时返回 null
-     */
-    private static FrameLayout createOverlay(Activity activity, String title, String message,
-                                            Options options) {
-        if (activity == null || activity.isFinishing()) {
-            return null;
-        }
-        FrameLayout rootView = activity.findViewById(android.R.id.content);
-        if (rootView == null) {
-            return null;
-        }
-        dismissExisting(rootView);
-
-        FrameLayout overlay = new FrameLayout(activity);
-        overlay.setTag(OVERLAY_TAG);
-        overlay.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-        overlay.setBackgroundColor(DEFAULT_OVERLAY_COLOR);
-        overlay.setClickable(true);
-        overlay.setFocusable(true);
-
-        LinearLayout dialog = new LinearLayout(activity);
-        dialog.setOrientation(LinearLayout.VERTICAL);
-        // UI 现代化：弹窗底色统一走 UiKit（#1E1F24、圆角 14dp）——
-        // 之前"两套底色"的分叉就从这类各自 setBackgroundColor 的地方来的
-        dialog.setBackground(UiKit.dialogCard(activity));
-        dialog.setPadding(
-                WatchUiUtils.px(activity, 16),
-                WatchUiUtils.px(activity, 12),
-                WatchUiUtils.px(activity, 16),
-                WatchUiUtils.px(activity, 12));
-        FrameLayout.LayoutParams dialogParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        dialogParams.gravity = Gravity.CENTER;
-        dialogParams.leftMargin = WatchUiUtils.px(activity, 16);
-        dialogParams.rightMargin = WatchUiUtils.px(activity, 16);
-        dialog.setLayoutParams(dialogParams);
-
-        dialog.addView(createTitleView(activity, title));
-        dialog.addView(createMessageView(activity, message));
-
-        overlay.addView(dialog);
-        return overlay;
-    }
-
-    /** 把搭好的遮罩挂到内容视图上，并处理「点外部关闭」。 */
-    private static void attach(Activity activity, FrameLayout overlay, boolean dismissOnOutsideTap) {
-        FrameLayout rootView = activity.findViewById(android.R.id.content);
-        if (rootView == null) {
-            return;
-        }
-        View dialog = overlay.getChildAt(0);
-        if (dismissOnOutsideTap) {
-            overlay.setOnClickListener(v -> rootView.removeView(overlay));
-        } else {
-            overlay.setOnClickListener(v -> {
-                // Consume outside taps without dismissing the dialog.
-            });
-        }
-        if (dialog != null) {
-            dialog.setOnClickListener(v -> {
-                // Consume dialog taps so they do not propagate to the overlay.
-            });
-        }
-        rootView.addView(overlay);
-    }
-
-    private static TextView createTitleView(Activity activity, String title) {
-        TextView titleView = new TextView(activity);
-        titleView.setText(title != null ? title : "");
-        titleView.setTextColor(DEFAULT_TITLE_TEXT_COLOR);
-        titleView.setTextSize(TypedValue.COMPLEX_UNIT_PX, WatchUiUtils.px(activity, 18));
-        titleView.setGravity(Gravity.CENTER);
-        titleView.setPadding(0, 0, 0, WatchUiUtils.px(activity, 6));
-        return titleView;
-    }
-
-    private static TextView createMessageView(Activity activity, String message) {
-        TextView messageView = new TextView(activity);
-        messageView.setText(message != null ? message : "");
-        messageView.setTextColor(DEFAULT_MESSAGE_TEXT_COLOR);
-        messageView.setTextSize(TypedValue.COMPLEX_UNIT_PX, WatchUiUtils.px(activity, 15));
-        messageView.setGravity(Gravity.CENTER);
-        messageView.setPadding(0, 0, 0, WatchUiUtils.px(activity, 12));
-        return messageView;
-    }
-
-    /** 横向并排的按钮（用于「取消 / 确定」）。 */
-    private static TextView createButton(Activity activity, FrameLayout overlay, String label,
-                                         int backgroundColor, boolean isConfirm,
-                                         Runnable action) {
-        TextView button = newButton(activity, label, backgroundColor);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        if (isConfirm) {
-            params.leftMargin = WatchUiUtils.px(activity, 4);
-        } else {
-            params.rightMargin = WatchUiUtils.px(activity, 4);
-        }
-        button.setLayoutParams(params);
-        button.setOnClickListener(v -> {
-            dismiss(overlay);
-            if (action != null) {
-                action.run();
-            }
-        });
-        return button;
-    }
-
-    /** 纵向堆叠的整宽按钮（用于动作菜单）。 */
-    private static TextView createStackedButton(Activity activity, FrameLayout overlay,
-                                                String label, int backgroundColor,
-                                                Runnable action) {
-        TextView button = newButton(activity, label, backgroundColor);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.topMargin = WatchUiUtils.px(activity, 4);
-        button.setLayoutParams(params);
-        button.setOnClickListener(v -> {
-            dismiss(overlay);
-            if (action != null) {
-                action.run();
-            }
-        });
-        return button;
-    }
-
-    private static TextView newButton(Activity activity, String label, int backgroundColor) {
-        TextView button = new TextView(activity);
-        button.setText(label);
-        button.setTextColor(DEFAULT_TITLE_TEXT_COLOR);
-        button.setTextSize(TypedValue.COMPLEX_UNIT_PX, WatchUiUtils.px(activity, 16));
-        button.setGravity(Gravity.CENTER);
-        button.setPadding(
-                WatchUiUtils.px(activity, 12),
-                WatchUiUtils.px(activity, 8),
-                WatchUiUtils.px(activity, 12),
-                WatchUiUtils.px(activity, 8));
-        button.setBackgroundColor(backgroundColor);
-        button.setClickable(true);
-        button.setFocusable(true);
-        return button;
-    }
-
-    private static void dismiss(FrameLayout overlay) {
-        if (overlay == null || overlay.getParent() == null) {
-            return;
-        }
-        ((FrameLayout) overlay.getParent()).removeView(overlay);
-    }
-
-    private static void dismissExisting(FrameLayout rootView) {
-        View existingOverlay = rootView.findViewWithTag(OVERLAY_TAG);
-        if (existingOverlay != null) {
-            rootView.removeView(existingOverlay);
-        }
+    /** 旧版本使用的遮罩标签（保留给需要主动清理的调试工具）。 */
+    public static String overlayTag() {
+        return OVERLAY_TAG;
     }
 
     public static final class Options {
-        /** 统一的弹窗底色。改动前各页面分别传 0xFF1E1E1E / 0xFF424242，看起来不像同一个 App。 */
+        /** 统一的弹窗底色（P5 起由 UiKit.dialogCard 决定，此值仅保留兼容）。 */
         private static final int DIALOG_BACKGROUND = 0xFF1E1E1E;
         /** 普通确认按钮（主色）。 */
         private static final int CONFIRM_COLOR = 0xFFBB86FC;

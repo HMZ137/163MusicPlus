@@ -720,31 +720,12 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
     }
 
     private void showSearchDialog() {
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setHint("曲名 / 曲师 / 专辑");
-        input.setText(searchQuery);
-        input.setSingleLine(true);
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-
-        LinearLayout container = new LinearLayout(this);
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("搜索歌单内歌曲")
-                .setView(container)
-                .setPositiveButton(android.R.string.ok, (d, w) -> {
-                    searchQuery = input.getText().toString().trim();
+        // P5：统一浮窗（输入栏带 × 清空）
+        com.qinghe.music163pro.util.WatchPopup.input(this, "搜索歌单内歌曲", null,
+                "曲名 / 曲师 / 专辑", searchQuery, "确定", text -> {
+                    searchQuery = text;
                     applyFilter();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     private void updateTitleText() {

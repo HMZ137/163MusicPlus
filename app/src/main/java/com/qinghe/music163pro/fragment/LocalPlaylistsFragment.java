@@ -134,24 +134,8 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
 
     @Override
     public void showCreatePlaylistDialog() {
-        EditText input = new EditText(requireContext());
-        input.setHint("输入歌单名称");
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-
-        LinearLayout container = new LinearLayout(requireContext());
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("新建本地歌单")
-                .setView(container)
-                .setPositiveButton("创建", (d, w) -> {
-                    String name = input.getText().toString().trim();
+        com.qinghe.music163pro.util.WatchPopup.input(requireActivity(),
+                "新建本地歌单", null, "输入歌单名称", "", "创建", name -> {
                     if (name.isEmpty()) {
                         toast("请输入歌单名称");
                         return;
@@ -166,9 +150,7 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
                     } else {
                         toast("创建失败");
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     private void showLocalPlaylistOptions(PlaylistInfo pl) {
@@ -189,25 +171,8 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
     }
 
     private void showRenameLocalDialog(PlaylistInfo pl) {
-        EditText input = new EditText(requireContext());
-        input.setText(pl.getName());
-        input.setTextColor(0xFFFFFFFF);
-        input.setHintTextColor(0xFF888888);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        input.setPadding(px(8), px(4), px(8), px(4));
-        input.setBackgroundColor(0xFF333333);
-        input.setSelectAllOnFocus(true);
-
-        LinearLayout container = new LinearLayout(requireContext());
-        container.setPadding(px(12), px(8), px(12), px(4));
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("改名")
-                .setView(container)
-                .setPositiveButton("确认", (d, w) -> {
-                    String newName = input.getText().toString().trim();
+        com.qinghe.music163pro.util.WatchPopup.input(requireActivity(),
+                "改名", null, "歌单名称", pl.getName(), "确认", newName -> {
                     if (newName.isEmpty()) {
                         toast("名称不能为空");
                         return;
@@ -225,25 +190,19 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
                     } else {
                         toast("改名失败");
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     private void showDeleteLocalDialog(PlaylistInfo pl) {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("删除歌单")
-                .setMessage("确定删除「" + pl.getName() + "」？此操作不可撤销。")
-                .setPositiveButton("删除", (d, w) -> {
+        com.qinghe.music163pro.util.WatchPopup.confirm(requireActivity(), "删除歌单",
+                "确定删除「" + pl.getName() + "」？此操作不可撤销。", "删除", true, () -> {
                     if (LocalPlaylistManager.deletePlaylist(pl.getName())) {
                         toast("已删除");
                         loadData();
                     } else {
                         toast("删除失败");
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
     }
 
     /** 导出：把本地歌单复制一份到 /sdcard/Download/<歌单名>.json，方便拷到电脑。 */
