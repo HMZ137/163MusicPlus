@@ -2912,6 +2912,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private String loadLocalLrc(Song song) {
+        // 2026-10-17：优先读「与音频同目录、同名」的 sidecar .lrc ——
+        // 局域网传歌上传歌词后与音频合并，就是写在这里（播放器优先认它）。
+        String sidecar = readSidecarLrc(song);
+        if (sidecar != null && !sidecar.isEmpty()) {
+            return sidecar;
+        }
         try {
             String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
             String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
@@ -2932,6 +2938,54 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 }
                 return sb.toString();
             }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 读取「与音频文件同目录、同文件名」的 .lrc（LAN 传歌上传歌词时生成）。
+     *
+     * <p>本地歌的 {@code url} 就是文件绝对路径，所以直接取同目录同名 .lrc；
+     * 没有则返回 null，继续走原来的「下载目录 lyrics.lrc」逻辑。</p>
+     */
+    private String readSidecarLrc(Song song) {
+        try {
+            if (song == null) {
+                return null;
+            }
+            String path = song.getUrl();
+            if (path == null || !path.startsWith("/") || path.contains("://")) {
+                return null;
+            }
+            java.io.File audio = new java.io.File(path);
+            if (!audio.isFile()) {
+                return null;
+            }
+            String name = audio.getName();
+            int dot = name.lastIndexOf('.');
+            String stem = dot > 0 ? name.substring(0, dot) : name;
+            java.io.File lrc = new java.io.File(audio.getParentFile(), stem + ".lrc");
+            if (!lrc.isFile()) {
+                return null;
+            }
+            String text = readTextFileUtf8(lrc);
+            return text == null ? null : text.replace("\uFEFF", "");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String readTextFileUtf8(java.io.File file) {
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(file);
+             java.io.InputStreamReader reader = new java.io.InputStreamReader(fis, "UTF-8")) {
+            StringBuilder sb = new StringBuilder();
+            char[] buf = new char[2048];
+            int len;
+            while ((len = reader.read(buf)) != -1) {
+                sb.append(buf, 0, len);
+            }
+            return sb.toString();
         } catch (Exception e) {
             return null;
         }

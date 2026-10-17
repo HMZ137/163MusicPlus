@@ -160,6 +160,42 @@ public final class AudioTagEmbedder {
         return 1;
     }
 
+    /**
+     * F4b（2026-10-17 深夜，需求方「局域网传歌上传歌词后按文件名匹配并合并」）：
+     * 把一段歌词**内嵌进单个音频文件**（只写歌词、不动封面）。
+     *
+     * <p>与 {@link #embedFolder(File, boolean)} 的区别：不依赖 {@code lyrics.lrc} 目录结构，
+     * 直接把调用方给的歌词文本写进该音频（LAN 传歌上传 .lrc 后与同名音频合并用）。
+     * 原文件首次写入前会备份成 {@code .bak}。</p>
+     *
+     * @return 1=成功；0=跳过（不支持该格式 / 歌词为空）；-1=失败
+     */
+    public static int embedLyricsInto(File audio, String lyrics) {
+        if (audio == null || !audio.isFile() || lyrics == null || lyrics.trim().isEmpty()) {
+            return 0;
+        }
+        String name = audio.getName().toLowerCase(java.util.Locale.ROOT);
+        try {
+            byte[] original = readAll(audio);
+            byte[] updated;
+            if (name.endsWith(".mp3")) {
+                updated = embedMp3(original, null, lyrics);
+            } else if (name.endsWith(".flac")) {
+                updated = embedFlac(original, null, lyrics);
+            } else {
+                return 0;   // 其它格式暂不支持内嵌歌词标签
+            }
+            if (updated == null) {
+                return -1;
+            }
+            backupOnce(audio);
+            writeAll(audio, updated);
+            return 1;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
     // ── MP3 / ID3v2.4 ───────────────────────────────────────────────────────
 
     private static byte[] embedMp3(byte[] file, byte[] cover, String lyrics) {

@@ -323,6 +323,24 @@ html.theme-light .btn-primary{color:#fff;}
     <ul class="file-list" id="fileList" data-page-node-id="DDuNCB4MGLlZkTCiSh6YDu"></ul>
   </div>
 
+  <!-- ========== 上传歌词（.lrc）：按文件名与音频匹配并合并 ========== -->
+  <div class="card" id="lrcCard">
+    <div class="card-head">
+      <h2>上传歌词（.lrc）</h2>
+    </div>
+    <div class="dropzone" id="lrcDropzone">
+      <div class="dz-icon" style="font-size:12px;font-weight:800;letter-spacing:.5px;">LRC</div>
+      <p class="dz-title">点击选择 .lrc 歌词</p>
+      <p class="dz-sub">按文件名与 Music 里的音频自动匹配并合并 · 支持多选</p>
+    </div>
+    <input type="file" id="lrcInput" accept=".lrc" multiple hidden>
+    <ul class="file-list" id="lrcList"></ul>
+    <p class="hint" style="text-align:left;margin-top:8px;">
+      匹配规则：歌词与音频「去掉扩展名的文件名」相同即配对，配对后会在音频旁生成同名 .lrc
+      （播放器优先读取）并写进音频标签；先传歌词也可以，音频上传后会自动配对。
+    </p>
+  </div>
+
   <p class="hint" data-page-node-id="vC9TBlyMaNHxyB3LVGyVZA">音乐文件落到手表的 Music 目录（App 里扫得到），其它文件落到 TransFiles。
                  传完记得回手表点「停止」。</p>
 
@@ -700,6 +718,54 @@ async function loadInbox() {
 }
 
 /* =========================================================
+ *  歌词上传（.lrc）：按文件名与音频匹配并合并
+ * ========================================================= */
+async function uploadLrcFile(file, row) {
+  const state = row.querySelector('.fi-state');
+  state.textContent = '上传中…';
+  try {
+    const res = await fetch('/upload?name=' + encodeURIComponent(file.name), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: file
+    });
+    const j = await res.json().catch(() => null);
+    if (j && j.ok) {
+      row.classList.add('done');
+      state.textContent = j.matched
+        ? ('已合并到：' + j.audio)
+        : '未找到同名音频，已暂存（音频上传后自动配对）';
+    } else {
+      row.classList.add('fail');
+      state.textContent = '失败：' + ((j && j.error) || ('HTTP ' + res.status));
+    }
+  } catch (e) {
+    row.classList.add('fail');
+    state.textContent = '失败：网络错误';
+  }
+}
+
+function addLrcFiles(files) {
+  const list = $('#lrcList');
+  [...files].forEach(f => {
+    const li = document.createElement('li');
+    li.className = 'file-item';
+    li.innerHTML = `
+      <div class="fi-icon" style="--c:#22c55e">LRC</div>
+      <div class="fi-main">
+        <div class="fi-top">
+          <span class="fi-name">${escapeHtml(f.name)}</span>
+          <span class="fi-size">${fmtSize(f.size)}</span>
+        </div>
+        <div class="fi-progress"><i style="width:100%"></i></div>
+        <div class="fi-bottom"><span class="fi-state">等待上传</span></div>
+      </div>`;
+    list.appendChild(li);
+    uploadLrcFile(f, li);
+  });
+}
+
+/* =========================================================
  *  事件
  * ========================================================= */
 function bindEvents() {
@@ -714,6 +780,28 @@ function bindEvents() {
     addFiles([...e.target.files].map(f => ({ file: f, name: f.name, size: f.size })));
     input.value = '';
   });
+
+  // 歌词上传：独立的选框 + 拖拽
+  const lrcDz = $('#lrcDropzone');
+  const lrcInput = $('#lrcInput');
+  if (lrcDz && lrcInput) {
+    lrcDz.addEventListener('click', () => lrcInput.click());
+    lrcInput.addEventListener('change', e => {
+      addLrcFiles(e.target.files);
+      lrcInput.value = '';
+    });
+    ['dragenter', 'dragover'].forEach(ev =>
+      lrcDz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); lrcDz.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev =>
+      lrcDz.addEventListener(ev, e => {
+        e.preventDefault(); e.stopPropagation();
+        if (ev === 'dragleave' && lrcDz.contains(e.relatedTarget)) return;
+        lrcDz.classList.remove('over');
+      }));
+    lrcDz.addEventListener('drop', e => {
+      if (e.dataTransfer && e.dataTransfer.files) addLrcFiles(e.dataTransfer.files);
+    });
+  }
 
   ['dragenter', 'dragover'].forEach(ev =>
     dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('over'); }));

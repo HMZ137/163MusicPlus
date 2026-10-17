@@ -315,6 +315,13 @@ public final class LanTransferServer {
         String name = queryValue(query, "name");
         String safeName = sanitizeFileName(name);
 
+        // 2026-10-17：局域网传歌「歌词上传」—— .lrc 按文件名与音频匹配后合并，
+        // 不落进音乐库 / 收件箱（它不是音频，也不是普通文件）。
+        if (safeName != null && safeName.toLowerCase(Locale.ROOT).endsWith(".lrc")) {
+            handleLyricsUpload(out, safeName, in, contentLength);
+            return;
+        }
+
         // 目录分流：音乐文件进 Music，其它文件进 TransFiles（与音乐库隔离）
         File dir = isMusicFile(safeName) ? saveDir : defaultTransFilesDir();
         if (!dir.exists() && !dir.mkdirs()) {
@@ -364,6 +371,8 @@ public final class LanTransferServer {
                 LocalLibraryCache.put(song);
             } catch (Exception ignored) {
             }
+            // 若之前先传过同名 .lrc（暂存在 Music/__lyrics__/），这里立即配对合并
+            matchPendingLyric(target);
         } else {
             Log.i(TAG, "非音乐文件，仅落盘不登记音乐库: " + target.getAbsolutePath());
         }
@@ -381,6 +390,162 @@ public final class LanTransferServer {
 
         String json = "{\"ok\":true,\"name\":\"" + jsonEscape(safeName) + "\",\"size\":" + written + "}";
         writeResponse(out, 200, "OK", "application/json; charset=utf-8", json.getBytes("UTF-8"));
+    }
+
+    // ==================== 歌词上传（.lrc → 按文件名匹配音频并合并） ====================
+
+    /** 暂存「还没找到同名音频」的歌词目录（音频后传时自动配对）。 */
+    private static File lyricsPendingDir() {
+        return new File(Environment.getExternalStorageDirectory(), "Music/__lyrics__");
+    }
+
+    private static String stripExt(String name) {
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    /**
+     * 处理 .lrc 上传：
+     * <ol>
+     *   <li>按「去掉扩展名的文件名」在 Music 目录（递归）里找同名音频；</li>
+     *   <li>找到 ⇒ 在音频旁边写同名 .lrc（本地播放器优先读取），
+     *       并调用 AudioTagEmbedder.embedLyricsInto 把歌词内嵌进音频标签（原文件备份 .bak）；</li>
+     *   <li>没找到 ⇒ 暂存到 Music/__lyrics__/，等音频上传后自动配对。</li>
+     * </ol>
+     */
+    private void handleLyricsUpload(OutputStream out, String safeName, InputStream in,
+                                    int contentLength) throws Exception {
+        if (contentLength <= 0 || contentLength > 4 * 1024 * 1024) {
+            byte[] body = "{\"ok\":false,\"error\":\"歌词文件过大或为空\"}".getBytes("UTF-8");
+            writeResponse(out, 400, "Bad Request", "application/json; charset=utf-8", body);
+            return;
+        }
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[BUFFER_SIZE];
+        int remaining = contentLength;
+        while (remaining > 0) {
+            int n = in.read(buf, 0, Math.min(buf.length, remaining));
+            if (n < 0) {
+                break;
+            }
+            bos.write(buf, 0, n);
+            remaining -= n;
+        }
+        byte[] data = bos.toByteArray();
+        String text = new String(data, "UTF-8");
+        String stem = stripExt(safeName).trim();
+        if (stem.isEmpty()) {
+            stem = "lyrics";
+        }
+
+        File audio = findAudioByStem(saveDir, stem);
+        boolean matched = false;
+        String audioName = "";
+        if (audio != null) {
+            File sidecar = new File(audio.getParentFile(), stripExt(audio.getName()) + ".lrc");
+            writeBytes(sidecar, data);
+            int embedded = AudioTagEmbedder.embedLyricsInto(audio, text);
+            matched = true;
+            audioName = audio.getName();
+            Log.i(TAG, "歌词已匹配: " + safeName + " -> " + audio.getAbsolutePath()
+                    + " (sidecar=" + sidecar.getName() + ", embed=" + embedded + ")");
+        } else {
+            File dir = lyricsPendingDir();
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            writeBytes(new File(dir, stem + ".lrc"), data);
+            Log.i(TAG, "歌词暂存（等音频上传）: " + safeName + " -> " + dir.getAbsolutePath());
+        }
+
+        String json = "{\"ok\":true,\"type\":\"lrc\",\"matched\":" + matched
+                + ",\"audio\":\"" + jsonEscape(audioName) + "\",\"name\":\""
+                + jsonEscape(safeName) + "\"}";
+        writeResponse(out, 200, "OK", "application/json; charset=utf-8", json.getBytes("UTF-8"));
+    }
+
+    /** 递归找「去掉扩展名后文件名等于 stem」的音乐文件（最多 4 层）。 */
+    private static File findAudioByStem(File dir, String stem) {
+        if (dir == null || !dir.isDirectory() || stem == null || stem.isEmpty()) {
+            return null;
+        }
+        return findAudioByStem(dir, stem, 0);
+    }
+
+    private static File findAudioByStem(File dir, String stem, int depth) {
+        if (depth > 4 || dir == null) {
+            return null;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return null;
+        }
+        for (File f : children) {
+            if (f.isFile() && isMusicFile(f.getName())
+                    && stripExt(f.getName()).equalsIgnoreCase(stem)) {
+                return f;
+            }
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                File hit = findAudioByStem(f, stem, depth + 1);
+                if (hit != null) {
+                    return hit;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 音频落盘后，看看 Music/__lyrics__/ 里有没有同名歌词，有就配对合并。 */
+    private void matchPendingLyric(File audio) {
+        try {
+            File pendingDir = lyricsPendingDir();
+            if (!pendingDir.isDirectory() || audio == null) {
+                return;
+            }
+            String stem = stripExt(audio.getName());
+            File lrc = new File(pendingDir, stem + ".lrc");
+            if (!lrc.isFile()) {
+                return;
+            }
+            byte[] data = readFileBytes(lrc);
+            if (data == null || data.length == 0) {
+                return;
+            }
+            File sidecar = new File(audio.getParentFile(), stem + ".lrc");
+            writeBytes(sidecar, data);
+            AudioTagEmbedder.embedLyricsInto(audio, new String(data, "UTF-8"));
+            lrc.delete();
+            Log.i(TAG, "音频上传后自动配对歌词: " + audio.getAbsolutePath());
+        } catch (Exception e) {
+            Log.w(TAG, "自动配对歌词失败: " + e);
+        }
+    }
+
+    private static void writeBytes(File file, byte[] data) throws Exception {
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(data);
+            fos.flush();
+        }
+    }
+
+    private static byte[] readFileBytes(File file) {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[BUFFER_SIZE];
+            int n;
+            while ((n = fis.read(buf)) > 0) {
+                bos.write(buf, 0, n);
+            }
+            return bos.toByteArray();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ==================== 收件箱（已接收文件）接口 ====================
