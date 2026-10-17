@@ -41,11 +41,31 @@ public final class BackgroundUtil {
     public static final String MODE_CUSTOM = "custom";
     public static final String MODE_DEFAULT = "default";
     /**
+     * P9：流体背景 —— 不跟随封面的动态色团背景（{@link FluidBackgroundDrawable}）。
+     * 手表上不依赖任何图片素材，无封面 / 未播放时也能用。
+     */
+    public static final String MODE_FLUID = "fluid";
+    /**
      * 封面优先：有专辑封面时用封面，没有（无封面 / 封面获取失败）时回退到用户
      * 选定的图片（{@link #MODE_CUSTOM} 的同款自定义图）；两者皆无则用默认背景。
      * 用于「想让有封面的歌自动漂亮、没封面的歌也能有个背景」的场景。
      */
     public static final String MODE_COVER_OR_CUSTOM = "cover_or_custom";
+
+    // ==================== P9：模糊强度 ====================
+
+    /** 模糊档位：0=关闭（原样，只加深），1=弱，2=中（默认），3=强。 */
+    public static final int BLUR_OFF = 0;
+    public static final int BLUR_LOW = 1;
+    public static final int BLUR_MID = 2;
+    public static final int BLUR_HIGH = 3;
+    private static final int[] BLUR_STEPS = {BLUR_OFF, BLUR_LOW, BLUR_MID, BLUR_HIGH};
+    private static final String[] BLUR_LABELS = {"关闭", "弱", "中", "强"};
+    private static final String KEY_BLUR = "background_blur_level";
+    /** 默认档位：需求方口径「参考 Main1.png 做模糊背景」⇒ 默认就是模糊的（中）。 */
+    private static final int DEFAULT_BLUR = BLUR_MID;
+    /** 模糊前的降采样宽度：先缩到 64px 再模糊，等于「大半径 + 平滑」而且极省 CPU。 */
+    private static final int BLUR_SOURCE_WIDTH = 64;
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String KEY_MODE = "background_mode";
@@ -58,13 +78,25 @@ public final class BackgroundUtil {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     // Album-cover background, kept in memory only.
+    /** 封面背景的**显示位图**（已按当前模糊档位模糊 + 加深），直接拿去当背景 / 预览。 */
     private static Bitmap sCoverBg;
+    /** 封面背景的**原始位图**（未模糊、未加深）：改模糊档位时用它重算显示位图。 */
+    private static Bitmap sCoverRaw;
     private static String sCoverBgUrl;
     /**
      * 封面加载的请求序号。异步解码乱序返回时，用它判断「这次结果是不是已经过期」——
      * 见 {@link #loadCoverBackground}。
      */
     private static int sCoverRequestSeq;
+
+    /** P9：自定义图片背景的缓存（原图 + 显示图），避免每次 applyBackground 都解码 + 重模糊。 */
+    private static Bitmap sCustomRaw;
+    private static String sCustomRawKey;
+    private static Bitmap sCustomBg;
+    private static int sCustomBgBlur = -1;
+
+    /** P9：流体背景实例按 View 复用；这里只记最近一个，避免每次重设背景都重新起动画。 */
+    private static FluidBackgroundDrawable sFluidDrawable;
 
     private BackgroundUtil() {
     }
@@ -77,6 +109,178 @@ public final class BackgroundUtil {
     public static void setMode(Context context, String mode) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putString(KEY_MODE, mode).apply();
+    }
+
+    // ==================== P9：模糊强度 ====================
+
+    /** 当前模糊档位（{@link #BLUR_OFF} / {@link #BLUR_LOW} / {@link #BLUR_MID} / {@link #BLUR_HIGH}）。 */
+    public static int getBlurLevel(Context context) {
+        int level = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_BLUR, DEFAULT_BLUR);
+        if (level < BLUR_OFF || level > BLUR_HIGH) {
+            level = DEFAULT_BLUR;
+        }
+        return level;
+    }
+
+    /** 设置模糊档位；封面 / 自定义图已缓存时立即用新档位重算（回到主界面即生效）。 */
+    public static void setBlurLevel(Context context, int level) {
+        if (level < BLUR_OFF || level > BLUR_HIGH) {
+            level = DEFAULT_BLUR;
+        }
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putInt(KEY_BLUR, level).apply();
+        if (sCoverRaw != null && !sCoverRaw.isRecycled()) {
+            sCoverBg = renderBackground(sCoverRaw, getBlurLevel(context));
+            LyricsTint.refresh(sCoverBg);
+        }
+        // 自定义图片按需重算（下一次 applyBackground 时重新解码 + 模糊）
+        sCustomBg = null;
+        sCustomBgBlur = -1;
+    }
+
+    /** 循环切到下一档，返回切换后的档位。 */
+    public static int cycleBlurLevel(Context context) {
+        int current = getBlurLevel(context);
+        int next = BLUR_STEPS[0];
+        for (int i = 0; i < BLUR_STEPS.length; i++) {
+            if (BLUR_STEPS[i] == current) {
+                next = BLUR_STEPS[(i + 1) % BLUR_STEPS.length];
+                break;
+            }
+        }
+        setBlurLevel(context, next);
+        return next;
+    }
+
+    /** 档位文案（关闭 / 弱 / 中 / 强）。 */
+    public static String getBlurLabel(Context context) {
+        return getBlurLabel(getBlurLevel(context));
+    }
+
+    public static String getBlurLabel(int level) {
+        if (level < BLUR_OFF || level > BLUR_HIGH) {
+            level = DEFAULT_BLUR;
+        }
+        return BLUR_LABELS[level];
+    }
+
+    /** 模糊档位对应的色团半径（在降采样图上；1 档 ≈ 全屏 8px）。 */
+    private static int blurRadiusFor(int level) {
+        switch (level) {
+            case BLUR_LOW:
+                return 1;
+            case BLUR_HIGH:
+                return 4;
+            case BLUR_MID:
+                return 2;
+            default:
+                return 0;
+        }
+    }
+
+    /**
+     * 把原图渲染成「背景显示位图」：按当前模糊档位模糊 + 加深遮罩。
+     *
+     * <p>做法是「先降采样到 64px 宽 → 3 遍盒式模糊 → 加深」。降采样后再模糊等价于全屏大半径模糊，
+     * 但计算量只有原图的 1/30；放大由 {@link CenterCropDrawable} 的双线性过滤完成，
+     * 不会出现马赛克边。模糊强度只影响这一步，不改任何调用方。</p>
+     *
+     * @param raw 原始位图（**不会被 recycle**，改档位重算时还要用）
+     */
+    private static Bitmap renderBackground(Bitmap raw, int blurLevel) {
+        if (raw == null || raw.isRecycled()) {
+            return null;
+        }
+        int radius = blurRadiusFor(blurLevel);
+        int w = Math.max(48, raw.getWidth());
+        int h = Math.max(48, raw.getHeight());
+        int smallW = Math.max(24, Math.min(BLUR_SOURCE_WIDTH, w));
+        int smallH = Math.max(24, Math.round((float) h * smallW / w));
+        Bitmap small = Bitmap.createScaledBitmap(raw, smallW, smallH, true);
+        if (radius > 0) {
+            small = boxBlur(small, radius);
+        }
+        Bitmap out = Bitmap.createBitmap(small.getWidth(), small.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        canvas.drawBitmap(small, 0, 0, null);
+        Paint scrim = new Paint();
+        scrim.setColor(Color.argb(SCRIM_ALPHA, 0, 0, 0));
+        canvas.drawRect(0, 0, out.getWidth(), out.getHeight(), scrim);
+        if (small != raw) {
+            small.recycle();
+        }
+        return out;
+    }
+
+    /** 3 遍盒式模糊（每遍「水平 → 垂直」，交替写两块缓冲；对 64px 图是微秒级）。 */
+    private static Bitmap boxBlur(Bitmap src, int radius) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w <= 1 || h <= 1 || radius <= 0) {
+            return src;
+        }
+        int[] cur = new int[w * h];
+        int[] tmp = new int[w * h];
+        src.getPixels(cur, 0, w, 0, 0, w, h);
+        for (int pass = 0; pass < 3; pass++) {
+            blurHorizontal(cur, tmp, w, h, radius);   // cur -> tmp
+            blurVertical(tmp, cur, w, h, radius);     // tmp -> cur
+        }
+        Bitmap result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        result.setPixels(cur, 0, w, 0, 0, w, h);
+        return result;
+    }
+
+    private static void blurHorizontal(int[] in, int[] out, int w, int h, int radius) {
+        int div = radius * 2 + 1;
+        for (int y = 0; y < h; y++) {
+            int row = y * w;
+            int sa = 0, sr = 0, sg = 0, sb = 0;
+            for (int i = -radius; i <= radius; i++) {
+                int p = in[row + clamp(i, w)];
+                sa += (p >>> 24) & 0xFF;
+                sr += (p >> 16) & 0xFF;
+                sg += (p >> 8) & 0xFF;
+                sb += p & 0xFF;
+            }
+            for (int x = 0; x < w; x++) {
+                out[row + x] = ((sa / div) << 24) | ((sr / div) << 16) | ((sg / div) << 8) | (sb / div);
+                int pOut = in[row + clamp(x - radius, w)];
+                int pIn = in[row + clamp(x + radius + 1, w)];
+                sa += ((pIn >>> 24) & 0xFF) - ((pOut >>> 24) & 0xFF);
+                sr += ((pIn >> 16) & 0xFF) - ((pOut >> 16) & 0xFF);
+                sg += ((pIn >> 8) & 0xFF) - ((pOut >> 8) & 0xFF);
+                sb += (pIn & 0xFF) - (pOut & 0xFF);
+            }
+        }
+    }
+
+    private static void blurVertical(int[] in, int[] out, int w, int h, int radius) {
+        int div = radius * 2 + 1;
+        for (int x = 0; x < w; x++) {
+            int sa = 0, sr = 0, sg = 0, sb = 0;
+            for (int i = -radius; i <= radius; i++) {
+                int p = in[clamp(i, h) * w + x];
+                sa += (p >>> 24) & 0xFF;
+                sr += (p >> 16) & 0xFF;
+                sg += (p >> 8) & 0xFF;
+                sb += p & 0xFF;
+            }
+            for (int y = 0; y < h; y++) {
+                out[y * w + x] = ((sa / div) << 24) | ((sr / div) << 16) | ((sg / div) << 8) | (sb / div);
+                int pOut = in[clamp(y - radius, h) * w + x];
+                int pIn = in[clamp(y + radius + 1, h) * w + x];
+                sa += ((pIn >>> 24) & 0xFF) - ((pOut >>> 24) & 0xFF);
+                sr += ((pIn >> 16) & 0xFF) - ((pOut >> 16) & 0xFF);
+                sg += ((pIn >> 8) & 0xFF) - ((pOut >> 8) & 0xFF);
+                sb += (pIn & 0xFF) - (pOut & 0xFF);
+            }
+        }
+    }
+
+    private static int clamp(int v, int n) {
+        return v < 0 ? 0 : (v >= n ? n - 1 : v);
     }
 
     /**
@@ -134,6 +338,7 @@ public final class BackgroundUtil {
     public static void clearCoverBackground() {
         sCoverRequestSeq++;
         sCoverBg = null;
+        sCoverRaw = null;
         sCoverBgUrl = null;
     }
 
@@ -166,17 +371,21 @@ public final class BackgroundUtil {
         final int requestSeq = ++sCoverRequestSeq;
         new Thread(() -> {
             Bitmap raw = downloadBitmap(appContext, targetUrl);
-            final Bitmap dimmed = raw != null ? dimBitmap(raw, appContext) : null;
+            // P9：在后台线程按当前模糊档位渲染显示位图（原图保留给「换档位重算」用）
+            final Bitmap rendered = raw != null
+                    ? renderBackground(raw, getBlurLevel(appContext)) : null;
             MAIN.post(() -> {
                 if (requestSeq != sCoverRequestSeq) {
                     // 已被更新的请求（或一次 clear）作废，丢弃结果
                     return;
                 }
-                if (dimmed != null) {
-                    sCoverBg = dimmed;
+                if (rendered != null) {
+                    sCoverRaw = raw;
+                    sCoverBg = rendered;
                     sCoverBgUrl = targetUrl;
                 } else {
                     // 直接置空，不要调 clearCoverBackground() —— 那会把序号再推进一格
+                    sCoverRaw = null;
                     sCoverBg = null;
                     sCoverBgUrl = null;
                 }
@@ -284,23 +493,20 @@ public final class BackgroundUtil {
         return out.toByteArray();
     }
 
-    private static Bitmap dimBitmap(Bitmap src, Context context) {
-        if (src == null) return null;
-        Bitmap dimmed = Bitmap.createBitmap(src.getWidth(), src.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(dimmed);
-        canvas.drawBitmap(src, 0, 0, null);
-        Paint scrim = new Paint();
-        scrim.setColor(Color.argb(SCRIM_ALPHA, 0, 0, 0));
-        canvas.drawRect(0, 0, dimmed.getWidth(), dimmed.getHeight(), scrim);
-        src.recycle();
-        return dimmed;
-    }
-
     // ==================== Apply ====================
 
     public static void applyBackground(Context context, View root) {
         if (root == null) return;
         String mode = getMode(context);
+        if (MODE_FLUID.equals(mode)) {
+            // P9：流体背景 —— 动态色团，不需要任何图片；歌词用默认白色（深底）。
+            if (!(root.getBackground() instanceof FluidBackgroundDrawable)) {
+                sFluidDrawable = new FluidBackgroundDrawable();
+                root.setBackground(sFluidDrawable);
+            }
+            LyricsTint.useDefault();
+            return;
+        }
         if (MODE_DEFAULT.equals(mode)) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
             LyricsTint.useDefault();
@@ -313,7 +519,6 @@ public final class BackgroundUtil {
             } else {
                 root.setBackgroundColor(DEFAULT_BG_COLOR);
                 LyricsTint.useDefault();
-            LyricsTint.useDefault();
             }
             return;
         }
@@ -334,6 +539,9 @@ public final class BackgroundUtil {
     /**
      * 解码用户选定的自定义图并铺满显示；无自定义图 / 解码失败时用默认深色。
      * 被 {@link #MODE_CUSTOM} 与 {@link #MODE_COVER_OR_CUSTOM}（封面缺失时）共用。
+     *
+     * <p>P9：加了「原图 / 显示图」两级缓存 —— 以前每次 applyBackground 都重新解码 + 加深，
+     * 改成模糊之后这一步更重，而 applyBackground 会随换歌 / 回前台频繁调用。</p>
      */
     private static void applyCustomOrDefault(Context context, View root) {
         if (!hasCustomBackground(context)) {
@@ -342,23 +550,34 @@ public final class BackgroundUtil {
             return;
         }
         try {
+            File file = getBackgroundFile(context);
+            String key = file.getAbsolutePath() + ":" + file.length() + ":" + file.lastModified();
+            int blur = getBlurLevel(context);
+            if (sCustomBg != null && key.equals(sCustomRawKey) && blur == sCustomBgBlur) {
+                root.setBackground(new CenterCropDrawable(sCustomBg));
+                LyricsTint.refresh(sCustomBg);
+                return;
+            }
             int reqW = context.getResources().getDisplayMetrics().widthPixels;
             int reqH = context.getResources().getDisplayMetrics().heightPixels;
             BitmapFactory.Options opts = new BitmapFactory.Options();
             opts.inJustDecodeBounds = true;
-            BitmapFactory.decodeFile(getBackgroundFile(context).getAbsolutePath(), opts);
+            BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
             opts.inSampleSize = calculateSampleSize(opts, reqW, reqH);
             opts.inJustDecodeBounds = false;
-            Bitmap src = BitmapFactory.decodeFile(getBackgroundFile(context).getAbsolutePath(), opts);
+            Bitmap src = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
             if (src == null) {
                 root.setBackgroundColor(DEFAULT_BG_COLOR);
                 LyricsTint.useDefault();
-            LyricsTint.useDefault();
                 return;
             }
-            Bitmap dimmed = dimBitmap(src, context);
-            LyricsTint.refresh(dimmed);   // F2：自定义背景（已加深）⇒ 按主色决定歌词颜色
-            root.setBackground(new CenterCropDrawable(dimmed));
+            Bitmap rendered = renderBackground(src, blur);
+            sCustomRaw = src;
+            sCustomRawKey = key;
+            sCustomBg = rendered;
+            sCustomBgBlur = blur;
+            LyricsTint.refresh(rendered);   // F2：自定义背景（已模糊 + 加深）⇒ 按主色决定歌词颜色
+            root.setBackground(new CenterCropDrawable(rendered));
         } catch (Exception ignored) {
             root.setBackgroundColor(DEFAULT_BG_COLOR);
             LyricsTint.useDefault();

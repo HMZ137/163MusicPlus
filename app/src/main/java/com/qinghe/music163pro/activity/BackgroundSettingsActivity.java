@@ -29,6 +29,10 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
     private static final int REQ_PICK_IMAGE = 3001;
 
     private ImageView ivPreview;
+    /** P9：预览下方的状态行（当前模式 · 模糊档位）。 */
+    private TextView tvStatus;
+    /** P9：「模糊强度」按钮，文案里带当前档位。 */
+    private TextView btnBlur;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,8 +60,17 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         ivPreview.setLayoutParams(previewParams);
         root.addView(ivPreview);
 
+        // P9：状态行 —— 一眼看出当前是哪种背景、模糊几档
+        tvStatus = new TextView(this);
+        tvStatus.setTextColor(0xFFBB86FC);
+        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
+        tvStatus.setGravity(Gravity.CENTER);
+        tvStatus.setPadding(px(10), 0, px(10), px(6));
+        root.addView(tvStatus);
+
         TextView hint = new TextView(this);
-        hint.setText("背景模式：跟随专辑封面 / 封面优先（有封面用封面，无封面用下方选定图片）/ 使用选定图片 / 默认背景。选「封面优先」前请先「选择图片」作为无封面的回退。");
+        hint.setText("背景：跟随专辑封面 / 封面优先（无封面用选定图片）/ 选定图片 / 流体背景 / 默认。"
+                + "封面与图片背景按「模糊强度」自动模糊 + 加深；流体背景是动态色团，不跟封面。");
         hint.setTextColor(0x80FFFFFF);
         hint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         hint.setGravity(Gravity.CENTER);
@@ -65,8 +78,11 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         root.addView(hint);
 
         root.addView(buildButton("选择图片", v -> pickImage()));
-        root.addView(buildButton("使用专辑封面", v -> useAlbumCover()));
+        root.addView(buildButton("使用专辑封面（模糊）", v -> useAlbumCover()));
         root.addView(buildButton("封面优先（无封面用图片）", v -> useCoverOrCustom()));
+        root.addView(buildButton("流体背景", v -> useFluidBackground()));
+        btnBlur = buildButton("模糊强度", v -> cycleBlurStrength());
+        root.addView(btnBlur);
         root.addView(buildButton("恢复默认背景", v -> resetBackground()));
 
         refreshPreview();
@@ -82,7 +98,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         return title;
     }
 
-    private View buildButton(String label, View.OnClickListener listener) {
+    private TextView buildButton(String label, View.OnClickListener listener) {
         TextView btn = new TextView(this);
         btn.setText(label);
         btn.setTextColor(0xFFBB86FC);
@@ -193,6 +209,22 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         }
     }
 
+    // ==================== P9：流体背景 / 模糊强度 ====================
+
+    /** 切到「流体背景」：动态色团，不需要图片，也不跟封面走。 */
+    private void useFluidBackground() {
+        BackgroundUtil.setMode(this, BackgroundUtil.MODE_FLUID);
+        refreshPreview();
+        Toast.makeText(this, "已切换到流体背景", Toast.LENGTH_SHORT).show();
+    }
+
+    /** 循环切换模糊档位（关闭 → 弱 → 中 → 强 → 关闭），封面 / 图片背景立即按新档位重算。 */
+    private void cycleBlurStrength() {
+        int next = BackgroundUtil.cycleBlurLevel(this);
+        refreshPreview();
+        Toast.makeText(this, "模糊强度：" + BackgroundUtil.getBlurLabel(next), Toast.LENGTH_SHORT).show();
+    }
+
     private void resetBackground() {
         BackgroundUtil.setMode(this, BackgroundUtil.MODE_DEFAULT);
         BackgroundUtil.clearBackground(this);
@@ -203,6 +235,16 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
 
     private void refreshPreview() {
         String mode = BackgroundUtil.getMode(this);
+        updateStatus(mode);
+        if (BackgroundUtil.MODE_FLUID.equals(mode)) {
+            // P9：流体背景的预览直接用一个动态色团 Drawable（和主界面同一套实现）
+            ivPreview.setImageDrawable(null);
+            if (!(ivPreview.getBackground() instanceof com.qinghe.music163pro.util.FluidBackgroundDrawable)) {
+                ivPreview.setBackground(new com.qinghe.music163pro.util.FluidBackgroundDrawable());
+            }
+            return;
+        }
+        ivPreview.setBackgroundColor(0xFF1E1E1E);
         if (BackgroundUtil.MODE_COVER.equals(mode)
                 || BackgroundUtil.MODE_COVER_OR_CUSTOM.equals(mode)) {
             Bitmap cover = BackgroundUtil.getCoverBackground();
@@ -224,6 +266,32 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         }
         ivPreview.setImageDrawable(null);
         ivPreview.setBackgroundColor(0xFF1E1E1E);
+    }
+
+    /** P9：状态行 + 「模糊强度」按钮文案（按当前模式显示，一眼可见）。 */
+    private void updateStatus(String mode) {
+        if (tvStatus != null) {
+            String modeLabel;
+            if (BackgroundUtil.MODE_COVER.equals(mode)) {
+                modeLabel = "跟随专辑封面";
+            } else if (BackgroundUtil.MODE_COVER_OR_CUSTOM.equals(mode)) {
+                modeLabel = "封面优先";
+            } else if (BackgroundUtil.MODE_CUSTOM.equals(mode)) {
+                modeLabel = "选定图片";
+            } else if (BackgroundUtil.MODE_FLUID.equals(mode)) {
+                modeLabel = "流体背景";
+            } else {
+                modeLabel = "默认背景";
+            }
+            if (BackgroundUtil.MODE_FLUID.equals(mode) || BackgroundUtil.MODE_DEFAULT.equals(mode)) {
+                tvStatus.setText("当前：" + modeLabel);
+            } else {
+                tvStatus.setText("当前：" + modeLabel + " · 模糊：" + BackgroundUtil.getBlurLabel(this));
+            }
+        }
+        if (btnBlur != null) {
+            btnBlur.setText("模糊强度：" + BackgroundUtil.getBlurLabel(this));
+        }
     }
 
     /**
