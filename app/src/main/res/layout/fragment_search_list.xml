@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S1：搜索页三个结果标签（单曲 / 歌单 / MV）共用这一个列表布局。
+  三个 Fragment 各自持有自己的 ListView 实例与适配器，只是视图结构相同，
+  所以不复制三份 XML；列表 id 统一为 lv_search_list。
+-->
+<ListView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lv_search_list"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_marginTop="4dp"
+    android:divider="@color/divider"
+    android:dividerHeight="0.5dp" />

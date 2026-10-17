@@ -1,24 +1,25 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.AbsListView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
-import com.qinghe.music163pro.model.MvInfo;
-import com.qinghe.music163pro.model.PlaylistInfo;
-import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.fragment.SearchListFragment;
+import com.qinghe.music163pro.fragment.SearchMvsFragment;
+import com.qinghe.music163pro.fragment.SearchPlaylistsFragment;
+import com.qinghe.music163pro.fragment.SearchSongsFragment;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
@@ -27,41 +28,36 @@ import org.json.JSONArray;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
- * Search activity - search songs, playlists and MVs.
+ * 搜索页（S1：三个结果标签改用 ViewPager2 + Fragment）。
+ *
+ * <p>本类只保留「搜索框 / 搜索历史 / 三个标签头的选中态与翻页」，三个结果列表分别由
+ * {@link SearchSongsFragment} / {@link SearchPlaylistsFragment} / {@link SearchMvsFragment} 承载，
+ * 它们共用一个分页与滚动加载的基类 {@link SearchListFragment}。</p>
+ *
+ * <p><b>搜索历史</b>不属于标签页（文档 S1 的口径），仍留在本页：未搜索时显示历史列表，
+ * 搜索后隐藏；表单与历史键 {@code search_history} 的持久化行为与改造前完全一致。</p>
  */
-public class SearchActivity extends BaseWatchActivity {
+public class SearchActivity extends BaseWatchActivity implements SearchListFragment.Host {
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String KEY_SEARCH_HISTORY = "search_history";
     private static final int MAX_HISTORY = 20;
-    private static final int PAGE_SIZE = 20;
 
     private static final int TAB_SONGS = 0;
     private static final int TAB_PLAYLISTS = 1;
     private static final int TAB_MVS = 2;
 
     private EditText etSearch;
-    private ListView lvSongs;
-    private ListView lvPlaylists;
-    private ListView lvMvs;
     private ListView lvHistory;
     private LinearLayout llSearchTabs;
     private TextView tabSongs;
     private TextView tabPlaylists;
     private TextView tabMvs;
-    private ArrayAdapter<Song> songAdapter;
-    private ArrayAdapter<PlaylistInfo> playlistAdapter;
-    private ArrayAdapter<MvInfo> mvAdapter;
+    private ViewPager2 vpSearchTabs;
     private ArrayAdapter<String> historyAdapter;
 
-    private android.widget.AdapterView.OnItemClickListener historyClickListener;
-    private android.widget.AdapterView.OnItemLongClickListener historyLongClickListener;
-    private final List<Song> songList = new ArrayList<>();
-    private final List<PlaylistInfo> playlistList = new ArrayList<>();
-    private final List<MvInfo> mvList = new ArrayList<>();
     private final List<String> historyList = new ArrayList<>();
     private MusicPlayerManager playerManager;
     private SharedPreferences prefs;
@@ -69,15 +65,6 @@ public class SearchActivity extends BaseWatchActivity {
     private String currentKeyword = "";
     /** 官方默认搜索词（/search/default），用于输入框提示与空输入兜底。 */
     private String defaultKeyword = "";
-    private int currentSongOffset = 0;
-    private int currentPlaylistOffset = 0;
-    private int currentMvOffset = 0;
-    private boolean isLoadingMoreSongs = false;
-    private boolean isLoadingMorePlaylists = false;
-    private boolean isLoadingMoreMvs = false;
-    private boolean hasMoreSongs = true;
-    private boolean hasMorePlaylists = true;
-    private boolean hasMoreMvs = true;
     private int currentTab = TAB_SONGS;
 
     @Override
@@ -98,14 +85,12 @@ public class SearchActivity extends BaseWatchActivity {
         }
 
         etSearch = findViewById(R.id.et_search);
-        lvSongs = findViewById(R.id.lv_songs);
-        lvPlaylists = findViewById(R.id.lv_playlists);
-        lvMvs = findViewById(R.id.lv_mvs);
         lvHistory = findViewById(R.id.lv_history);
         llSearchTabs = findViewById(R.id.ll_search_tabs);
         tabSongs = findViewById(R.id.tab_songs);
         tabPlaylists = findViewById(R.id.tab_playlists);
         tabMvs = findViewById(R.id.tab_mvs);
+        vpSearchTabs = findViewById(R.id.vp_search_tabs);
         TextView btnSearch = findViewById(R.id.btn_search);
         // 归零 MaterialButton 默认上下 inset，让按钮底衬铺满 30dp，与输入框等高
         if (btnSearch instanceof com.google.android.material.button.MaterialButton) {
@@ -118,16 +103,53 @@ public class SearchActivity extends BaseWatchActivity {
         playerManager = MusicPlayerManager.getInstance();
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        initAdapters();
+        // S1：结果区改成 ViewPager2，三个标签各一个 Fragment
+        vpSearchTabs.setAdapter(new SearchTabsAdapter(this));
+        vpSearchTabs.setOffscreenPageLimit(1);
+        vpSearchTabs.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                currentTab = position;
+                updateTabAppearance();
+            }
+        });
+
         initListeners(btnSearch);
         loadSearchHistory();
 
-        historyAdapter = new ArrayAdapter<>(this, R.layout.item_history, R.id.tv_history_text, historyList);
+        historyAdapter = new ArrayAdapter<>(this, R.layout.item_history,
+                R.id.tv_history_text, historyList);
         lvHistory.setAdapter(historyAdapter);
         updateHistoryVisibility();
         updateTabAppearance();
 
         loadDefaultKeyword();
+    }
+
+    /** S1：ViewPager2 的页面适配器（第 0/1/2 页 = 单曲 / 歌单 / MV）。 */
+    private final class SearchTabsAdapter extends FragmentStateAdapter {
+        SearchTabsAdapter(@NonNull androidx.fragment.app.FragmentActivity activity) {
+            super(activity);
+        }
+
+        @NonNull
+        @Override
+        public Fragment createFragment(int position) {
+            switch (position) {
+                case TAB_PLAYLISTS:
+                    return new SearchPlaylistsFragment();
+                case TAB_MVS:
+                    return new SearchMvsFragment();
+                case TAB_SONGS:
+                default:
+                    return new SearchSongsFragment();
+            }
+        }
+
+        @Override
+        public int getItemCount() {
+            return 3;
+        }
     }
 
     /**
@@ -164,92 +186,15 @@ public class SearchActivity extends BaseWatchActivity {
                 });
     }
 
-    private void initAdapters() {
-        songAdapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, songList) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                Song song = getItem(position);
-                if (song != null) {
-                    TextView tvName = view.findViewById(R.id.tv_item_name);
-                    TextView tvArtist = view.findViewById(R.id.tv_item_artist);
-                    ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getDisplayName());
-                    tvArtist.setText(song.getArtist());
-                    if (ivCover != null) {
-                        NetworkImageLoader.load(ivCover, song.getCoverUrl());
-                    }
-                }
-                return view;
-            }
-        };
-        lvSongs.setAdapter(songAdapter);
-
-        playlistAdapter = new ArrayAdapter<PlaylistInfo>(this, R.layout.item_playlist, R.id.tv_playlist_name, playlistList) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                PlaylistInfo playlistInfo = getItem(position);
-                if (playlistInfo != null) {
-                    TextView tvName = view.findViewById(R.id.tv_playlist_name);
-                    TextView tvInfo = view.findViewById(R.id.tv_playlist_info);
-                    ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(playlistInfo.getName());
-                    String info = playlistInfo.getTrackCount() + "首";
-                    if (playlistInfo.getCreator() != null && !playlistInfo.getCreator().isEmpty()) {
-                        info += " · " + playlistInfo.getCreator();
-                    }
-                    tvInfo.setText(info);
-                    if (ivCover != null) {
-                        NetworkImageLoader.load(ivCover, playlistInfo.getCoverUrl());
-                    }
-                }
-                return view;
-            }
-        };
-        lvPlaylists.setAdapter(playlistAdapter);
-
-        mvAdapter = new ArrayAdapter<MvInfo>(this, R.layout.item_mv, R.id.tv_mv_name, mvList) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                MvInfo mvInfo = getItem(position);
-                if (mvInfo != null) {
-                    TextView tvName = view.findViewById(R.id.tv_mv_name);
-                    TextView tvInfo = view.findViewById(R.id.tv_mv_info);
-                    ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(mvInfo.getName());
-                    StringBuilder info = new StringBuilder();
-                    if (mvInfo.getArtist() != null && !mvInfo.getArtist().isEmpty()) {
-                        info.append(mvInfo.getArtist());
-                    }
-                    if (mvInfo.getDurationMs() > 0) {
-                        if (info.length() > 0) {
-                            info.append(" · ");
-                        }
-                        info.append(formatDuration(mvInfo.getDurationMs()));
-                    }
-                    tvInfo.setText(info.length() > 0 ? info.toString() : getString(R.string.tap_to_view_detail));
-                    if (ivCover != null) {
-                        NetworkImageLoader.load(ivCover, mvInfo.getCoverUrl());
-                    }
-                }
-                return view;
-            }
-        };
-        lvMvs.setAdapter(mvAdapter);
-    }
-
     private void initListeners(TextView btnSearch) {
-        historyClickListener = (parent, view, position, id) -> {
+        lvHistory.setOnItemClickListener((parent, view, position, id) -> {
             String keyword = historyList.get(position);
             etSearch.setText(keyword);
             etSearch.setSelection(keyword.length());
             doSearch();
-        };
-        lvHistory.setOnItemClickListener(historyClickListener);
+        });
 
-        historyLongClickListener = (parent, view, position, id) -> {
+        lvHistory.setOnItemLongClickListener((parent, view, position, id) -> {
             String keyword = historyList.get(position);
             showConfirmDialog("确认删除", "确定删除搜索记录「" + keyword + "」？", () -> {
                 historyList.remove(position);
@@ -258,115 +203,18 @@ public class SearchActivity extends BaseWatchActivity {
                 updateHistoryVisibility();
             });
             return true;
-        };
-        lvHistory.setOnItemLongClickListener(historyLongClickListener);
+        });
 
         btnSearch.setOnClickListener(v -> doSearch());
-        tabSongs.setOnClickListener(v -> switchTab(TAB_SONGS));
-        tabPlaylists.setOnClickListener(v -> switchTab(TAB_PLAYLISTS));
-        tabMvs.setOnClickListener(v -> switchTab(TAB_MVS));
-
-        lvSongs.setOnItemClickListener((parent, view, position, id) -> {
-            Song song = songList.get(position);
-            List<Song> playlist = new ArrayList<>(songList);
-            playerManager.setPlaylist(playlist, position);
-            playerManager.playCurrent();
-            Intent intent = new Intent(this, MainActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            startActivity(intent);
-            finish();
-        });
-
-        lvPlaylists.setOnItemClickListener((parent, view, position, id) -> {
-            PlaylistInfo playlistInfo = playlistList.get(position);
-            Intent intent = new Intent(this, PlaylistDetailActivity.class);
-            intent.putExtra("playlist_id", playlistInfo.getId());
-            intent.putExtra("playlist_name", playlistInfo.getName());
-            intent.putExtra("track_count", playlistInfo.getTrackCount());
-            intent.putExtra("creator", playlistInfo.getCreator());
-            intent.putExtra("creator_user_id", playlistInfo.getUserId());
-            intent.putExtra("is_liked_playlist", playlistInfo.isLikedPlaylist());
-            startActivity(intent);
-        });
-
-        lvMvs.setOnItemClickListener((parent, view, position, id) -> {
-            MvInfo mvInfo = mvList.get(position);
-            Intent intent = new Intent(this, MvDetailActivity.class);
-            intent.putExtra("mv_id", mvInfo.getId());
-            intent.putExtra("mv_name", mvInfo.getName());
-            intent.putExtra("cookie", playerManager.getCookie());
-            startActivity(intent);
-        });
-
-        lvSongs.setOnScrollListener(buildScrollListener(() -> {
-            if (currentTab == TAB_SONGS && !isLoadingMoreSongs && hasMoreSongs) {
-                loadMoreSongs();
-            }
-        }, songAdapter, position -> position >= 0 && position < songList.size()
-                ? songList.get(position).getCoverUrl() : null));
-
-        lvPlaylists.setOnScrollListener(buildScrollListener(() -> {
-            if (currentTab == TAB_PLAYLISTS && !isLoadingMorePlaylists && hasMorePlaylists) {
-                loadMorePlaylists();
-            }
-        }, playlistAdapter, position -> position >= 0 && position < playlistList.size()
-                ? playlistList.get(position).getCoverUrl() : null));
-
-        lvMvs.setOnScrollListener(buildScrollListener(() -> {
-            if (currentTab == TAB_MVS && !isLoadingMoreMvs && hasMoreMvs) {
-                loadMoreMvs();
-            }
-        }, mvAdapter, position -> position >= 0 && position < mvList.size()
-                ? mvList.get(position).getCoverUrl() : null));
-    }
-
-    private AbsListView.OnScrollListener buildScrollListener(Runnable loadMoreAction,
-                                                             android.widget.BaseAdapter adapter,
-                                                             NetworkImageLoader.CoverUrlProvider provider) {
-        return new AbsListView.OnScrollListener() {
-            @Override
-            public void onScrollStateChanged(AbsListView view, int scrollState) {
-                NetworkImageLoader.onListScrollStateChanged(view, adapter, scrollState, provider);
-            }
-
-            @Override
-            public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
-                if (totalItemCount > 0 && firstVisibleItem + visibleItemCount >= totalItemCount) {
-                    loadMoreAction.run();
-                }
-                NetworkImageLoader.onListScrolled(firstVisibleItem, visibleItemCount,
-                        totalItemCount, provider);
-            }
-        };
-    }
-
-    private void switchTab(int targetTab) {
-        currentTab = targetTab;
-        updateTabAppearance();
-        showCurrentResultList();
-        if (currentKeyword.isEmpty()) {
-            updateHistoryVisibility();
-            return;
-        }
-        if (currentTab == TAB_SONGS && songList.isEmpty()) {
-            doSearchSongs();
-        } else if (currentTab == TAB_PLAYLISTS && playlistList.isEmpty()) {
-            doSearchPlaylists();
-        } else if (currentTab == TAB_MVS && mvList.isEmpty()) {
-            doSearchMvs();
-        }
+        tabSongs.setOnClickListener(v -> vpSearchTabs.setCurrentItem(TAB_SONGS, true));
+        tabPlaylists.setOnClickListener(v -> vpSearchTabs.setCurrentItem(TAB_PLAYLISTS, true));
+        tabMvs.setOnClickListener(v -> vpSearchTabs.setCurrentItem(TAB_MVS, true));
     }
 
     private void updateTabAppearance() {
         tabSongs.setTextColor(currentTab == TAB_SONGS ? 0xFFBB86FC : 0xB3FFFFFF);
         tabPlaylists.setTextColor(currentTab == TAB_PLAYLISTS ? 0xFFBB86FC : 0xB3FFFFFF);
         tabMvs.setTextColor(currentTab == TAB_MVS ? 0xFFBB86FC : 0xB3FFFFFF);
-    }
-
-    private void showCurrentResultList() {
-        lvSongs.setVisibility(currentTab == TAB_SONGS && !songList.isEmpty() ? View.VISIBLE : View.GONE);
-        lvPlaylists.setVisibility(currentTab == TAB_PLAYLISTS && !playlistList.isEmpty() ? View.VISIBLE : View.GONE);
-        lvMvs.setVisibility(currentTab == TAB_MVS && !mvList.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     private void doSearch() {
@@ -386,188 +234,21 @@ public class SearchActivity extends BaseWatchActivity {
         addToSearchHistory(keyword);
 
         llSearchTabs.setVisibility(View.VISIBLE);
+        vpSearchTabs.setVisibility(View.VISIBLE);
         lvHistory.setVisibility(View.GONE);
+        vpSearchTabs.setCurrentItem(currentTab, false);
+        // 已创建的页各自重搜；之后才创建的页会在 onViewCreated 里用当前关键词补搜
+        searchCreatedFragments(keyword);
+    }
 
-        songList.clear();
-        playlistList.clear();
-        mvList.clear();
-        songAdapter.notifyDataSetChanged();
-        playlistAdapter.notifyDataSetChanged();
-        mvAdapter.notifyDataSetChanged();
-        showCurrentResultList();
-
-        currentSongOffset = 0;
-        currentPlaylistOffset = 0;
-        currentMvOffset = 0;
-        hasMoreSongs = true;
-        hasMorePlaylists = true;
-        hasMoreMvs = true;
-
-        if (currentTab == TAB_SONGS) {
-            doSearchSongs();
-        } else if (currentTab == TAB_PLAYLISTS) {
-            doSearchPlaylists();
-        } else {
-            doSearchMvs();
+    /** 把新关键词分发给当前已经创建的结果页（后面才创建的页由 Fragment 自己补）。 */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void searchCreatedFragments(String keyword) {
+        for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+            if (fragment instanceof SearchListFragment && fragment.isAdded()) {
+                ((SearchListFragment) fragment).search(keyword);
+            }
         }
-    }
-
-    private void doSearchSongs() {
-        currentSongOffset = 0;
-        hasMoreSongs = true;
-        MusicApiHelper.searchSongs(currentKeyword, 0, playerManager.getCookie(), new MusicApiHelper.SearchCallback() {
-            @Override
-            public void onResult(List<Song> songs) {
-                songList.clear();
-                songList.addAll(songs);
-                songAdapter.notifyDataSetChanged();
-                currentSongOffset = songs.size();
-                hasMoreSongs = songs.size() >= PAGE_SIZE;
-                showCurrentResultList();
-                if (songs.isEmpty()) {
-                    Toast.makeText(SearchActivity.this, R.string.no_song, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onError(String message) {
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void doSearchPlaylists() {
-        currentPlaylistOffset = 0;
-        hasMorePlaylists = true;
-        MusicApiHelper.searchPlaylists(currentKeyword, 0, playerManager.getCookie(), new MusicApiHelper.SearchPlaylistCallback() {
-            @Override
-            public void onResult(List<PlaylistInfo> playlists) {
-                playlistList.clear();
-                playlistList.addAll(playlists);
-                playlistAdapter.notifyDataSetChanged();
-                currentPlaylistOffset = playlists.size();
-                hasMorePlaylists = playlists.size() >= PAGE_SIZE;
-                showCurrentResultList();
-                if (playlists.isEmpty()) {
-                    Toast.makeText(SearchActivity.this, "暂无歌单", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onError(String message) {
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void doSearchMvs() {
-        currentMvOffset = 0;
-        hasMoreMvs = true;
-        MusicApiHelper.searchMvs(currentKeyword, 0, playerManager.getCookie(), new MusicApiHelper.SearchMvCallback() {
-            @Override
-            public void onResult(List<MvInfo> mvs) {
-                mvList.clear();
-                mvList.addAll(mvs);
-                mvAdapter.notifyDataSetChanged();
-                currentMvOffset = mvs.size();
-                hasMoreMvs = mvs.size() >= PAGE_SIZE;
-                showCurrentResultList();
-                if (mvs.isEmpty()) {
-                    Toast.makeText(SearchActivity.this, R.string.no_mv, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onError(String message) {
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void loadMoreSongs() {
-        if (currentKeyword.isEmpty() || isLoadingMoreSongs || !hasMoreSongs) {
-            return;
-        }
-        isLoadingMoreSongs = true;
-        MusicApiHelper.searchSongs(currentKeyword, currentSongOffset, playerManager.getCookie(), new MusicApiHelper.SearchCallback() {
-            @Override
-            public void onResult(List<Song> songs) {
-                isLoadingMoreSongs = false;
-                if (songs.isEmpty()) {
-                    hasMoreSongs = false;
-                    return;
-                }
-                songList.addAll(songs);
-                songAdapter.notifyDataSetChanged();
-                currentSongOffset += songs.size();
-                hasMoreSongs = songs.size() >= PAGE_SIZE;
-            }
-
-            @Override
-            public void onError(String message) {
-                isLoadingMoreSongs = false;
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void loadMorePlaylists() {
-        if (currentKeyword.isEmpty() || isLoadingMorePlaylists || !hasMorePlaylists) {
-            return;
-        }
-        isLoadingMorePlaylists = true;
-        MusicApiHelper.searchPlaylists(currentKeyword, currentPlaylistOffset, playerManager.getCookie(), new MusicApiHelper.SearchPlaylistCallback() {
-            @Override
-            public void onResult(List<PlaylistInfo> playlists) {
-                isLoadingMorePlaylists = false;
-                if (playlists.isEmpty()) {
-                    hasMorePlaylists = false;
-                    return;
-                }
-                playlistList.addAll(playlists);
-                playlistAdapter.notifyDataSetChanged();
-                currentPlaylistOffset += playlists.size();
-                hasMorePlaylists = playlists.size() >= PAGE_SIZE;
-            }
-
-            @Override
-            public void onError(String message) {
-                isLoadingMorePlaylists = false;
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void loadMoreMvs() {
-        if (currentKeyword.isEmpty() || isLoadingMoreMvs || !hasMoreMvs) {
-            return;
-        }
-        isLoadingMoreMvs = true;
-        MusicApiHelper.searchMvs(currentKeyword, currentMvOffset, playerManager.getCookie(), new MusicApiHelper.SearchMvCallback() {
-            @Override
-            public void onResult(List<MvInfo> mvs) {
-                isLoadingMoreMvs = false;
-                if (mvs.isEmpty()) {
-                    hasMoreMvs = false;
-                    return;
-                }
-                mvList.addAll(mvs);
-                mvAdapter.notifyDataSetChanged();
-                currentMvOffset += mvs.size();
-                hasMoreMvs = mvs.size() >= PAGE_SIZE;
-            }
-
-            @Override
-            public void onError(String message) {
-                isLoadingMoreMvs = false;
-                Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private String formatDuration(long durationMs) {
-        long totalSeconds = durationMs / 1000;
-        return String.format(Locale.getDefault(), "%d:%02d", totalSeconds / 60, totalSeconds % 60);
     }
 
     private void loadSearchHistory() {
@@ -602,17 +283,24 @@ public class SearchActivity extends BaseWatchActivity {
         }
     }
 
+    /** 未搜索时显示历史；搜索后隐藏（历史不属于结果标签页）。 */
     private void updateHistoryVisibility() {
-        boolean noSearchResults = songList.isEmpty() && playlistList.isEmpty() && mvList.isEmpty();
-        if (noSearchResults && !historyList.isEmpty() && currentKeyword.isEmpty()) {
-            lvHistory.setVisibility(View.VISIBLE);
-            lvSongs.setVisibility(View.GONE);
-            lvPlaylists.setVisibility(View.GONE);
-            lvMvs.setVisibility(View.GONE);
+        boolean showHistory = currentKeyword.isEmpty() && !historyList.isEmpty();
+        lvHistory.setVisibility(showHistory ? View.VISIBLE : View.GONE);
+        if (showHistory) {
             llSearchTabs.setVisibility(View.GONE);
-        } else {
-            lvHistory.setVisibility(View.GONE);
+            vpSearchTabs.setVisibility(View.GONE);
         }
+    }
+
+    @Override
+    public String getSearchKeyword() {
+        return currentKeyword;
+    }
+
+    @Override
+    public String getCookie() {
+        return playerManager.getCookie();
     }
 
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {

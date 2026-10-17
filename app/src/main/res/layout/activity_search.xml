@@ -55,7 +55,7 @@
             style="@style/Widget.App.Button" />
     </LinearLayout>
 
-    <!-- Search type tabs: 单曲 / 歌单 / MV -->
+    <!-- S1：搜索类型标签（单曲 / 歌单 / MV）。点击切 ViewPager2 的页；左右滑也会回写选中态。 -->
     <LinearLayout
         android:id="@+id/ll_search_tabs"
         android:layout_width="match_parent"
@@ -104,36 +104,12 @@
             android:focusable="true" />
     </LinearLayout>
 
-    <!-- Song list -->
-    <ListView
-        android:id="@+id/lv_songs"
+    <!-- S1：三个结果标签的容器（每页一个 SearchListFragment 子类） -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vp_search_tabs"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="4dp"
         android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp" />
-
-    <!-- Playlist list -->
-    <ListView
-        android:id="@+id/lv_playlists"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="4dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp"
-        android:visibility="gone" />
-
-    <!-- MV list -->
-    <ListView
-        android:id="@+id/lv_mvs"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="4dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp"
         android:visibility="gone" />
 
     <!-- Search history list -->
