@@ -33,7 +33,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="48dp">
+        <!-- 底部留白：界面缩放 115% 下本页实测「最后一行被窗口下沿裁掉约 62px」
+             （滚到底也露不全，导出行/统计行会被切一半）。48dp≈93px 足以把最后一项
+             顶进可视区。见 verify/F6 证据。 -->
 
             <LinearLayout
                 android:id="@+id/btn_settings_toggle"

@@ -125,10 +125,12 @@ public class SettingsActivity extends BaseWatchActivity {
                 new java.io.File(external, "Download/163Music导出").getAbsolutePath(),
                 new java.io.File(external, "163Music/导出").getAbsolutePath(),
         };
-        String[] labels = {"Music 文件夹（直接）", "Music/163Music导出", "Download/163Music导出",
+        // 条目单行显示：标签改短，保证「目录名 / 强制覆盖开/关状态」在 1 行内不被省略号吃掉
+        // （完整目标路径由下一步的确认浮窗「导出到：<路径>」给出）。
+        String[] labels = {"Music 文件夹", "Music/163Music", "Download 目录",
                 "163Music/导出",
-                exportForceOverwrite ? "强制覆盖同名文件：已开" : "强制覆盖同名文件：已关",
-                "自定义…"};
+                exportForceOverwrite ? "强制覆盖：已开" : "强制覆盖：已关",
+                "自定义路径…"};
         Runnable[] actions = {
                 () -> confirmExport(targets[0]),
                 () -> confirmExport(targets[1]),
@@ -140,9 +142,15 @@ public class SettingsActivity extends BaseWatchActivity {
                 },
                 this::promptCustomExportTarget
         };
-        WatchConfirmDialog.showChoice(this, "导出到文件夹",
-                "把已下载的歌曲复制一份到目标文件夹，原始下载不受影响。",
-                labels, actions, WatchConfirmDialog.Options.defaultOptions());
+        // 需求方 2026-10-17：按钮太多了、选项被挤出去（6 个竖排按钮超出手表可视区）。
+        // 改为可滚动的统一列表浮窗（WatchMenuDialog）：条目单行、超出可滑，不再把选项挤出屏幕。
+        // 标题同样收短到单行可容（原「（复制一份，原下载不受影响）」会被省略号截断）。
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, "导出到文件夹",
+                labels, which -> {
+                    if (which >= 0 && which < actions.length && actions[which] != null) {
+                        actions[which].run();
+                    }
+                });
     }
 
     private void promptCustomExportTarget() {
@@ -161,9 +169,16 @@ public class SettingsActivity extends BaseWatchActivity {
     }
 
     private void confirmExport(final String targetDir) {
-        WatchConfirmDialog.show(this, "导出下载的音乐",
-                "导出到：\n" + targetDir + "\n\n"
-                        + (exportForceOverwrite ? "同名文件会被**覆盖**。" : "同名文件会跳过，不会被覆盖。"),
+        // P5 浮窗高度有限：115% 界面缩放下把 /storage/emulated/0/... 全路径折成 4 行，
+        // 会把底部「取消/确定」挤出屏幕。这里统一用 /sdcard 别名 + 压缩成两行。
+        String shown = targetDir;
+        String root = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
+        if (root != null && !root.isEmpty() && shown != null && shown.startsWith(root)) {
+            shown = "/sdcard" + shown.substring(root.length());
+        }
+        WatchConfirmDialog.show(this, "导出确认",
+                "目标：" + shown + "\n"
+                        + (exportForceOverwrite ? "同名文件：覆盖" : "同名文件：跳过不覆盖"),
                 () -> runExport(targetDir), WatchConfirmDialog.Options.defaultOptions());
     }
 
