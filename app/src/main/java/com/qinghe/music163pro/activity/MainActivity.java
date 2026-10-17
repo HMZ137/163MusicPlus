@@ -1588,9 +1588,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
                 0, dp(24), 1f);
         progressBar.setLayoutParams(progressParams);
-        progressBar.setProgressDrawable(ContextCompat.getDrawable(this, R.drawable.progress_volume_indicator));
-        progressBar.setThumb(ContextCompat.getDrawable(this, R.drawable.volume_thumb));
-        progressBar.setPadding(dp(8), 0, dp(8), 0);
+        // M1b：按 音量条示例.png —— 胶囊条（白填充 / 灰底）+ 橙色告警阈值竖线；
+        // 不画 thumb（参考图只有胶囊与数值），但 SeekBar 仍负责拖动 / 点击交互。
+        progressBar.setProgressDrawable(new com.qinghe.music163pro.util.VolumeCapsuleDrawable(
+                SAFE_VOLUME_PERCENT, dp(2)));
+        progressBar.setThumb(new android.graphics.drawable.ColorDrawable(0x00000000));
+        progressBar.setThumbOffset(0);
+        progressBar.setPadding(dp(2), 0, dp(2), 0);
         progressBar.setMax(hasVolumeInfo ? Math.max(max, 1) : 1);
         progressBar.setProgress(hasVolumeInfo ? current : 0);
         progressBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1613,15 +1617,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             }
         });
 
+        // M1b：右侧大号数字（参考图为「25」）。颜色规则：默认白，**超过阈值才橙色**。
         TextView percentView = new TextView(this);
         LinearLayout.LayoutParams percentParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         percentParams.leftMargin = dp(10);
         percentView.setLayoutParams(percentParams);
-        percentView.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
-        percentView.setTextSize(13);
+        percentView.setTextColor(hasVolumeInfo && percent >= SAFE_VOLUME_PERCENT
+                ? 0xFFFFA726 : 0xFFFFFFFF);
+        percentView.setTextSize(20);
         percentView.setTypeface(percentView.getTypeface(), android.graphics.Typeface.BOLD);
-        percentView.setText(hasVolumeInfo ? (percent + "%") : "--");
+        percentView.setText(hasVolumeInfo ? String.valueOf(percent) : "--");
 
         card.addView(progressBar);
         card.addView(percentView);
@@ -1657,7 +1663,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         volumeProgressBar.setMax(hasVolumeInfo ? max : 1);
         volumeProgressBar.setProgress(hasVolumeInfo ? current : 0);
-        volumePercentView.setText(hasVolumeInfo ? (percent + "%") : "--");
+        volumePercentView.setText(hasVolumeInfo ? String.valueOf(percent) : "--");
+        volumePercentView.setTextColor(hasVolumeInfo && percent >= SAFE_VOLUME_PERCENT
+                ? 0xFFFFA726 : 0xFFFFFFFF);
     }
 
     private void dismissVolumeIndicator() {
