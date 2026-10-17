@@ -217,12 +217,24 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         mainBgLayer = layer;
     }
 
+    /**
+     * 背景绘制目标：优先画到 {@link #mainBgLayer}（OLED 防烧屏用的整屏背景层）。
+     *
+     * <p>2026-10-17 修：以前 {@code updateCoverBackground()} 直接画在
+     * {@code android.R.id.content} 上，而 content 的索引 0 又被 mainBgLayer 全屏盖住，
+     * 所以**切歌时新封面画到了看不见的那一层** —— 表现为「背景不换，重启后才换」。
+     * 现在所有背景绘制统一走这里。</p>
+     */
+    private View backgroundTargetView() {
+        if (mainBgLayer != null) {
+            return mainBgLayer;
+        }
+        return getWindow().getDecorView().findViewById(android.R.id.content);
+    }
+
     /** 把背景画到背景层上；拿不到背景层时退回整屏容器（老行为）。 */
     private void applyMainBackground() {
-        View target = mainBgLayer != null
-                ? mainBgLayer
-                : getWindow().getDecorView().findViewById(android.R.id.content);
-        BackgroundUtil.applyBackground(this, target);
+        BackgroundUtil.applyBackground(this, backgroundTargetView());
     }
 
     private boolean isOledBurnProtectionOn() {
@@ -5596,9 +5608,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (!BackgroundUtil.isCoverMode(BackgroundUtil.getMode(this))) {
             return;
         }
-        final View root = getWindow().getDecorView().findViewById(android.R.id.content);
+        // 必须画到「真正可见」的背景层上（见 backgroundTargetView 注释）
+        final View root = backgroundTargetView();
         Song song = playerManager.getBackgroundSong();
         final String cover = song != null && song.getCoverUrl() != null ? song.getCoverUrl() : "";
+        MusicLog.i("BG", "切歌刷新: song=" + (song == null ? "null" : song.getName())
+                + " cover=" + (cover.isEmpty() ? "(空)" : cover)
+                + " cached=" + BackgroundUtil.hasCoverBackground(cover)
+                + " mode=" + BackgroundUtil.getMode(this));
         if (!cover.isEmpty()) {
             if (BackgroundUtil.hasCoverBackground(cover)) {
                 BackgroundUtil.applyBackground(this, root);
@@ -5608,8 +5625,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 if (BackgroundUtil.MODE_COVER_OR_CUSTOM.equals(BackgroundUtil.getMode(this))) {
                     BackgroundUtil.applyBackground(this, root);
                 }
-                BackgroundUtil.loadCoverBackground(this, cover,
-                        () -> BackgroundUtil.applyBackground(this, root));
+                final String coverParam = cover;
+                BackgroundUtil.loadCoverBackground(this, coverParam, () -> {
+                    MusicLog.i("BG", "封面回调: " + coverParam + " 就绪="
+                            + BackgroundUtil.hasCoverBackground(coverParam));
+                    BackgroundUtil.applyBackground(this, root);
+                });
             }
             return;
         }
@@ -5628,7 +5649,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
         coverFetchInFlightId = songId;
-        final View root = getWindow().getDecorView().findViewById(android.R.id.content);
+        final View root = backgroundTargetView();
         MusicApiHelper.fetchSongsDetails(java.util.Collections.singletonList(songId),
                 playerManager.getCookie(), new MusicApiHelper.BatchSongDetailsCallback() {
                     @Override
