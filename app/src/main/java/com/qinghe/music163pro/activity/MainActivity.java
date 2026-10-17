@@ -250,6 +250,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // Lyrics overlay state
     private boolean lyricsOverlayShowing = false;
+    // M2/M5：主界面 ViewPager2（第 0 页 = 播放页，第 1 页 = 歌词页）
+    private androidx.viewpager2.widget.ViewPager2 vpMainPages;
+    /** 歌词页顶栏左侧的「歌名」（与设置按钮同一行）。 */
+    private TextView tvLyricsTitle;
+    /** 歌词数据当前对应的歌曲 key；切歌或首次进入歌词页时据此判断要不要重新拉歌词。 */
+    private String loadedLyricsSongKey;
 
     // 播放列表浮层：仅对「显示」做首字母排序（不动真实队列）。
     // playlistOverlayMap 把「显示位置 → 真实队列下标」映射出来，点歌 / 长按都用真实下标。
@@ -519,20 +525,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
                 if (Math.abs(diffX) > 80 && diffY < 200 && Math.abs(velocityX) > 200) {
                     if (diffX > 0) {
-                        // Right swipe: dismiss overlay if open; exit app on main screen
-                        if (overlayContainer != null || lyricsOverlayShowing) {
+                        // 右滑：有浮层先关浮层；歌词页交给 ViewPager 返回播放页；播放页右滑退出应用
+                        if (overlayContainer != null) {
                             dismissOverlay();
-                        } else {
+                        } else if (!lyricsOverlayShowing) {
                             finish();
                         }
                         return true;
-                    } else {
-                        // Left swipe: show lyrics (only when no overlay is showing)
-                        if (overlayContainer == null && !lyricsOverlayShowing) {
-                            showLyricsOverlay();
-                            return true;
-                        }
                     }
+                    // 左滑：交给 ViewPager2 翻页（播放页 ←→ 歌词页）。
+                    // M2 起旧的「左滑打开歌词浮层」手势已移除，统一由 ViewPager2 承载。
                 }
                 return false;
             }
@@ -540,6 +542,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         // Create persistent page indicator (player/lyrics) at the bottom
         ensurePageIndicator();
+
+        // M2/M5：把现有播放页与新建的歌词页装进 ViewPager2
+        // （第 0 页 = 播放页，第 1 页 = 歌词页；左右滑切换）
+        installMainPager();
     }
 
     @Override
@@ -1376,35 +1382,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             overlayTimerHandler = null;
             overlayTimerRunnable = null;
         }
-        if (lyricsOverlayShowing && overlayContainer != null) {
-            // Animate lyrics overlay sliding out to the right, player sliding back from left
-            stopLyricsScrollSync();
-            updatePageIndicator(false);
-            final FrameLayout container = overlayContainer;
+        if (overlayContainer != null) {
+            FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
+                    .findViewById(android.R.id.content);
+            rootView.removeView(overlayContainer);
             overlayContainer = null;
-            int screenWidth = getResources().getDisplayMetrics().widthPixels;
-            if (mainPlayerContentView != null) {
-                mainPlayerContentView.animate().translationX(0).setDuration(250).start();
-            }
-            container.animate().translationX(screenWidth).setDuration(250)
-                    .withEndAction(() -> {
-                        FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
-                                .findViewById(android.R.id.content);
-                        rootView.removeView(container);
-                    }).start();
-        } else {
-            if (lyricsOverlayShowing) {
-                stopLyricsScrollSync();
-                updatePageIndicator(false);
-                if (mainPlayerContentView != null) {
-                    mainPlayerContentView.animate().translationX(0).setDuration(250).start();
-                }
-            }
-            if (overlayContainer != null) {
-                FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
-                rootView.removeView(overlayContainer);
-                overlayContainer = null;
-            }
         }
     }
 
@@ -2343,174 +2325,180 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * Show lyrics as an inline overlay on the player screen.
      * Left-swipe on player opens this; right-swipe (via dispatchTouchEvent) closes it.
      */
+    /** M2：进入歌词页（保留旧方法名兼容「功能菜单 → 歌词」等调用点）。 */
     private void showLyricsOverlay() {
-        Song song = playerManager.getCurrentSong();
-        if (song == null) {
-            Toast.makeText(this, "暂无歌曲", Toast.LENGTH_SHORT).show();
+        dismissOverlay();
+        gotoLyricsPage();
+    }
+
+    private void gotoLyricsPage() {
+        if (vpMainPages != null) {
+            vpMainPages.setCurrentItem(1, true);
+        }
+    }
+
+    private void gotoPlayerPage() {
+        if (vpMainPages != null) {
+            vpMainPages.setCurrentItem(0, false);
+        }
+    }
+
+    /**
+     * M2/M5：主界面装 ViewPager2。
+     *
+     * <p>第 0 页 = 现有播放页（{@code activity_main} 的根布局）**原样复用**，既有布局与逻辑一行不改；
+     * 第 1 页 = 新歌词页（{@link #createLyricsPageView()}）。
+     * 之所以用「先 setContentView、最后再把根视图搬进 pager」的方式：MainActivity 有 5500 行、
+     * 初始化顺序很长，中途换 setContentView 风险大；最后一次性 re-parent 对既有初始化零影响。</p>
+     */
+    private void installMainPager() {
+        FrameLayout contentRoot = (FrameLayout) getWindow().getDecorView()
+                .findViewById(android.R.id.content);
+        if (contentRoot == null) {
             return;
         }
+        // ❗ content 根的第一个子 View 是「OLED 防烧屏背景层」（installBackgroundLayer 加的），
+        // 不是播放页。必须按 id 找 main_player_layout，再往上找到它在 content 下的直接父/祖先整体搬走；
+        // 早先误用 getChildAt(0) 会把背景层塞进 pager 当第 0 页，播放页反而留在 pager 之上，
+        // 表现就是「滑到歌词页时播放页元素还叠在上面」。
+        View playerPage = contentRoot.findViewById(R.id.main_player_layout);
+        if (playerPage == null) {
+            return;
+        }
+        View movedChild = playerPage;
+        android.view.ViewParent parent = movedChild.getParent();
+        while (parent instanceof ViewGroup && parent != contentRoot) {
+            movedChild = (View) parent;
+            parent = movedChild.getParent();
+        }
+        if (parent != contentRoot) {
+            return;
+        }
+        contentRoot.removeView(movedChild);
 
-        SharedPreferences lyricPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        lyricScrollMode = lyricPrefs.getInt("lyric_scroll_mode", LYRIC_MODE_BLOCK);
-        int intervalSec = lyricPrefs.getInt("lyric_resume_interval", 3);
-        if (intervalSec < 1) intervalSec = 1;
-        lyricResumeIntervalMs = intervalSec * 1000;
-        lyricsUserScrolled = false;
-        lyricsLastUserScrollTime = 0L;
-        lyricsTouchStartedInScrollView = false;
-        lyricsGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onDown(MotionEvent e) {
-                return true;
-            }
-
-            @Override
-            public boolean onDoubleTap(MotionEvent e) {
-                if (lyricScrollMode != LYRIC_MODE_BLOCK
-                        || !isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
-                    return false;
-                }
-                int index = findOverlayLyricIndexAtRawY(e.getRawY());
-                if (index < 0 || index >= lyricLines.size()) {
-                    return false;
-                }
-                int seekMs = LyricSettings.seekPositionForLine(MainActivity.this,
-                        lyricLines.get(index).timeMs);
-                playerManager.seekTo(seekMs);
-                lyricsUserScrolled = false;
-                lyricsLastUserScrollTime = 0L;
-                clearCurrentLyricHighlight();
-                scrollOverlayToLine(index);
-                return true;
-            }
-        });
-
-        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
-
-        overlayContainer = new FrameLayout(this);
-        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+        FrameLayout pagerRoot = new FrameLayout(this);
+        vpMainPages = new androidx.viewpager2.widget.ViewPager2(this);
+        pagerRoot.addView(vpMainPages, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        // Transparent: the custom background lives on the fixed content root so it
-        // stays put while the player/lyrics views slide over it.
-        overlayContainer.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-        // clickable/focusable makes the full-screen container consume taps that miss
-        // its children, while child views still receive their own touch dispatch.
-        // dispatchTouchEvent continues to observe the full event stream for gestures.
-        overlayContainer.setClickable(true);
-        overlayContainer.setFocusable(true);
-        // Don't use addSwipeToDismiss - dispatchTouchEvent handles swipe gestures
+        // 插入位置：背景层之后、页码指示器之前（背景层要留在 pager 下面继续当背景）
+        int insertIndex = 0;
+        if (mainBgLayer != null && contentRoot.indexOfChild(mainBgLayer) >= 0) {
+            insertIndex = contentRoot.indexOfChild(mainBgLayer) + 1;
+        }
+        contentRoot.addView(pagerRoot, insertIndex, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        com.qinghe.music163pro.util.MusicLog.i("Vp2", "installMainPager: content="
+                + contentRoot.getChildCount() + " moved=" + movedChild.getClass().getSimpleName()
+                + " insert=" + insertIndex);
 
-        LinearLayout mainLayout = new LinearLayout(this);
-        mainLayout.setOrientation(LinearLayout.VERTICAL);
-        mainLayout.setLayoutParams(new FrameLayout.LayoutParams(
+        vpMainPages.setAdapter(new MainPagerAdapter(movedChild, createLyricsPageView()));
+        vpMainPages.setOffscreenPageLimit(1);
+        vpMainPages.registerOnPageChangeCallback(
+                new androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+                    @Override
+                    public void onPageSelected(int position) {
+                        onMainPageSelected(position);
+                    }
+                });
+        onMainPageSelected(0);
+    }
+
+    /** M2/M5：页面切换后的收尾（页码指示器 / 歌词加载与同步 / 与浮层互斥）。 */
+    private void onMainPageSelected(int position) {
+        boolean lyricsPage = position == 1;
+        com.qinghe.music163pro.util.MusicLog.i("Vp2", "主界面滑到 page=" + position);
+        lyricsOverlayShowing = lyricsPage;
+        updatePageIndicator(lyricsPage);
+        if (!lyricsPage) {
+            // 离开歌词页：停掉同步计时器（歌词数据保留，下次进来直接复用）
+            lyricsScrollHandler.removeCallbacksAndMessages(null);
+            lyricsScrollRunnable = null;
+            return;
+        }
+        // 歌词页是全屏内容，其它浮层不应盖在上面
+        if (overlayContainer != null) {
+            dismissOverlay();
+        }
+        Song song = playerManager.getCurrentSong();
+        if (song == null) {
+            showNoLyricsInOverlay();
+            return;
+        }
+        if (tvLyricsTitle != null) {
+            tvLyricsTitle.setText(song.getDisplayName());
+        }
+        if (tvLyricsSongLabel != null) {
+            tvLyricsSongLabel.setText(song.getDisplayName() + " - " + song.getArtist());
+        }
+        String key = songKeyOf(song);
+        if (!key.equals(loadedLyricsSongKey)) {
+            loadedLyricsSongKey = key;
+            lyricLines.clear();
+            lyricViews.clear();
+            currentHighlightIndex = -1;
+            lyricsScrollHandler.removeCallbacksAndMessages(null);
+            lyricsScrollRunnable = null;
+            loadLyricsForOverlay(song, tvLyricsTimeRef);
+        } else if (!lyricLines.isEmpty() && tvLyricsTimeRef != null) {
+            startLyricsScrollSync(tvLyricsTimeRef);
+        }
+    }
+
+    /**
+     * M2：新歌词页布局 —— 顶栏「歌名 + 设置」**同一行**；下面时间行 + 歌词滚动区。
+     *
+     * <p>歌词渲染链路完全复用原有实现（{@code displayLyricsInOverlay} /
+     * {@code startLyricsScrollSync} / F2 着色 / 双击跳转行），只是把入口从「全屏浮层」改成
+     * ViewPager 的一页，并把原先的「音 / 译 / AI / 全屏」按钮收进「设置」浮层。</p>
+     */
+    private View createLyricsPageView() {
+        FrameLayout page = new FrameLayout(this);
+        // 透明：主界面的背景（含封面/自定义图）由 content 根布局统一绘制，歌词页沿用同一背景
+        page.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        page.addView(column, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Top bar: 曲名 + 「音 / 译」开关。
-        //
-        // 用横向 LinearLayout 而不是 FrameLayout：曲名是跑马灯，在 FrameLayout 里它会
-        // 铺满整行、从按钮下面滚过去（看起来就是被曲名糊住、点不准）。
-        // 给曲名 weight=1 之后它的边界就止于按钮左侧，结构上不可能重叠。
-        // 顶栏改成两行，但**不额外占高度**：
-        //   第 1 行 = 歌名（跑马灯，独占整行宽度）
-        //   第 2 行 = 时间（左） + 音/译/AI/全屏 按钮组（右）
-        // 原来「歌名 + 按钮」挤在一行，日语歌四个按钮会把跑马灯的可见宽度压得很窄；
-        // 而时间本来就单独占一行，合并后总高度不变。
-        LinearLayout topBar = new LinearLayout(this);
-        topBar.setOrientation(LinearLayout.VERTICAL);
-        topBar.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // ── 顶栏：左 = 歌名，右 = 设置按钮（同一行） ──
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.setPadding(dp(14), dp(4), dp(4), dp(2));
 
-        // Song name at top (leave right padding for the toggle button)
-        tvLyricsSongLabel = new TextView(this);
-        tvLyricsSongLabel.setText(song.getDisplayName() + " - " + song.getArtist());
-        tvLyricsSongLabel.setTextColor(LyricsTint.textColor(0xFF));   // F2
-        tvLyricsSongLabel.setTextSize(13);
-        tvLyricsSongLabel.setGravity(Gravity.CENTER);
-        tvLyricsSongLabel.setPadding(dp(10), dp(6), dp(6), dp(4));
-        tvLyricsSongLabel.setSingleLine(true);
-        tvLyricsSongLabel.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
-        tvLyricsSongLabel.setSelected(true);
-        // 纵向布局下标题独占整行，跑马灯有充足宽度
-        LinearLayout.LayoutParams songLabelParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        tvLyricsSongLabel.setLayoutParams(songLabelParams);
-        topBar.addView(tvLyricsSongLabel);
+        tvLyricsTitle = new TextView(this);
+        tvLyricsTitle.setTextColor(LyricsTint.textColor(0xFF));   // F2
+        tvLyricsTitle.setTextSize(16);
+        tvLyricsTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvLyricsTitle.setSingleLine(true);
+        tvLyricsTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvLyricsTitle.setSelected(true);
+        titleRow.addView(tvLyricsTitle, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        // 右上角的歌词开关：「音」（音译 / 罗马音）与「译」（翻译）。
-        // 两个按钮默认都隐藏，只有确实拿到了对应的歌词才显示。
-        translationEnabled = LyricSettings.isTranslationEnabled(this);
-        romanizationEnabled = LyricSettings.isRomanizationEnabled(this);
+        android.widget.ImageView btnLyricSettings = new android.widget.ImageView(this);
+        btnLyricSettings.setImageResource(R.drawable.ic_settings);
+        btnLyricSettings.setColorFilter(UiKit.COLOR_ACCENT);
+        btnLyricSettings.setPadding(dp(8), dp(8), dp(8), dp(8));
+        btnLyricSettings.setClickable(true);
+        btnLyricSettings.setFocusable(true);
+        btnLyricSettings.setContentDescription("歌词设置");
+        btnLyricSettings.setOnClickListener(v -> showLyricSettingsMenu());
+        titleRow.addView(btnLyricSettings, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        column.addView(titleRow);
 
-        LinearLayout lyricToggleRow = new LinearLayout(this);
-        lyricToggleRow.setOrientation(LinearLayout.HORIZONTAL);
-        lyricToggleRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        btnRomanizationToggle = makeLyricToggleButton(romanizationEnabled ? "音✓" : "音");
-        applyLyricToggleStyle(btnRomanizationToggle, romanizationEnabled ? "音✓" : "音",
-                romanizationEnabled);
-        btnRomanizationToggle.setVisibility(View.GONE); // 拿到音译歌词前不显示
-        btnRomanizationToggle.setOnClickListener(v -> toggleLyricsRomanization());
-        lyricToggleRow.addView(btnRomanizationToggle);
-
-        btnTranslationToggle = makeLyricToggleButton(translationEnabled ? "译✓" : "译");
-        applyLyricToggleStyle(btnTranslationToggle, translationEnabled ? "译✓" : "译",
-                translationEnabled);
-        btnTranslationToggle.setVisibility(View.GONE); // Hidden until translation is available
-        btnTranslationToggle.setOnClickListener(v -> toggleLyricsTranslation());
-        lyricToggleRow.addView(btnTranslationToggle);
-
-        // 「AI」：语言学习模式的单次激活入口。即使总开关关着也能用（点了只对当前这首歌生效）。
-        btnAiToggle = makeLyricToggleButton("AI");
-        btnAiToggle.setVisibility(View.GONE); // 有歌词才显示
-        btnAiToggle.setOnClickListener(v -> onAiToggleClicked());
-        // 长按 = 丢掉这首歌的缓存并重新分析（改了提示词/想重算时用，不必清空全部缓存）
-        btnAiToggle.setOnLongClickListener(v -> {
-            reanalyzeCurrentSong();
-            return true;
-        });
-        lyricToggleRow.addView(btnAiToggle);
-
-        // 「全屏」：进入大字沉浸式歌词页（LyricsActivity），同一套 AI 着色
-        TextView btnFullscreenLyrics = makeLyricToggleButton("全屏");
-        btnFullscreenLyrics.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, LyricsActivity.class)));
-        // 是否显示由设置项控制（开关选项 → 全屏歌词按钮），关掉后按钮与入口一起隐藏
-        btnFullscreenLyrics.setVisibility(LyricSettings.isFullscreenButtonEnabled(this)
-                ? View.VISIBLE : View.GONE);
-        lyricToggleRow.addView(btnFullscreenLyrics);
-
-        // 第二行：左侧时间 + 右侧按钮组（按钮按自身宽度排列，不拉伸）
-        LinearLayout infoRow = new LinearLayout(this);
-        infoRow.setOrientation(LinearLayout.HORIZONTAL);
-        // 内容整体居中：时间 + 按钮组作为一组排在中间
-        infoRow.setGravity(Gravity.CENTER);
-        infoRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
+        // ── 时间行（小字，左对齐）：保留原有「播放进度」信息 ──
         tvLyricsTimeRef = new TextView(this);
         tvLyricsTimeRef.setTextColor(LyricsTint.textColor(0x80));   // F2
         tvLyricsTimeRef.setTextSize(10);
-        tvLyricsTimeRef.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        tvLyricsTimeRef.setPadding(dp(2), 0, dp(8), 0);
-        // 单行 + 省略：空间再紧也只截断，绝不会被压成竖排（一次实测事故）
+        tvLyricsTimeRef.setGravity(Gravity.START);
+        tvLyricsTimeRef.setPadding(dp(16), 0, dp(8), dp(2));
         tvLyricsTimeRef.setSingleLine(true);
         tvLyricsTimeRef.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        tvLyricsTimeRef.setText("");
-        tvLyricsTimeRef.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        infoRow.addView(tvLyricsTimeRef);
+        column.addView(tvLyricsTimeRef);
 
-        LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        toggleParams.setMarginEnd(dp(6));
-        lyricToggleRow.setLayoutParams(toggleParams);
-        infoRow.addView(lyricToggleRow);
-
-        topBar.addView(infoRow);
-
-        mainLayout.addView(topBar);
-
-        // Lyrics scroll view
+        // ── 歌词滚动区 ──
         lyricsScrollView = new ScrollView(this);
         lyricsScrollView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
@@ -2523,26 +2511,112 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsContainer.setGravity(Gravity.CENTER_HORIZONTAL);
         lyricsContainer.setPadding(dp(12), dp(40), dp(12), dp(56));
         lyricsScrollView.addView(lyricsContainer);
-        mainLayout.addView(lyricsScrollView);
+        column.addView(lyricsScrollView);
 
-        overlayContainer.addView(mainLayout);
-        // Slide in from right (lyrics), slide player out to left
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        overlayContainer.setTranslationX(screenWidth);
-        rootView.addView(overlayContainer);
-        overlayContainer.animate().translationX(0).setDuration(250).start();
-        if (mainPlayerContentView != null) {
-            mainPlayerContentView.animate().translationX(-screenWidth).setDuration(250).start();
+        // 双击歌词行跳转（沿用原歌词浮层的交互）
+        lyricsGestureDetector = new GestureDetector(this,
+                new GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDown(MotionEvent e) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent e) {
+                        if (lyricScrollMode != LYRIC_MODE_BLOCK
+                                || !isPointInsideView(e.getRawX(), e.getRawY(), lyricsScrollView)) {
+                            return false;
+                        }
+                        int index = findOverlayLyricIndexAtRawY(e.getRawY());
+                        if (index < 0 || index >= lyricLines.size()) {
+                            return false;
+                        }
+                        int seekMs = LyricSettings.seekPositionForLine(MainActivity.this,
+                                lyricLines.get(index).timeMs);
+                        playerManager.seekTo(seekMs);
+                        lyricsUserScrolled = false;
+                        lyricsLastUserScrollTime = 0L;
+                        clearCurrentLyricHighlight();
+                        scrollOverlayToLine(index);
+                        return true;
+                    }
+                });
+        return page;
+    }
+
+    /**
+     * M2：歌词页「设置」浮层 —— AI 着色 / 音译 / 翻译 三个开关，双向绑定 {@link LyricSettings}
+     * 既有键（AI 走当前歌曲的 AI 歌词激活态）；按设置项保留「全屏歌词」入口。
+     * 每点一项立即生效，并重新打开浮层以刷新开/关状态。
+     */
+    private void showLyricSettingsMenu() {
+        final boolean aiOn = aiLyricActive;
+        final boolean romaOn = LyricSettings.isRomanizationEnabled(this);
+        final boolean transOn = LyricSettings.isTranslationEnabled(this);
+        final boolean fullscreen = LyricSettings.isFullscreenButtonEnabled(this);
+        java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("AI 着色：" + (aiOn ? "开" : "关"));
+        items.add("音译：" + (romaOn ? "开" : "关"));
+        items.add("翻译：" + (transOn ? "开" : "关"));
+        if (fullscreen) {
+            items.add("全屏歌词");
         }
-        lyricsOverlayShowing = true;
-        // Bring indicator on top and switch to lyrics page
-        if (pageIndicatorLayout != null) {
-            pageIndicatorLayout.bringToFront();
-            updatePageIndicator(true);
+        final String[] entries = items.toArray(new String[0]);
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, "歌词设置", entries, which -> {
+            if (which == 0) {
+                onAiToggleClicked();
+            } else if (which == 1) {
+                toggleLyricsRomanization();
+            } else if (which == 2) {
+                toggleLyricsTranslation();
+            } else if (fullscreen && which == 3) {
+                startActivity(new Intent(this, LyricsActivity.class));
+            }
+            // 开关状态变化后重新弹出，让用户看到「开 / 关」已更新
+            showLyricSettingsMenu();
+        });
+    }
+
+    /** ViewPager2 的固定两页适配器（复用已 inflated 的两个页面视图）。 */
+    private static final class MainPagerHolder
+            extends androidx.recyclerview.widget.RecyclerView.ViewHolder {
+        MainPagerHolder(View itemView) {
+            super(itemView);
+        }
+    }
+
+    private final class MainPagerAdapter
+            extends androidx.recyclerview.widget.RecyclerView.Adapter<MainPagerHolder> {
+        private final View playerPage;
+        private final View lyricsPage;
+
+        MainPagerAdapter(View playerPage, View lyricsPage) {
+            this.playerPage = playerPage;
+            this.lyricsPage = lyricsPage;
         }
 
-        // Load lyrics
-        loadLyricsForOverlay(song, tvLyricsTimeRef);
+        @Override
+        public MainPagerHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View page = viewType == 0 ? playerPage : lyricsPage;
+            // ViewPager2/RecyclerView 要求 item 的 LayoutParams 是 RecyclerView.LayoutParams
+            page.setLayoutParams(new androidx.recyclerview.widget.RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            return new MainPagerHolder(page);
+        }
+
+        @Override
+        public void onBindViewHolder(MainPagerHolder holder, int position) {
+        }
+
+        @Override
+        public int getItemCount() {
+            return 2;
+        }
+
+        @Override
+        public int getItemViewType(int position) {
+            return position;
+        }
     }
 
     private void loadLyricsForOverlay(Song song, TextView tvLyricsTime) {
@@ -3224,7 +3298,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsScrollRunnable = new Runnable() {
             @Override
             public void run() {
-                if (!lyricsOverlayShowing || overlayContainer == null) return;
+                if (!lyricsOverlayShowing || lyricsContainer == null) return;
                 if (playerManager.isPlaying() || playerManager.getCurrentPosition() > 0) {
                     int currentPos = playerManager.getCurrentPosition();
                     int duration = playerManager.getDuration();
@@ -5219,7 +5293,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         startPlaybackService(song.getName(), song.getArtist(), song.getCoverUrl(), true);
         // Save to play history
         HistoryManager.getInstance().addToHistory(song);
-        // Refresh lyrics overlay if it is currently showing
+        // M2：歌词页顶栏歌名随歌曲切换更新；标记「歌词需要重拉」
+        if (tvLyricsTitle != null) {
+            tvLyricsTitle.setText(song.getDisplayName());
+        }
+        loadedLyricsSongKey = null;
+        // 正在显示歌词页时：重拉新歌的歌词
         if (lyricsOverlayShowing && lyricsContainer != null && tvLyricsTimeRef != null) {
             // Stop current sync
             lyricsScrollHandler.removeCallbacksAndMessages(null);
@@ -5487,11 +5566,24 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      */
     @Override
     public void onBackPressed() {
-        if (overlayContainer != null || lyricsOverlayShowing) {
+        if (overlayContainer != null) {
             dismissOverlay();
             return;
         }
+        // M2：歌词页上按返回键先回播放页（ViewPager 第 0 页），不直接退出应用
+        if (lyricsOverlayShowing) {
+            gotoPlayerPage();
+            return;
+        }
         super.onBackPressed();
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        // M5：任何入口（FLAG_ACTIVITY_CLEAR_TOP | SINGLE_TOP）跳回主界面都落在播放页（第 0 页）
+        gotoPlayerPage();
     }
 
     @Override
