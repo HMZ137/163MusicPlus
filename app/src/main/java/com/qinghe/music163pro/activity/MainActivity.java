@@ -85,6 +85,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
     /** M1：音量浮层自动收起延时（浮层升级为可交互后，比原来的 1500ms 放宽）。 */
     private static final long VOLUME_DISMISS_DELAY_MS = 2500L;
+    /** F1：表冠调音量时，音量条/数字从旧值过渡到新值的时长。 */
+    private static final long VOLUME_STEP_ANIM_MS = 150L;
     private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
     private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
     private static final int SAFE_VOLUME_PERCENT = 60;
@@ -118,6 +120,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // Volume indicator
     private View volumeIndicator;
+    /** F1/M1：音量浮层的平滑过渡动画（表冠一格一格调时，条与数字平滑移动而不是瞬间跳）。 */
+    private android.animation.ValueAnimator volumeAnimator;
+    /** 当前界面上实际显示到的音量进度（动画续接用）。 */
+    private int volumeDisplayedProgress;
+    /** 下一次音量刷新是否走平滑动画（表冠=true，手指拖动=false —— 拖动时不能跟手指抢）。 */
+    private boolean animateVolumeUpdate;
     /** M1：底部「播放模式」按钮（图标随当前模式变化）。 */
     private ImageView btnPlayMode;
     private ProgressBar volumeProgressBar;
@@ -1462,8 +1470,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     /** F1：两次事件间隔超过它 ⇒ 视为一次新的「旋转手势」，立刻响应一步。 */
     private static final long CROWN_GESTURE_GAP_MS = 250L;
-    /** F1：持续旋转时，每一步之间的节拍（音量 max=16，约 5 格/秒）。 */
-    private static final long CROWN_STEP_INTERVAL_MS = 200L;
+    /** F1：持续旋转时每一步的节拍（16 格音量下约 5.4s 从 0 到 100%，需求方 2026-10-17 指定）。 */
+    private static final long CROWN_STEP_INTERVAL_MS = 340L;
     /** F1：方向判定所需的最小累计位移（防抖；避免正负抖动来回跳音量）。 */
     private static final float CROWN_DIR_THRESHOLD = 3f;
 
@@ -1519,7 +1527,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         crownDirAccum += clamped;
         boolean stepped = false;
         if (Math.abs(crownDirAccum) >= CROWN_DIR_THRESHOLD) {
-            int dir = crownDirAccum > 0 ? 1 : -1;
+            // 方向映射（需求方 2026-10-17 要求「上下两个方向调整一下」）：
+            // 本机向上转 = AXIS_VSCROLL 负值，映射为**音量增大**；向下转为减小。
+            // 若以后固件方向又反了，只改这一行的三元表达式即可。
+            int dir = crownDirAccum > 0 ? -1 : 1;
             crownDirAccum = 0;
             boolean newGesture = now - crownLastEventMs > CROWN_GESTURE_GAP_MS;
             crownLastEventMs = now;
@@ -1564,6 +1575,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
         int target = Math.max(0, Math.min(max, cur + (dir > 0 ? 1 : -1)));
         if (target != cur) {
+            animateVolumeUpdate = true;     // 表冠：音量条走平滑过渡
             applyUserVolume(target, max);   // 复用 M1：含耳机安全音量确认
         }
         showVolumeIndicator();
@@ -1593,7 +1605,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         boolean hasVolumeInfo = max > 0;
         int percent = hasVolumeInfo ? Math.round(current * 100f / max) : 0;
         ensureVolumeIndicator(hasVolumeInfo, current, max, percent);
-        updateVolumeIndicator(hasVolumeInfo, current, max, percent);
+        // 表冠连续调节时动画可能还没跑完，此时不要用「系统当前值」把动画打断（否则又变回跳变）
+        if (volumeAnimator == null || !volumeAnimator.isStarted()) {
+            updateVolumeIndicator(hasVolumeInfo, current, max, percent);
+        }
         // M1：浮层已升级为**可交互**（拖动 / 点击改音量），故给足收起时间；
         // 拖动期间由 onStartTrackingTouch 暂停计时，不会在手指按着时消失。
         scheduleVolumeDismiss();
@@ -1642,7 +1657,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             com.qinghe.music163pro.util.MusicLog.w("Volume", "setStreamVolume 失败: " + e);
         }
         int percent = max > 0 ? Math.round(target * 100f / max) : 0;
-        updateVolumeIndicator(max > 0, target, max, percent);
+        boolean animate = animateVolumeUpdate;
+        animateVolumeUpdate = false;
+        updateVolumeIndicator(max > 0, target, max, percent, animate);
         scheduleVolumeDismiss();
     }
 
@@ -1743,14 +1760,58 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private void updateVolumeIndicator(boolean hasVolumeInfo, int current, int max, int percent) {
+        updateVolumeIndicator(hasVolumeInfo, current, max, percent, false);
+    }
+
+    /**
+     * 刷新音量浮层。
+     *
+     * @param animate true 时从「当前显示值」平滑过渡到 {@code current}（表冠一格一格调的时候用，
+     *                避免一小格一跳看起来卡）；false 时直接落位（手指拖动时不能跟手指抢）。
+     */
+    private void updateVolumeIndicator(boolean hasVolumeInfo, int current, int max, int percent,
+                                       boolean animate) {
         if (volumeProgressBar == null || volumePercentView == null) {
             return;
         }
         volumeProgressBar.setMax(hasVolumeInfo ? max : 1);
-        volumeProgressBar.setProgress(hasVolumeInfo ? current : 0);
-        volumePercentView.setText(hasVolumeInfo ? String.valueOf(percent) : "--");
-        volumePercentView.setTextColor(hasVolumeInfo && percent >= SAFE_VOLUME_PERCENT
-                ? 0xFFFFA726 : 0xFFFFFFFF);
+        final int targetProgress = hasVolumeInfo ? current : 0;
+        final int safeMax = hasVolumeInfo ? Math.max(max, 1) : 1;
+        if (volumeAnimator != null) {
+            volumeAnimator.cancel();
+            volumeAnimator = null;
+        }
+        if (!animate || targetProgress == volumeDisplayedProgress) {
+            volumeProgressBar.setProgress(targetProgress);
+            volumeDisplayedProgress = targetProgress;
+            int shownPercent = hasVolumeInfo ? Math.round(targetProgress * 100f / safeMax) : percent;
+            volumePercentView.setText(hasVolumeInfo ? String.valueOf(shownPercent) : "--");
+            volumePercentView.setTextColor(hasVolumeInfo && shownPercent >= SAFE_VOLUME_PERCENT
+                    ? 0xFFFFA726 : 0xFFFFFFFF);
+            return;
+        }
+        // 差值越大动画略长一点，但封顶 240ms，保证连续调节时不会越拖越长
+        long duration = Math.min(240L, VOLUME_STEP_ANIM_MS + 40L * Math.abs(
+                targetProgress - volumeDisplayedProgress));
+        android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(
+                volumeDisplayedProgress, targetProgress);
+        animator.setDuration(duration);
+        animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        animator.addUpdateListener(a -> {
+            int shown = (int) a.getAnimatedValue();
+            volumeDisplayedProgress = shown;
+            if (volumeProgressBar != null) {
+                volumeProgressBar.setProgress(shown);
+            }
+            if (volumePercentView != null) {
+                int p = hasVolumeInfo ? Math.round(shown * 100f / safeMax) : 0;
+                volumePercentView.setText(hasVolumeInfo ? String.valueOf(p) : "--");
+                volumePercentView.setTextColor(hasVolumeInfo && p >= SAFE_VOLUME_PERCENT
+                        ? 0xFFFFA726 : 0xFFFFFFFF);
+            }
+        });
+        volumeAnimator = animator;
+        animator.start();
     }
 
     private void dismissVolumeIndicator() {
@@ -1760,6 +1821,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (volumeIndicator.getParent() instanceof FrameLayout) {
             ((FrameLayout) volumeIndicator.getParent()).removeView(volumeIndicator);
         }
+        if (volumeAnimator != null) {
+            volumeAnimator.cancel();
+            volumeAnimator = null;
+        }
+        volumeDisplayedProgress = 0;
         volumeIndicator = null;
         volumeProgressBar = null;
         volumePercentView = null;
