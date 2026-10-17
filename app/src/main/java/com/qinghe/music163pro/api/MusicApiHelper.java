@@ -4,10 +4,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.qinghe.music163pro.model.AlbumInfo;
 import com.qinghe.music163pro.model.CloudItem;
 import com.qinghe.music163pro.model.MvInfo;
 import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.model.SoundInfo;
 import com.qinghe.music163pro.util.MusicLog;
 
 import org.json.JSONArray;
@@ -301,6 +303,18 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    /** S2：专辑搜索结果回调（cloudsearch type=10）。 */
+    public interface SearchAlbumCallback {
+        void onResult(List<AlbumInfo> albums);
+        void onError(String message);
+    }
+
+    /** S2：声音（电台节目）搜索结果回调（cloudsearch type=2000）。 */
+    public interface SearchSoundCallback {
+        void onResult(List<SoundInfo> sounds);
+        void onError(String message);
+    }
+
     public interface MvDetailCallback {
         void onResult(JSONObject mvDetail);
         void onError(String message);
@@ -558,6 +572,149 @@ public class MusicApiHelper {
             } catch (Exception e) {
                 MusicLog.w(TAG, "搜索MV失败: " + keyword, e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== S2：Search Albums / Sounds ====================
+
+    /**
+     * S2（任务 5-1）：搜索专辑（cloudsearch type=10）。
+     *
+     * <p>与 {@link #searchPlaylists} / {@link #searchMvs} 同一套请求范式，只换 {@code type}；
+     * 结果由搜索页「歌单」标签与歌单混排展示，点击进 {@code AlbumDetailActivity}。</p>
+     */
+    public static void searchAlbums(String keyword, int offset, String cookie,
+                                    SearchAlbumCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "搜索专辑", "keyword=" + keyword + " offset=" + offset);
+                JSONObject data = new JSONObject();
+                data.put("s", keyword);
+                data.put("type", 10);   // 10 = albums
+                data.put("limit", 20);
+                data.put("offset", offset);
+                data.put("total", true);
+                data.put("csrf_token", extractCsrfToken(cookie));
+
+                String response = weapiPost("/api/cloudsearch/pc", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                List<AlbumInfo> albums = new ArrayList<>();
+                JSONObject result = json.optJSONObject("result");
+                if (result != null) {
+                    JSONArray arr = result.optJSONArray("albums");
+                    if (arr != null) {
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject a = arr.optJSONObject(i);
+                            if (a == null) {
+                                continue;
+                            }
+                            long id = a.optLong("id", 0);
+                            String name = a.optString("name", "");
+                            String artist = "";
+                            JSONObject artistObj = a.optJSONObject("artist");
+                            if (artistObj != null) {
+                                artist = artistObj.optString("name", "");
+                            }
+                            if (artist.isEmpty()) {
+                                artist = joinArtistNames(a.optJSONArray("artists"));
+                            }
+                            String coverUrl = pickFirstNonEmpty(a, "picUrl", "coverUrl", "cover");
+                            int trackCount = a.optInt("size", a.optInt("trackCount", 0));
+                            albums.add(new AlbumInfo(id, name, artist, coverUrl, trackCount));
+                        }
+                    }
+                }
+                MusicLog.d(TAG, "搜索专辑结果: " + albums.size() + " 个");
+                mainHandler.post(() -> callback.onResult(albums));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "搜索专辑失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * S2（任务 5-2）：搜索声音（cloudsearch type=2000，电台节目）。
+     *
+     * <p>声音条目字段随接口版本略有差异，这里对 {@code sounds / djprograms / programs}
+     * 三种数组名都做兼容；主歌信息取 {@code mainSong}，点击时用它构造可播放的 {@link Song}。</p>
+     */
+    public static void searchSounds(String keyword, int offset, String cookie,
+                                    SearchSoundCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "搜索声音", "keyword=" + keyword + " offset=" + offset);
+                JSONObject data = new JSONObject();
+                data.put("s", keyword);
+                // 需求文档写的是 type=2000，但实测本机该 type 在 /api/cloudsearch/pc 上返回
+                // 空 result（{"result":{}}，0 条）；cloudsearch 的声音（电台节目）类型是 1018。
+                // 这里按实测取 1018，注释保留差异原因，避免下次又踩回 2000。
+                data.put("type", 1018);   // 1018 = 声音（电台节目 djprogram）
+                data.put("limit", 20);
+                data.put("offset", offset);
+                data.put("total", true);
+                data.put("csrf_token", extractCsrfToken(cookie));
+
+                String response = weapiPost("/api/cloudsearch/pc", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                List<SoundInfo> sounds = new ArrayList<>();
+                JSONObject result = json.optJSONObject("result");
+                if (result != null) {
+                    JSONArray arr = result.optJSONArray("sounds");
+                    if (arr == null) {
+                        arr = result.optJSONArray("djprograms");
+                    }
+                    if (arr == null) {
+                        arr = result.optJSONArray("programs");
+                    }
+                    if (arr != null) {
+                        for (int i = 0; i < arr.length(); i++) {
+                            JSONObject sObj = arr.optJSONObject(i);
+                            if (sObj == null) {
+                                continue;
+                            }
+                            long id = sObj.optLong("id", 0);
+                            String name = sObj.optString("name", "");
+                            String coverUrl = pickFirstNonEmpty(sObj, "coverUrl", "picUrl", "cover");
+                            String djName = "";
+                            JSONObject dj = sObj.optJSONObject("dj");
+                            if (dj != null) {
+                                djName = dj.optString("nickname", "");
+                            }
+                            long mainSongId = 0;
+                            String mainSongName = "";
+                            String mainSongArtist = "";
+                            JSONObject mainSong = sObj.optJSONObject("mainSong");
+                            if (mainSong != null) {
+                                mainSongId = mainSong.optLong("id", 0);
+                                mainSongName = mainSong.optString("name", "");
+                                mainSongArtist = joinArtistNames(mainSong.optJSONArray("artists"));
+                                if (coverUrl.isEmpty()) {
+                                    JSONObject al = mainSong.optJSONObject("al");
+                                    if (al != null) {
+                                        coverUrl = al.optString("picUrl", "");
+                                    }
+                                }
+                            }
+                            long duration = sObj.optLong("duration", 0);
+                            sounds.add(new SoundInfo(id, name, coverUrl, djName,
+                                    mainSongId, mainSongName, mainSongArtist, duration));
+                        }
+                    } else {
+                        // 字段名不匹配时把 code 与 result 打出来（截断），便于按实测调整
+                        String raw = result.toString();
+                        MusicLog.w(TAG, "搜索声音无已知数组，code=" + json.optInt("code", -999)
+                                + " result=" + (raw.length() > 300 ? raw.substring(0, 300) : raw));
+                    }
+                }
+                MusicLog.d(TAG, "搜索声音结果: " + sounds.size() + " 个");
+                mainHandler.post(() -> callback.onResult(sounds));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "搜索声音失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }
