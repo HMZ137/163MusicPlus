@@ -151,7 +151,9 @@ public class DownloadListActivity extends BaseWatchActivity
         // 「整理」：把早期下载固定的 song.mp3 / song.flac 改成「曲名 - 曲师」
         View btnTidy = findViewById(R.id.btn_tidy_downloads);
         if (btnTidy != null) {
-            btnTidy.setOnClickListener(v -> confirmTidyFileNames());
+            // L2：多 Tab 迁 VP2 后，标题栏右上角按参考图收成「菜单」入口；
+            // 原「整理」能力收进菜单，功能不丢。
+            btnTidy.setOnClickListener(v -> showDownloadsMenu());
         }
 
         // 页内标签：下载 / 本地。4-1 起标签**不再跨 Activity**，而是切 ViewPager2 的页；
@@ -355,6 +357,13 @@ public class DownloadListActivity extends BaseWatchActivity
         } else {
             tvProgress.setText("下载中…");
         }
+    }
+
+    /** L2：标题栏右上角「更多」菜单（目前只有「整理文件名」，保留原能力）。 */
+    private void showDownloadsMenu() {
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, getString(R.string.downloads),
+                new String[]{"整理文件名（song → 曲名 - 曲师）"},
+                which -> confirmTidyFileNames());
     }
 
     /** 标题按优先级显示：整理进度 > 下载队列 > 常态标题。 */
