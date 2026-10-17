@@ -23,6 +23,7 @@ import com.qinghe.music163pro.api.NeteaseWatchApi;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.CookieBackup;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
+import com.qinghe.music163pro.util.WatchMenuDialog;
 
 import org.json.JSONObject;
 
@@ -81,12 +82,12 @@ public class LoginActivity extends BaseWatchActivity {
         etCookie = findViewById(R.id.et_cookie);
         tvBackupHint = findViewById(R.id.tv_cookie_backup_hint);
         TextView btnSave = findViewById(R.id.btn_save_cookie);
-        TextView btnQrLogin = findViewById(R.id.btn_qr_login);
+        TextView btnMoreLogin = findViewById(R.id.btn_more_login_options);
         TextView btnExport = findViewById(R.id.btn_export_cookie);
         TextView btnImport = findViewById(R.id.btn_import_cookie);
         // 归零 MaterialButton 默认上下 6dp inset：按钮间距只由 margin 决定，行距更紧凑
         zeroVerticalInsets(btnSave);
-        zeroVerticalInsets(btnQrLogin);
+        zeroVerticalInsets(btnMoreLogin);
         zeroVerticalInsets(btnExport);
         zeroVerticalInsets(btnImport);
 
@@ -116,14 +117,10 @@ public class LoginActivity extends BaseWatchActivity {
         // Cookie 保存：确认后落盘（1016 上游口径）
         btnSave.setOnClickListener(v -> confirmSaveCookie());
 
-        // 登录入口
-        btnQrLogin.setOnClickListener(v ->
-                startActivity(new Intent(this, QrLoginActivity.class)));
-        findViewById(R.id.btn_password_login_entry).setOnClickListener(v ->
-                startActivity(new Intent(this, PasswordLoginActivity.class)));
-        // 1016：验证码登录改走手表网关（SmsLoginActivity 已重写为 NeteaseWatchApi 流程）
-        findViewById(R.id.btn_captcha_login_entry).setOnClickListener(v ->
-                startActivity(new Intent(this, SmsLoginActivity.class)));
+        // 登录入口（需求方 2026-10-17 晚：扫码/密码/验证码全部收进「更多登录选项」浮窗，选中后跳对应页面）
+        if (btnMoreLogin != null) {
+            btnMoreLogin.setOnClickListener(v -> showMoreLoginOptions());
+        }
         // 1016：Cookie 登录（粘贴完整 Cookie 并验证）
         findViewById(R.id.btn_cookie_login_entry).setOnClickListener(v ->
                 startActivity(new Intent(this, CookieLoginActivity.class)));
@@ -215,6 +212,27 @@ public class LoginActivity extends BaseWatchActivity {
                 });
             }
         });
+    }
+
+    /**
+     * 需求方 2026-10-17 晚：登录方式不再平铺在页面上，统一收进「更多登录选项」浮窗
+     * （扫码登录 / 密码登录 / 验证码登录），选中后跳到对应登录页面。
+     */
+    private void showMoreLoginOptions() {
+        WatchMenuDialog.show(this, "登录方式",
+                new String[]{"扫码登录", "密码登录", "验证码登录"},
+                index -> {
+                    Intent intent;
+                    if (index == 0) {
+                        intent = new Intent(this, QrLoginActivity.class);
+                    } else if (index == 1) {
+                        intent = new Intent(this, PasswordLoginActivity.class);
+                    } else {
+                        // 1016：验证码登录改走手表网关（SmsLoginActivity 已重写为 NeteaseWatchApi 流程）
+                        intent = new Intent(this, SmsLoginActivity.class);
+                    }
+                    startActivity(intent);
+                });
     }
 
     /** 复制当前保存的 Cookie 到剪贴板。 */

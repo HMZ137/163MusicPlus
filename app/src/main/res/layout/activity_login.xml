@@ -162,7 +162,7 @@
                 android:textAllCaps="false"
                 style="@style/Widget.App.Button" />
 
-            <!-- ============ 登录入口（需求方口径：放在「保存 Cookie」下面、「导出/读取」上面） ============ -->
+            <!-- ============ 登录入口（需求方 2026-10-17 晚：登录方式全部收进「更多登录选项」弹窗） ============ -->
             <LinearLayout
                 android:id="@+id/ll_not_logged_in"
                 android:layout_width="match_parent"
@@ -179,53 +179,15 @@
                     android:paddingTop="4dp"
                     android:paddingBottom="4dp" />
 
+                <!-- 点它弹「登录方式」浮窗：扫码登录 / 密码登录 / 验证码登录（选中后跳对应页面） -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_qr_login"
+                    android:id="@+id/btn_more_login_options"
                     android:layout_width="match_parent"
                     android:layout_height="36dp"
-                    android:text="@string/qr_login"
+                    android:text="@string/more_login_options"
                     android:textSize="13sp"
                     android:textAllCaps="false"
                     style="@style/Widget.App.Button.Outlined" />
-
-                <!-- 密码 / 验证码登录入口：并排一行，跳对应登录页 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_password_login_entry"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:paddingStart="2dp"
-                        android:paddingEnd="2dp"
-                        android:maxLines="1"
-                        android:text="密码登录"
-                        android:textSize="12sp"
-                        android:textAllCaps="false"
-                        style="@style/Widget.App.Button.Outlined" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_captcha_login_entry"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:paddingStart="2dp"
-                        android:paddingEnd="2dp"
-                        android:maxLines="1"
-                        android:text="@string/captcha_login"
-                        android:textSize="12sp"
-                        android:textAllCaps="false"
-                        style="@style/Widget.App.Button.Outlined" />
-                </LinearLayout>
 
                 <!-- 1016：Cookie 登录（粘贴完整 Cookie 并验证后保存） -->
                 <com.google.android.material.button.MaterialButton
@@ -237,9 +199,7 @@
                     android:textSize="13sp"
                     android:textAllCaps="false"
                     style="@style/Widget.App.Button.Outlined" />
-            </LinearLayout>
-
-            <!-- ============ Cookie 备份：导出 / 读取（保持在最下面） ============ -->
+            </LinearLayout>            <!-- ============ Cookie 备份：导出 / 读取（保持在最下面） ============ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

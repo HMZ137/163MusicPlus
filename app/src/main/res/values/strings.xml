@@ -16,6 +16,7 @@
     <string name="more">更多</string>
     <string name="search_history_hint">长按可删除记录</string>
     <string name="qr_login">扫码登录</string>
+    <string name="more_login_options">更多登录选项</string>
     <string name="qr_loading">正在获取二维码…</string>
     <string name="qr_refresh">刷新二维码</string>
     <string name="sms_login">短信登录</string>
