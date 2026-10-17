@@ -7,8 +7,8 @@
     <string name="settings">设置</string>
     <string name="save_cookie">保存Cookie</string>
     <!-- Cookie 备份：写到 /sdcard/163Music/cookie.txt（公共外部存储，卸载不会被清） -->
-    <string name="cookie_export">导出 Cookie</string>
-    <string name="cookie_import">读取 Cookie</string>
+    <string name="cookie_export">导出备份</string>
+    <string name="cookie_import">读取备份</string>
     <!-- 备份位置提示，%1$s 是实际路径。让用户知道文件去哪了，卸载后好找 -->
     <string name="cookie_backup_path">备份位置：%1$s</string>
     <string name="cookie_hint">Cookie（扫码登录后自动填入，也可手动粘贴）</string>

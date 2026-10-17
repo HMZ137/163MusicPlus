@@ -64,6 +64,7 @@
         <activity android:name=".activity.XtcModuleActivity" android:exported="false" />
         <activity android:name=".activity.QrLoginActivity" android:exported="false" />
         <activity android:name=".activity.SmsLoginActivity" android:exported="false" />
+        <activity android:name=".activity.CookieLoginActivity" android:exported="false" />
         <activity android:name=".activity.LyricsActivity" android:exported="false" />
         <activity android:name=".activity.RingtoneListActivity" android:exported="false" />
         <activity android:name=".activity.ProfileActivity" android:exported="false" />

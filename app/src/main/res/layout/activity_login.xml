@@ -33,9 +33,107 @@
         android:orientation="vertical"
         android:padding="12dp">
 
+            <!-- ============ 已登录状态（1016：账号信息 / 复制 Cookie / 退出登录） ============ -->
+            <LinearLayout
+                android:id="@+id/ll_logged_in"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/account_logged_in"
+                    android:textColor="@color/colorAccent"
+                    android:textSize="12sp"
+                    android:paddingBottom="6dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/user_id_label"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:paddingBottom="2dp" />
+
+                <TextView
+                    android:id="@+id/tv_user_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/surface_elevated"
+                    android:padding="6dp"
+                    android:singleLine="true"
+                    android:ellipsize="marquee"
+                    android:marqueeRepeatLimit="-1"
+                    android:text="--"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/nickname_label"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:paddingBottom="2dp" />
+
+                <TextView
+                    android:id="@+id/tv_nickname"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/surface_elevated"
+                    android:padding="6dp"
+                    android:singleLine="true"
+                    android:ellipsize="marquee"
+                    android:marqueeRepeatLimit="-1"
+                    android:text="--"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_copy_cookie"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:text="@string/copy_cookie"
+                        android:textSize="12sp"
+                        android:textAllCaps="false"
+                        style="@style/Widget.App.Button.Outlined" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_logout"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:maxLines="1"
+                        android:text="@string/logout"
+                        android:textColor="@color/colorError"
+                        android:textSize="12sp"
+                        android:textAllCaps="false"
+                        style="@style/Widget.App.Button.Outlined" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Cookie 输入 / 保存（保留原样式） ============ -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:text="Cookie"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp"
@@ -64,65 +162,88 @@
                 android:textAllCaps="false"
                 style="@style/Widget.App.Button" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_qr_login"
-                android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:layout_marginTop="4dp"
-                android:text="@string/qr_login"
-                android:textSize="13sp"
-                android:textAllCaps="false"
-                style="@style/Widget.App.Button.Outlined" />
-
-            <!-- 密码 / 验证码登录入口：并排一行，跳对应登录页 -->
+            <!-- ============ 登录入口（需求方口径：放在「保存 Cookie」下面、「导出/读取」上面） ============ -->
             <LinearLayout
+                android:id="@+id/ll_not_logged_in"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:layout_marginTop="4dp"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/not_logged_in"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_password_login_entry"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:paddingStart="2dp"
-                    android:paddingEnd="2dp"
-                    android:maxLines="1"
-                    android:text="密码登录"
-                    android:textSize="12sp"
+                    android:id="@+id/btn_qr_login"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:text="@string/qr_login"
+                    android:textSize="13sp"
                     android:textAllCaps="false"
                     style="@style/Widget.App.Button.Outlined" />
 
+                <!-- 密码 / 验证码登录入口：并排一行，跳对应登录页 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_password_login_entry"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:maxLines="1"
+                        android:text="密码登录"
+                        android:textSize="12sp"
+                        android:textAllCaps="false"
+                        style="@style/Widget.App.Button.Outlined" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_captcha_login_entry"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:paddingStart="2dp"
+                        android:paddingEnd="2dp"
+                        android:maxLines="1"
+                        android:text="@string/captcha_login"
+                        android:textSize="12sp"
+                        android:textAllCaps="false"
+                        style="@style/Widget.App.Button.Outlined" />
+                </LinearLayout>
+
+                <!-- 1016：Cookie 登录（粘贴完整 Cookie 并验证后保存） -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_captcha_login_entry"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:paddingStart="2dp"
-                    android:paddingEnd="2dp"
-                    android:maxLines="1"
-                    android:text="验证码登录"
-                    android:textSize="12sp"
+                    android:id="@+id/btn_cookie_login_entry"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/cookie_login"
+                    android:textSize="13sp"
                     android:textAllCaps="false"
                     style="@style/Widget.App.Button.Outlined" />
             </LinearLayout>
 
-            <!--
-              Cookie 备份：导出到公共外部存储（/sdcard/163Music/cookie.txt），卸载不会被清，
-              重装后点「读取 Cookie」即可恢复登录。
-              两个按钮并排而不是各占一行 —— 320px 表盘竖向空间很紧，并排能省下 42px。
-              行距收紧：inset 在 LoginActivity 代码里归零，这里 margin 只留 4dp。
-            -->
+            <!-- ============ Cookie 备份：导出 / 读取（保持在最下面） ============ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
