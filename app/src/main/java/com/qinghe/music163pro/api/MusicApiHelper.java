@@ -874,19 +874,58 @@ public class MusicApiHelper {
      */
     public static void getSongUrlWithQuality(long songId, String cookie,
                                              String preferredLevel, UrlCallback callback) {
+        getSongUrlInfo(songId, cookie, preferredLevel, new SongUrlInfoCallback() {
+            @Override
+            public void onResult(String url, boolean trialOnly) {
+                callback.onResult(url);
+            }
+
+            @Override
+            public void onError(String message) {
+                callback.onError(message);
+            }
+        });
+    }
+
+    public interface SongUrlInfoCallback {
+        void onResult(String url, boolean trialOnly);
+
+        void onError(String message);
+    }
+
+    /**
+     * Fetch song URL with quality, also reporting whether the returned link is a
+     * free-trial clip (freeTrialInfo present in the player/url response). Songs
+     * unlocked by watching ads on the phone return a full link with no freeTrialInfo.
+     *
+     * <p><b>1016 合并要点</b>：即使 cookie 为空也要走一次 eapi —— 匿名 eapi 会返回
+     * 试听片段，这个 trialOnly 标记正是后续路由到「手表网关（游客会话）」的判据；
+     * 跳过它会直接落到底部直连兜底（trialOnly=false），网关就永远不会被调用。</p>
+     */
+    public static void getSongUrlInfo(long songId, String cookie,
+                                      String preferredLevel, SongUrlInfoCallback callback) {
         executor.execute(() -> {
             try {
                 String url = null;
+                boolean trialOnly = false;
                 MusicLog.op(TAG, "获取歌曲URL", "songId=" + songId + " level=" + preferredLevel);
 
-                // Try preferred level first (may need VIP/SVIP for higher tiers)
-                if (cookie != null && !cookie.isEmpty()) {
-                    try {
-                        url = fetchSongUrl(songId, cookie, preferredLevel);
-                        if (url != null) MusicLog.d(TAG, "获取" + preferredLevel + " URL成功: " + songId);
-                    } catch (Exception e) {
-                        MusicLog.w(TAG, "eapi " + preferredLevel + " 失败: " + songId, e);
+                // Try preferred level first (may need VIP/SVIP for higher tiers).
+                // Runs even with an EMPTY cookie on purpose: anonymous eapi
+                // returns the trial clip, and that trial flag is what routes
+                // the song through the watch gateway (guest session) below.
+                // Skipping here would fall through to the direct-link fallback
+                // with trialOnly=false and the gateway would never run.
+                try {
+                    JSONObject item = fetchSongUrlData(songId, cookie, preferredLevel);
+                    url = extractUrlFromItem(item);
+                    trialOnly = url != null && isTrialUrlItem(item);
+                    if (url != null) {
+                        MusicLog.d(TAG, "获取" + preferredLevel + " URL成功: " + songId
+                                + (trialOnly ? " (试听)" : ""));
                     }
+                } catch (Exception e) {
+                    MusicLog.w(TAG, "eapi " + preferredLevel + " 失败: " + songId, e);
                 }
 
                 // Fallback through free quality levels
@@ -894,9 +933,12 @@ public class MusicApiHelper {
                     for (String level : FREE_FALLBACK_LEVELS) {
                         if (level.equals(preferredLevel)) continue; // already tried
                         try {
-                            url = fetchSongUrl(songId, cookie, level);
+                            JSONObject item = fetchSongUrlData(songId, cookie, level);
+                            url = extractUrlFromItem(item);
                             if (url != null) {
-                                MusicLog.d(TAG, "回落到" + level + " URL成功: " + songId);
+                                trialOnly = isTrialUrlItem(item);
+                                MusicLog.d(TAG, "回落到" + level + " URL成功: " + songId
+                                        + (trialOnly ? " (试听)" : ""));
                                 break;
                             }
                         } catch (Exception e) {
@@ -908,11 +950,13 @@ public class MusicApiHelper {
                 // Last resort: direct link
                 if (url == null) {
                     url = "https://music.163.com/song/media/outer/url?id=" + songId + ".mp3";
+                    trialOnly = false;
                     MusicLog.w(TAG, "使用直连兜底URL: " + songId);
                 }
 
                 String finalUrl = url;
-                mainHandler.post(() -> callback.onResult(finalUrl));
+                boolean finalTrial = trialOnly;
+                mainHandler.post(() -> callback.onResult(finalUrl, finalTrial));
             } catch (Exception e) {
                 MusicLog.e(TAG, "getSongUrl 异常: " + songId, e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
@@ -969,8 +1013,11 @@ public class MusicApiHelper {
     /**
      * Fetch song URL using eapi crypto, which is required by /api/song/enhance/player/url/v1
      * for lossless and higher quality tiers (matches NeteaseCloudMusicApiBackup song_url_v1.js).
+     *
+     * <p>返回原始 item（而不是只返回 url）：里面的 {@code freeTrialInfo} 决定这首歌是不是
+     * 「只能试听」—— 上层据此决定是否走手表网关拿完整链接。</p>
      */
-    private static String fetchSongUrl(long songId, String cookie, String level)
+    private static JSONObject fetchSongUrlData(long songId, String cookie, String level)
             throws Exception {
         JSONObject data = new JSONObject();
         data.put("ids", "[" + songId + "]");
@@ -984,23 +1031,31 @@ public class MusicApiHelper {
         data.put("csrf_token", csrfToken);
 
         String response = eapiPost("/api/song/enhance/player/url/v1", data.toString(), cookie);
-        return extractSongUrlFromResponse(response);
-    }
-
-    private static String extractSongUrlFromResponse(String response) throws Exception {
         JSONObject json = new JSONObject(response);
-        JSONArray data = json.optJSONArray("data");
-        if (data != null && data.length() > 0) {
-            JSONObject first = data.getJSONObject(0);
-            int code = first.optInt("code", -1);
-            if (code == 200) {
-                String url = first.optString("url", null);
-                if (url != null && !"null".equals(url) && !url.isEmpty()) {
-                    return url;
-                }
-            }
+        JSONArray dataArray = json.optJSONArray("data");
+        if (dataArray != null && dataArray.length() > 0) {
+            return dataArray.getJSONObject(0);
         }
         return null;
+    }
+
+    private static String extractUrlFromItem(JSONObject item) {
+        if (item == null) {
+            return null;
+        }
+        if (item.optInt("code", -1) != 200) {
+            return null;
+        }
+        String url = item.optString("url", null);
+        if (url != null && !"null".equals(url) && !url.isEmpty()) {
+            return url;
+        }
+        return null;
+    }
+
+    /** freeTrialInfo present means the URL only contains the free trial clip. */
+    private static boolean isTrialUrlItem(JSONObject item) {
+        return item != null && item.optJSONObject("freeTrialInfo") != null;
     }
 
     // ==================== 歌手页 ====================
@@ -1686,6 +1741,38 @@ public class MusicApiHelper {
                 MusicLog.e(TAG, "短信登录异常", e);
                 String errMsg = e.getMessage() != null ? e.getMessage() : "网络连接失败";
                 mainHandler.post(() -> callback.onError(errMsg));
+            }
+        });
+    }
+
+    // ==================== Logout（1016 合并） ====================
+
+    /**
+     * Real server-side logout.
+     * (NeteaseCloudMusicApiBackup module/logout.js: request('/api/logout', {}, createOption(query)))
+     * Weapi POST /api/logout with the user cookie (__csrf included).
+     * The caller clears the local cookie afterwards regardless of the result.
+     */
+    public static void logout(String cookie, LikeCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "退出登录", null);
+                JSONObject data = new JSONObject();
+                data.put("csrf_token", extractCsrfToken(cookie));
+
+                String response = weapiPost("/api/logout", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                boolean ok = code == 200;
+                if (!ok) {
+                    MusicLog.w(TAG, "退出登录返回 code=" + code);
+                }
+                mainHandler.post(() -> callback.onResult(ok));
+            } catch (Exception e) {
+                // Network failure must not block local logout; report and let caller decide
+                MusicLog.e(TAG, "退出登录失败", e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "网络连接失败"));
             }
         });
     }

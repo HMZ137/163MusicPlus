@@ -124,6 +124,51 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- 1016 合并：随机播放切歌顺序（随机 / 列表顺序，点按循环；只在随机播放模式下影响上下键） -->
+            <LinearLayout
+                android:id="@+id/row_random_skip_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="随机切歌顺序"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_random_skip_mode_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/colorPrimary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_more_horiz"
+                    android:alpha="0.5" />
+            </LinearLayout>
+
             <!-- Keep screen on: SwitchMaterial row -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -248,6 +293,92 @@
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switch_sleep_timer_exit_app"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- 1016 合并：使用手表解析接口（试听歌曲先用手表网关拿完整链接，失败回退试听） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="手表解析接口"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="试听歌曲先用手表网关解析完整链接，失败则回退试听"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_use_watch_api"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- 1016 合并：跳过试听歌曲（仅可试听的歌自动跳过，跳过时不提示） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="跳过试听歌曲"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="仅可试听的歌曲自动跳过（完整链接不跳过），跳过时不提示"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_skip_trial_songs"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
             </LinearLayout>

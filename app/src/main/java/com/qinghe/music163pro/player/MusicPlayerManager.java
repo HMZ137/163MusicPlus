@@ -27,6 +27,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
+import com.qinghe.music163pro.api.NeteaseWatchApi;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.util.MusicLog;
@@ -144,6 +145,12 @@ public class MusicPlayerManager {
     private Context appContext;
     private long bilibiliRetrySongId = -1;
     private int bilibiliRetryCount = 0;
+    /**
+     * 1016 合并：MediaPlayer 出错重试的保护 —— 同一首歌最多自动重取一次 URL。
+     * 没有这个保护时，死链会无限循环（error → getSongUrl → 同一个死链 → error…），
+     * 每 ~300ms 打一次接口。
+     */
+    private long errorRetrySongId = -1;
 
     // ExoPlayer for Bilibili audio (better seek/buffering than MediaPlayer)
     private ExoPlayer exoPlayer;
@@ -457,8 +464,11 @@ public class MusicPlayerManager {
                 if (song != null) {
                     song.setUrl(null);
                 }
-                // Retry without cached URL
-                if (song != null) {
+                // Retry without cached URL —— 但每首歌只重试一次：
+                // 没有这个 guard 时死链会无限循环（error → getSongUrl → 同一个死链 → error…），
+                // 每 ~300ms 打一次接口。
+                if (song != null && song.getId() != errorRetrySongId) {
+                    errorRetrySongId = song.getId();
                     String cookie = getCookie();
                     MusicApiHelper.getSongUrl(song.getId(), cookie, false,
                             new MusicApiHelper.UrlCallback() {
@@ -487,7 +497,7 @@ public class MusicPlayerManager {
                 return true;
             });
             mediaPlayer.prepareAsync();
-            probeLoudnessFeasibility(false);   // F5/R4 探针
+            probeLoudnessFeasibility(false);   // F5/R4 探针
             applyLoudnessBalance();
         } catch (Exception e) {
             if (callback != null) {
@@ -567,7 +577,7 @@ public class MusicPlayerManager {
                 return true;
             });
             mediaPlayer.prepareAsync();
-            probeLoudnessFeasibility(false);   // F5/R4 探针
+            probeLoudnessFeasibility(false);   // F5/R4 探针
             applyLoudnessBalance();
         } catch (Exception e) {
             if (callback != null) {
@@ -947,7 +957,12 @@ public class MusicPlayerManager {
         // 「下一首播放」优先：用户明确指定了接下来听什么，随机模式下也让位于它
         if (consumeQueuedNext()) return;
         if (playMode == PlayMode.RANDOM && !personalFmMode) {
-            playShuffle(true);
+            // 1016：随机播放模式下，上下键可按设置走「随机切歌」或「列表顺序」
+            if (isRandomSkipRandom()) {
+                playShuffle(true);
+            } else {
+                playNextSequential();
+            }
         } else {
             playNextSequential();
         }
@@ -961,7 +976,13 @@ public class MusicPlayerManager {
         if (playlist.isEmpty()) return;
         cancelPendingSleepStopOnManualAction();
         if (playMode == PlayMode.RANDOM && !personalFmMode) {
-            playShuffle(false);
+            // 1016：随机切歌开关关掉时，上一首按列表顺序回退
+            if (isRandomSkipRandom()) {
+                playShuffle(false);
+            } else {
+                currentIndex = (currentIndex - 1 + playlist.size()) % playlist.size();
+                playCurrent();
+            }
         } else {
             currentIndex = (currentIndex - 1 + playlist.size()) % playlist.size();
             playCurrent();
@@ -1214,6 +1235,10 @@ public class MusicPlayerManager {
             return;
         }
 
+        // 用户主动播放（或上下键切歌）时，重新允许这首歌再做一次错误重试。
+        // MediaPlayer 错误循环走的是 play() 内部重试、不经过这里，所以不会重新打开死循环。
+        errorRetrySongId = -1;
+
         // Always fetch a fresh URL to avoid expired URL issues.
         // NetEase song URLs are time-limited, so cached URLs may not work.
         String cookie = getCookie();
@@ -1225,14 +1250,21 @@ public class MusicPlayerManager {
             preferredQuality = prefs.getString("preferred_quality", "exhigh");
         }
         String qualityForLambda = preferredQuality;
-        MusicApiHelper.getSongUrlWithQuality(song.getId(), cookie, qualityForLambda,
-                new MusicApiHelper.UrlCallback() {
+        MusicApiHelper.getSongUrlInfo(song.getId(), cookie, qualityForLambda,
+                new MusicApiHelper.SongUrlInfoCallback() {
             @Override
-            public void onResult(String freshUrl) {
+            public void onResult(String freshUrl, boolean trialOnly) {
                 autoSkipCount = 0;   // 成功播放后清零"连续跳过"计数
-                song.setUrl(freshUrl);
-                currentlyPlayingSongId = song.getId();
-                play(freshUrl);
+                // 1016：主接口给出试听片段、或只给了外链直连兜底（外层 /song/media/outer/url）时，
+                // 交给手表网关再要一次完整链接。后一种情况在未登录时很常见：匿名 eapi 对 VIP 歌
+                // 直接 404（没有 freeTrialInfo），不路由到网关就只能听到外链跳转后的试听。
+                boolean needsGateway = trialOnly
+                        || (freshUrl != null && freshUrl.contains("/song/media/outer/url"));
+                if (needsGateway && isWatchParseEnabled()) {
+                    resolveViaWatchGateway(song, freshUrl, cookie);
+                    return;
+                }
+                finishPlay(song, freshUrl, trialOnly);
             }
 
             @Override
@@ -1259,6 +1291,159 @@ public class MusicPlayerManager {
                 }
             }
         });
+    }
+
+    // ==================== 1016：手表网关（游客/试听兜底） ====================
+
+    /**
+     * 拿到试听链接且「使用手表解析接口」开着时：找手表网关（NeteaseWatchApi，eapi trialMode）
+     * 要完整链接。
+     *   - 网关给出完整链接 → 播它
+     *   - 网关没有（空/仍是试听）→ 回退原始试听链接，再走原来的「跳过试听」判断
+     */
+    private void resolveViaWatchGateway(Song song, String trialUrl, String sessionCookie) {
+        MusicLog.i("MusicPlayerManager", "试听链接，手表网关解析 songId=" + song.getId());
+        boolean loggedIn = sessionCookie != null && sessionCookie.contains("MUSIC_U");
+        if (loggedIn) {
+            // 已登录：用登录态 cookie 认证网关
+            NeteaseWatchApi.setSessionCookie(sessionCookie);
+            requestWatchPlayUrl(song, trialUrl);
+            return;
+        }
+        // 未登录：复用首次使用时的匿名「游客」cookie（长期保存、任何情况都不删除，
+        // 只给 NeteaseWatchApi 的取 URL 请求用，绝不用于主接口）。
+        String guest = readPersistedGuestCookie();
+        if (!guest.isEmpty()) {
+            NeteaseWatchApi.setSessionCookie(guest);
+            requestWatchPlayUrl(song, trialUrl);
+            return;
+        }
+        // 首次使用：通过游客接口铸一个匿名会话
+        NeteaseWatchApi.fetchGuestSession(new NeteaseWatchApi.GuestSessionCallback() {
+            @Override
+            public void onResult(String guestCookie) {
+                if (!guestCookie.isEmpty()) {
+                    persistGuestCookie(guestCookie);
+                    NeteaseWatchApi.setSessionCookie(guestCookie);
+                    MusicLog.i("MusicPlayerManager", "已获取并保存游客会话");
+                }
+                requestWatchPlayUrl(song, trialUrl);
+            }
+
+            @Override
+            public void onError(String message) {
+                MusicLog.w("MusicPlayerManager", "获取游客会话失败: " + message);
+                requestWatchPlayUrl(song, trialUrl);
+            }
+        });
+    }
+
+    /** 游客 cookie (watch_guest_cookie) —— 长期存储，任何情况都不删除。 */
+    private static final String PREF_WATCH_GUEST_COOKIE = "watch_guest_cookie";
+
+    private String readPersistedGuestCookie() {
+        return appContext == null ? "" : appContext.getSharedPreferences("music163_settings",
+                Context.MODE_PRIVATE).getString(PREF_WATCH_GUEST_COOKIE, "");
+    }
+
+    private void persistGuestCookie(String guestCookie) {
+        if (appContext == null || guestCookie == null || guestCookie.isEmpty()) return;
+        appContext.getSharedPreferences("music163_settings", Context.MODE_PRIVATE)
+                .edit().putString(PREF_WATCH_GUEST_COOKIE, guestCookie).apply();
+    }
+
+    /** resolveViaWatchGateway 的后半段：发网关请求并处理回退。 */
+    private void requestWatchPlayUrl(Song song, String trialUrl) {
+        NeteaseWatchApi.getPlayUrl(song.getId(), new NeteaseWatchApi.WatchUrlCallback() {
+            @Override
+            public void onResult(String url, boolean trialOnly) {
+                if (!trialOnly && url != null && !url.isEmpty()) {
+                    MusicLog.i("MusicPlayerManager", "手表网关返回完整链接 songId=" + song.getId());
+                    finishPlay(song, url, false);
+                } else {
+                    // 网关也没给完整链接：回退试听链接
+                    finishPlay(song, trialUrl, true);
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                MusicLog.w("MusicPlayerManager", "手表网关解析失败，回退试听: " + message);
+                finishPlay(song, trialUrl, true);
+            }
+        });
+    }
+
+    /** playCurrent 的共同收尾：先按「跳过试听」开关判断，然后真正开始播放。 */
+    private void finishPlay(Song song, String url, boolean trialOnly) {
+        if (trialOnly && isSkipTrialEnabled()) {
+            onTrialOnlySong(song);
+            return;
+        }
+        trialSkipStreak = 0;
+        song.setUrl(url);
+        currentlyPlayingSongId = song.getId();
+        play(url);
+    }
+
+    /** 开关选项：是否使用手表解析接口（默认开）。 */
+    private boolean isWatchParseEnabled() {
+        return appContext == null || appContext.getSharedPreferences("music163_settings",
+                Context.MODE_PRIVATE).getBoolean("use_watch_parse", true);
+    }
+
+    /** 开关选项：随机播放模式下上下键随机切歌（默认关 = 按列表顺序）。 */
+    private boolean isRandomSkipRandom() {
+        return appContext != null && appContext.getSharedPreferences("music163_settings",
+                Context.MODE_PRIVATE).getBoolean("random_skip_random", false);
+    }
+
+    // ==================== 1016：跳过试听歌曲 ====================
+
+    private int trialSkipStreak = 0;
+
+    /** 开关选项：仅可试听的歌曲自动跳过（默认关）。 */
+    private boolean isSkipTrialEnabled() {
+        return appContext != null && appContext.getSharedPreferences("music163_settings",
+                Context.MODE_PRIVATE).getBoolean("skip_trial_songs", false);
+    }
+
+    /**
+     * URL 接口只给了试听片段、且用户开了「跳过试听歌曲」：静默跳到下一首。
+     *
+     * <p>跳完一整圈还没有可播的歌就停下（而不是无限循环）；私人 FM 到最后一首时走顺序推进。</p>
+     */
+    private void onTrialOnlySong(Song song) {
+        trialSkipStreak++;
+        // 静默跳过（不再 Toast「已跳过试听歌曲」）
+        Log.d(TAG, "试听歌曲跳过: " + song.getDisplayName());
+        if (playlist.isEmpty()) {
+            return;
+        }
+        if (trialSkipStreak >= playlist.size()) {
+            // 整圈都没有可播的歌：停止，避免无限循环
+            trialSkipStreak = 0;
+            if (callback != null) {
+                mainHandler.post(() -> callback.onError("列表歌曲仅可试听，已停止"));
+            }
+            stop();
+            notifyPlayStateChanged(false);
+            return;
+        }
+        if (personalFmMode && currentIndex == playlist.size() - 1) {
+            playNextSequential();
+            return;
+        }
+        if (playMode == PlayMode.RANDOM && playlist.size() > 1) {
+            int newIndex;
+            do {
+                newIndex = random.nextInt(playlist.size());
+            } while (newIndex == currentIndex);
+            currentIndex = newIndex;
+        } else {
+            currentIndex = (currentIndex + 1) % playlist.size();
+        }
+        playCurrent();
     }
 
     /**
@@ -1419,7 +1604,7 @@ public class MusicPlayerManager {
 
             exoPlayer.setMediaItem(MediaItem.fromUri(url));
             exoPlayer.prepare();
-            probeLoudnessFeasibility(true);   // F5/R4 探针
+            probeLoudnessFeasibility(true);   // F5/R4 探针
             applyLoudnessBalance();
 
             if (resumePositionMs > 0) {

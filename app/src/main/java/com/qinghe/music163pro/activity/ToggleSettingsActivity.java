@@ -36,6 +36,10 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private static final String PREF_OLED_BURN_PROTECTION = "oled_burn_protection";
     private static final String PREF_SLEEP_TIMER_MODE = "sleep_timer_mode";
     private static final String PREF_FAV_MODE_CLOUD = "fav_mode_cloud";
+    // 1016 合并：手表解析接口 / 跳过试听歌曲 / 随机播放切歌顺序
+    private static final String PREF_USE_WATCH_API = "use_watch_parse";
+    private static final String PREF_SKIP_TRIAL_SONGS = "skip_trial_songs";
+    private static final String PREF_RANDOM_SKIP_RANDOM = "random_skip_random";
     private static final int MODE_MANUAL = 0;
     private static final int MODE_AUTO = 1;
     // Lyric scroll modes: 0=每行 (follow current line), 1=阻塞 (blocked by user scroll)
@@ -57,6 +61,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private SwitchMaterial switchOledBurnProtection;
     private SwitchMaterial switchLocalOnlyMode;
     private SwitchMaterial switchOnlineOnlyMode;
+    private SwitchMaterial switchUseWatchApi;
+    private SwitchMaterial switchSkipTrialSongs;
+    private TextView tvRandomSkipModeValue;
     private TextView tvFavModeValue;
     private TextView tvSleepTimerModeValue;
     private TextView tvSpeedModeValue;
@@ -104,6 +111,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         switchOledBurnProtection = findViewById(R.id.switch_oled_burn_protection);
         switchLocalOnlyMode = findViewById(R.id.switch_local_only_mode);
         switchOnlineOnlyMode = findViewById(R.id.switch_online_only_mode);
+        switchUseWatchApi = findViewById(R.id.switch_use_watch_api);
+        switchSkipTrialSongs = findViewById(R.id.switch_skip_trial_songs);
+        tvRandomSkipModeValue = findViewById(R.id.tv_random_skip_mode_value);
         tvFavModeValue = findViewById(R.id.tv_fav_mode_value);
         tvSleepTimerModeValue = findViewById(R.id.tv_sleep_timer_mode_value);
         tvSpeedModeValue = findViewById(R.id.tv_speed_mode_value);
@@ -193,6 +203,37 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                     isChecked ? "定时结束后将退出应用" : "定时结束后仅停止播放",
                     Toast.LENGTH_SHORT).show();
         });
+
+        // Favorites mode: tap to cycle (本地 / 云端)
+        if (rowFavMode != null) rowFavMode.setOnClickListener(v -> cycleFavMode());
+
+        // 1016：使用手表解析接口（试听歌先用手表网关拿完整链接）
+        if (switchUseWatchApi != null) {
+            switchUseWatchApi.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                prefs.edit().putBoolean(PREF_USE_WATCH_API, isChecked).apply();
+                Toast.makeText(this,
+                        isChecked ? "试听歌曲将先用手表接口解析完整链接" : "已关闭手表解析，按原逻辑获取URL",
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // 1016：跳过试听歌曲（仅可试听的自动跳过、跳过时不提示）
+        if (switchSkipTrialSongs != null) {
+            switchSkipTrialSongs.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                prefs.edit().putBoolean(PREF_SKIP_TRIAL_SONGS, isChecked).apply();
+                Toast.makeText(this,
+                        isChecked ? "已开启：仅可试听的歌曲自动跳过" : "已关闭：试听歌曲照常播放",
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        // 1016：随机播放切歌顺序（随机 / 列表顺序，点按循环）
+        LinearLayout rowRandomSkipMode = findViewById(R.id.row_random_skip_mode);
+        if (rowRandomSkipMode != null) {
+            rowRandomSkipMode.setOnClickListener(v -> cycleRandomSkipMode());
+        }
 
         // Favorites mode: tap to cycle (本地 / 云端)
         if (rowFavMode != null) rowFavMode.setOnClickListener(v -> cycleFavMode());
@@ -483,6 +524,12 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 switchOnlineOnlyMode.setChecked(PlaybackMode.isOnlineOnly(this));
             }
         }
+        if (switchUseWatchApi != null) {
+            switchUseWatchApi.setChecked(prefs.getBoolean(PREF_USE_WATCH_API, true));
+        }
+        if (switchSkipTrialSongs != null) {
+            switchSkipTrialSongs.setChecked(prefs.getBoolean(PREF_SKIP_TRIAL_SONGS, false));
+        }
         updatingSwitch = false;
         updateFavModeValue();
         updateSleepTimerModeValue();
@@ -490,6 +537,24 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         updateRecognitionModeValue();
         updateLyricScrollModeValue();
         updateLyricResumeIntervalValue();
+        updateRandomSkipModeValue();
+    }
+
+    /** 1016：随机播放切歌顺序（随机 / 列表顺序）在两种取值间切换。 */
+    private void cycleRandomSkipMode() {
+        boolean current = prefs.getBoolean(PREF_RANDOM_SKIP_RANDOM, false);
+        boolean next = !current;
+        prefs.edit().putBoolean(PREF_RANDOM_SKIP_RANDOM, next).apply();
+        updateRandomSkipModeValue();
+        Toast.makeText(this,
+                "随机播放切歌顺序: " + (next ? "随机" : "列表顺序"),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateRandomSkipModeValue() {
+        if (tvRandomSkipModeValue == null) return;
+        boolean random = prefs.getBoolean(PREF_RANDOM_SKIP_RANDOM, false);
+        tvRandomSkipModeValue.setText(random ? "随机" : "列表顺序");
     }
 
     private void cycleFavMode() {
