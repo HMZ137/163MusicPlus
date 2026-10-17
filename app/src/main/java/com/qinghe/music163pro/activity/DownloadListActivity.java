@@ -30,7 +30,6 @@ import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.fragment.DownloadTabFragment;
 import com.qinghe.music163pro.fragment.LocalMusicFragment;
-import com.qinghe.music163pro.fragment.LocalMusicTabFragment;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -48,7 +47,7 @@ import java.util.Map;
  * 长按进入多选，可批量收藏 / 批量删除。
  */
 public class DownloadListActivity extends BaseWatchActivity
-        implements DownloadTabFragment.Host, LocalMusicTabFragment.Host {
+        implements DownloadTabFragment.Host, LocalMusicFragment.Host {
 
     /** 4-1：内容区容器 —— 承载「下载 / 本地」两页。 */
     private ViewPager2 vpDownloadTabs;
@@ -302,10 +301,16 @@ public class DownloadListActivity extends BaseWatchActivity
         refreshHandler.removeCallbacks(refreshTick);
     }
 
-    /** 「本地」页的桥接按钮（4-3 之前保留原有能力）。 */
+    /**
+     * 「本地」页里点了一首歌（4-3 步骤③-2 起由 {@link LocalMusicFragment} 回调）。
+     *
+     * <p>行为与步骤② 的标签页一致：播放已由 Fragment 设好队列并开始，这里跳回主界面
+     * （主界面是播放器页，用户点歌后自然要看到它）。完整页 LocalMusicActivity 的宿主
+     * 实现相反 —— 那里是二级页面，直接 finish 自己。</p>
+     */
     @Override
-    public void onOpenLocalMusicTab() {
-        openLocalMusicTab();
+    public void onLocalSongPlayed() {
+        startActivity(new Intent(this, MainActivity.class));
     }
 
     @Override
@@ -674,20 +679,6 @@ public class DownloadListActivity extends BaseWatchActivity
         song.setUrl(file.getAbsolutePath());
         song.setForceLocalPlayback(true);
         return song;
-    }
-    /**
-     * 切到「本地」标签（本机音乐页）。
-     *
-     * <p>「本地音乐管理」现在是下载 / 本地两个标签，但两边的内容各自都是一个成熟页面
-     * （下载有进度刷新、整理、批量收藏；本地有扫描、排序、搜索、局域网传歌），
-     * 合成一个 Activity 要动两套列表与动作行，风险大于收益。所以标签仍然跨 Activity：
-     * 先开目标页再 finish 自己，**不往返回栈里叠页面**（按返回键应当回到进入本页之前的
-     * 位置，而不是在两个标签之间来回跳），并去掉切换动画，让它看着像页内切换。</p>
-     */
-    private void openLocalMusicTab() {
-        startActivity(new Intent(this, LocalMusicActivity.class));
-        overridePendingTransition(0, 0);
-        finish();
     }
 
     /**

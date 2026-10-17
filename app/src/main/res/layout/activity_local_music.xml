@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  4-3 步骤③-2：完整页 LocalMusicActivity 变「薄宿主」。
+  本布局只剩两块：
+    1) 标题栏（动作行 搜索/排序/更多 + 标题「本地音乐」+ 页内标签 下载/本地）；
+    2) 内容区 FrameLayout —— 由 advanced=true 的 LocalMusicFragment 填充
+       （列表 / 状态行 / 空态；搜索、排序、A-Z、多选、局域网传歌的逻辑也在 Fragment 里）。
+  标题栏的 inset / 额外高度计算保持不变（见 WatchBackButton 的注释），否则标题会被压掉半截。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -8,12 +16,10 @@
 
     <!--
       标题栏两行：
-        第 1 行 = 右侧动作按钮（A-Z / 排序 / 随机）；
+        第 1 行 = 右侧动作按钮（搜索 / 排序 / 更多）；
         第 2 行 = 标题「本地音乐」。
       两行一起被 WatchBackButton.applyTitleBarInset() 撑到「返回按钮占地」的高度（本机约 101px），
-      所以头部总高≈一个返回按钮 —— 不再额外吃掉列表空间（这是上一版踩的坑：把占位加到第 1 行上，
-      那一行被强行撑到 101px，再叠一行标题，头部近 150px，列表只剩两行半）。
-      标题要放长文本（如扫描进度）放不下，所以进度改到下面的状态行去显示。
+      所以头部总高≈一个返回按钮 —— 不再额外吃掉列表空间。
     -->
     <LinearLayout
         android:id="@+id/layout_local_music_title_bar"
@@ -26,11 +32,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <!--
-              本页一共有 5 个操作（搜索 / 排序 / A-Z 字母索引 / 随机播放 / 局域网传歌），
-              标题栏扣掉返回按钮占位后只有约 220px，一行放不下 5 个文字按钮。
-              所以：最常用的两个留在外面，其余（含全部 5 个的完整入口）收进「更多」二级菜单。
-            -->
+            <!-- 搜索：弹搜索框（逻辑在 LocalMusicFragment.showSearchDialog） -->
             <TextView
                 android:id="@+id/btn_local_search"
                 android:layout_width="wrap_content"
@@ -64,7 +66,7 @@
                 android:textColor="@color/colorPrimary"
                 android:textSize="11sp" />
 
-            <!-- 更多：五个操作都在这里（A-Z 字母索引 / 随机播放 / 局域网传歌 等） -->
+            <!-- 更多：五个操作都在这里（搜索 / 排序 / A-Z 字母索引 / 随机播放 / 局域网传歌 + 刷新缓存） -->
             <TextView
                 android:id="@+id/btn_local_more"
                 android:layout_width="wrap_content"
@@ -100,7 +102,6 @@
           页内二级标签：下载 / 本地。样式与「收藏」页一致（纯文字、无底衬、等宽、仅颜色区分选中）。
           必须放在**标题栏里面**：标题栏高度被 applyTitleBarInset() 钉成「返回按钮占地」，
           只够「动作行 + 标题」两行；把标签放在外面时标题会被挤掉下半截（实机确认）。
-          放进来的代价由 WatchBackButton.addTitleBarExtraHeight() 补足高度，头部总高不变。
         -->
         <LinearLayout
             android:id="@+id/ll_local_music_tabs"
@@ -137,40 +138,10 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!--
-      状态 / 筛选行：只在需要时出现 —— 扫描进度 / 搜索命中 / 已移出若干首。
-      点按行为：搜索中 → 清除搜索；否则 → 打开「已移出」恢复界面。
-    -->
-    <TextView
-        android:id="@+id/tv_status_row"
-        android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:background="?attr/selectableItemBackground"
-        android:clickable="true"
-        android:ellipsize="end"
-        android:focusable="true"
-        android:gravity="center"
-        android:singleLine="true"
-        android:textColor="@color/text_secondary"
-        android:textSize="11sp"
-        android:visibility="gone" />
-
-    <ListView
-        android:id="@+id/lv_local_music"
+    <!-- 内容区：advanced=true 的 LocalMusicFragment 挂在这里 -->
+    <FrameLayout
+        android:id="@+id/local_music_fragment_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp" />
-
-    <TextView
-        android:id="@+id/tv_local_music_empty"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="未找到本地音乐"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp"
-        android:visibility="gone" />
+        android:layout_weight="1" />
 </LinearLayout>

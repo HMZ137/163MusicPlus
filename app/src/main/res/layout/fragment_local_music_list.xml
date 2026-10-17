@@ -1,32 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  4-3 步骤②：本地音乐 Fragment 的视图层（用于下载页「本地」标签）。
-  刻意只放「列表 + 状态行 + 空态」：搜索 / A-Z 索引条 / 多选 / 局域网传歌仍留在完整页
-  LocalMusicActivity 里（标签页是轻量浏览入口，完整页是全能管理入口 —— 见文档 4-3 的取舍说明）。
+  4-3 步骤③-2：本地音乐 Fragment 的视图层（两条入口共用）。
+
+  历史：步骤② 这里只有「列表 + 状态行 + 空态」三件套，给下载页「本地」标签用；
+  步骤③-2 把完整页 LocalMusicActivity 的列表区也搬到这里，于是它同时充当
+  「More→本机音乐」完整页的内容区（标题栏仍由宿主 Activity 提供）。
+
+  视图刻意保持与改造前的 activity_local_music.xml 列表区一致：
+  状态行 32dp（搜索命中 / 扫描进度 / 已移出）、ListView 撑满、空态同尺寸；
+  两侧留白由宿主布局的 6dp padding 提供，本布局不再重复加，避免完整页变窄。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:paddingStart="6dp"
-    android:paddingEnd="6dp">
+    android:orientation="vertical">
 
+    <!--
+      状态 / 筛选行：只在需要时出现。
+      · 完整页（advanced=true）：扫描进度 / 搜索命中 / 已移出，点按可清除搜索或恢复已移出的曲目；
+      · 标签页（advanced=false）：只显示「扫描中… / 读取歌曲信息中… / 本地音乐 N 首」。
+    -->
     <TextView
-        android:id="@+id/tv_local_music_tab_status"
+        android:id="@+id/tv_status_row"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="4dp"
+        android:layout_height="32dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
         android:ellipsize="end"
+        android:focusable="true"
+        android:gravity="center"
         android:singleLine="true"
-        android:text="扫描中…"
         android:textColor="@color/text_secondary"
-        android:textSize="@dimen/watch_text_caption" />
+        android:textSize="11sp"
+        android:visibility="gone" />
 
     <ListView
-        android:id="@+id/lv_local_music_tab"
+        android:id="@+id/lv_local_music"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -34,13 +43,13 @@
         android:dividerHeight="0.5dp" />
 
     <TextView
-        android:id="@+id/tv_local_music_tab_empty"
+        android:id="@+id/tv_local_music_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center"
         android:text="@string/local_music_empty"
         android:textColor="@color/text_secondary"
-        android:textSize="@dimen/watch_text_sub"
+        android:textSize="13sp"
         android:visibility="gone" />
 </LinearLayout>
