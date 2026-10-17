@@ -1,6 +1,8 @@
 package com.qinghe.music163pro.util;
 
 import android.app.Activity;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,10 +15,12 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 /**
- * G3：标题栏「<b>下滑收起 / 上滑展开</b>」，并要求标题栏本身**固定、不随列表滚动**。
+ * G3：标题栏「<b>上滑收起 / 下滑展开</b>」，并要求标题栏本身**固定、不随列表滚动**。
  *
- * <p><b>方向以需求方 2026-10-17 的口径为准</b>：<u>下滑 = 收起，上滑 = 展开</u>。
- * 技术文档此前写的「上滑收起 / 下滑展开」是错的，已在 G3 节更正，改代码时别照旧文档做反。</p>
+ * <p><b>方向以需求方 2026-10-17 晚的第二次勘误为准</b>：<u>上滑 = 收起，下滑 = 展开</u>；
+ * 并且收起后 <b>2.5 秒无任何触摸操作自动展开</b>（需求方口径「超过 2.5s 无操作时展出」）。
+ * 此前记录过的「下滑 = 收起，上滑 = 展开」已被需求方推翻，技术文档 G3 节同步改回并补上自动展开，
+ * 改代码时以本文件注释为准。</p>
  *
  * <p><b>为什么放在这里统一做</b>：与 G5 同一思路 —— 全 App 的标题栏有一个统一时机
  * （{@link WatchBackButton#applyTitleBarInset} / {@link WatchBackButton#applyTitleBarTopInset}），
@@ -39,6 +43,13 @@ public final class TitleBarCollapse {
     private static final int SWIPE_THRESHOLD_BASE = 26;
     /** 收起/展开动画时长。 */
     private static final long ANIM_MS = 180L;
+    /**
+     * 收起后**无操作自动展开**的等待时长（需求方 2026-10-17 晚口径：2.5 秒）。
+     *
+     * <p>「无操作」按<b>没有新的触摸按下</b>判定：一旦用户再次按下屏幕（滚动列表、点击等），
+     * 计时从头开始 —— 手还在操作时标题栏不该自己弹回来；手停下来 2.5 秒才自动展开。</p>
+     */
+    private static final long AUTO_EXPAND_MS = 2500L;
 
     /** 已登记的标题栏：Activity → 标题栏 View。 */
     private static final Map<Activity, View> TITLE_BARS =
@@ -49,6 +60,11 @@ public final class TitleBarCollapse {
     /** 本次手势的按下点。 */
     private static final Map<Activity, Float> DOWN_Y =
             Collections.synchronizedMap(new WeakHashMap<Activity, Float>());
+    /** 收起态的自动展开任务：Activity → 待执行的那一次展开。 */
+    private static final Map<Activity, Runnable> AUTO_EXPAND_TASKS =
+            Collections.synchronizedMap(new WeakHashMap<Activity, Runnable>());
+    /** 自动展开用的主线程定时器（只在收起后跑一次，2.5s）。 */
+    private static final Handler AUTO_EXPAND_HANDLER = new Handler(Looper.getMainLooper());
 
     private TitleBarCollapse() {
     }
@@ -110,6 +126,10 @@ public final class TitleBarCollapse {
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 DOWN_Y.put(activity, ev.getY());
+                // 「无操作」以有没有新的按下为准：手还在操作（滚动/点击）时不断顺延自动展开。
+                if (isCollapsed(titleBar)) {
+                    scheduleAutoExpand(activity, titleBar);
+                }
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
@@ -119,9 +139,10 @@ public final class TitleBarCollapse {
                 }
                 float dy = ev.getY() - down;
                 int threshold = WatchUiUtils.px(activity, SWIPE_THRESHOLD_BASE);
-                if (dy >= threshold) {
+                // 需求方 2026-10-17 晚第二次勘误：**上滑 = 收起**（dy 为负）、**下滑 = 展开**（dy 为正）。
+                if (dy <= -threshold) {
                     collapse(activity, titleBar);
-                } else if (dy <= -threshold) {
+                } else if (dy >= threshold) {
                     expand(activity, titleBar);
                 }
                 break;
@@ -134,6 +155,7 @@ public final class TitleBarCollapse {
     /** 页面重新进入时复位为展开（G3 验收：返回再进入时状态复位）。 */
     public static void reset(Activity activity) {
         View titleBar = activity == null ? null : TITLE_BARS.get(activity);
+        cancelAutoExpand(activity);
         if (titleBar != null) {
             expand(activity, titleBar);
         }
@@ -156,9 +178,12 @@ public final class TitleBarCollapse {
             EXPANDED_HEIGHT.put(titleBar, current);
         }
         animateHeight(titleBar, current, 0);
+        // 收起后起一个「2.5 秒无操作自动展开」的计时；用户再有按下会顺延（见 observe）。
+        scheduleAutoExpand(activity, titleBar);
     }
 
     private static void expand(Activity activity, View titleBar) {
+        cancelAutoExpand(activity);
         Integer target = EXPANDED_HEIGHT.get(titleBar);
         if (target == null || target <= 0) {
             // 还没量到过展开高度：退回 wrap_content，让系统自己量
@@ -169,6 +194,42 @@ public final class TitleBarCollapse {
             return;
         }
         animateHeight(titleBar, titleBar.getHeight(), target);
+    }
+
+    /**
+     * 收起后安排一次「2.5 秒无操作自动展开」。
+     *
+     * <p>重复调用先取消旧任务再重排：用户每按一下屏幕，倒计时就从头开始 ——
+     * 手还在操作时标题栏不该自己弹回来。</p>
+     */
+    private static void scheduleAutoExpand(final Activity activity, final View titleBar) {
+        cancelAutoExpand(activity);
+        Runnable task = new Runnable() {
+            @Override
+            public void run() {
+                AUTO_EXPAND_TASKS.remove(activity);
+                if (activity.isFinishing() || activity.isDestroyed()) {
+                    return;
+                }
+                // 收起态才需要展开；期间用户已经手动展开的话这次是空操作
+                if (isCollapsed(titleBar)) {
+                    expand(activity, titleBar);
+                }
+            }
+        };
+        AUTO_EXPAND_TASKS.put(activity, task);
+        AUTO_EXPAND_HANDLER.postDelayed(task, AUTO_EXPAND_MS);
+    }
+
+    /** 取消「自动展开」计时（展开、复位、页面销毁路径都走这里，幂等）。 */
+    private static void cancelAutoExpand(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        Runnable task = AUTO_EXPAND_TASKS.remove(activity);
+        if (task != null) {
+            AUTO_EXPAND_HANDLER.removeCallbacks(task);
+        }
     }
 
     private static void animateHeight(final View titleBar, int from, int to) {

@@ -6,7 +6,7 @@
     android:background="@color/bg_dark"
     android:orientation="vertical">
 
-    <!-- G3：标题栏固定在此，不随下方列表滚动（可下滑收起 / 上滑展开） -->
+    <!-- G3：标题栏固定在此，不随下方列表滚动（可上滑收起 / 下滑展开） -->
     <TextView
             android:id="@+id/tv_more_title"
             android:layout_width="match_parent"

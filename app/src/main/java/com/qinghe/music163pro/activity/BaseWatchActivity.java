@@ -128,7 +128,7 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
     }
 
     /**
-     * G3：观察竖直手势（<b>下滑收起 / 上滑展开</b> 标题栏）。
+     * G3：观察竖直手势（<b>上滑收起 / 下滑展开</b> 标题栏）。
      *
      * <p>放在基类的 {@code dispatchTouchEvent} 里，是为了<b>只观察、不消费</b>事件 ——
      * 返回 {@code super} 的结果，列表的滚动与点击完全不受影响。

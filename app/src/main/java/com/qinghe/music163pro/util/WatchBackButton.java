@@ -136,7 +136,7 @@ public final class WatchBackButton {
         if (params == null) {
             return;
         }
-        // G3：把标题栏登记为「可下滑收起 / 上滑展开」。挂在这个统一时机上，
+        // G3：把标题栏登记为「可上滑收起 / 下滑展开」。挂在这个统一时机上，
         // 所有走本方法的页面一次性接入；标题仍在滚动容器里的页面会被 skip 并留日志。
         TitleBarCollapse.register(activity, titleBar);
         // 下限留够一行标题的高度，再压就压到字上去了
@@ -200,7 +200,7 @@ public final class WatchBackButton {
         if (params == null) {
             return;
         }
-        // G3：同上，统一时机登记标题栏（下滑收起 / 上滑展开）
+        // G3：同上，统一时机登记标题栏（上滑收起 / 下滑展开）
         TitleBarCollapse.register(activity, titleBar);
         int reserved = getReservedStartPadding(activity);
         int current = params.height;
