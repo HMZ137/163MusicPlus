@@ -25,7 +25,7 @@
             android:textSize="@dimen/watch_title_text_size"
             android:textStyle="bold"
             android:letterSpacing="0.05"
-            android:gravity="center" />
+            android:gravity="start" />
 
         <!-- 更多：☰ 矢量图标（需求方 2026-10-17：标题与动作同一行、更多用图标不用文字）；搜索 / 排序收进二级菜单 -->
         <ImageView
@@ -42,6 +42,19 @@
             android:src="@drawable/ic_menu"
             android:tint="@color/colorPrimary" />
     </RelativeLayout>
+
+    <!-- P3：独立信息行「N 首」（与下载页 / 收藏页同一口径） -->
+    <TextView
+        android:id="@+id/tv_local_playlist_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        android:paddingBottom="2dp"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
 
     <!-- 状态行：搜索时显示命中数（点按清除搜索），平时不占高度 -->
     <TextView

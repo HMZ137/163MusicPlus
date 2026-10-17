@@ -58,6 +58,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
     private TextView tvEmpty;
     private TextView tvTitle;
     private TextView tvStatusRow;
+    private TextView tvInfo;
     private MultiSelectController multiSelect;
 
     private String searchQuery = "";
@@ -85,7 +86,10 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
         tvEmpty = findViewById(R.id.tv_local_playlist_empty);
         tvTitle.setText(playlistName);
         // 标题栏撑到左上角浮动返回按钮（X）的占位高度，避免压住第一行
-        WatchBackButton.applyTitleBarInset(this, findViewById(R.id.layout_local_playlist_title_bar));
+        // P3：单行标题栏占位（标题居左 + 右侧 ☰），与其它去 Tab 页面一致
+        WatchBackButton.applySingleRowTitleBarInset(this,
+                findViewById(R.id.layout_local_playlist_title_bar));
+        tvInfo = findViewById(R.id.tv_local_playlist_info);
 
         tvStatusRow = findViewById(R.id.tv_status_row);
         if (tvStatusRow != null) {
@@ -257,6 +261,9 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
         lvSongs.setVisibility(empty ? View.GONE : View.VISIBLE);
         if (empty) {
             tvEmpty.setText(searchQuery.isEmpty() ? "歌单为空" : "没有匹配的曲目");
+        }
+        if (tvInfo != null) {
+            tvInfo.setText(songs.size() + " 首");
         }
         if (tvStatusRow != null) {
             if (searchQuery.isEmpty()) {

@@ -57,8 +57,6 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
     private TextView tvStatus;
     private TextView tvTitle;
     private TextView tvCreatorLabel;
-    private ImageView btnFav;
-    private ImageView btnDelete;
     private long playlistId;
     private String playlistName;
     private int trackCount;
@@ -117,12 +115,13 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         // Title
         tvTitle = new TextView(this);
         updateTitleText();
+        // P3：单行标题栏口径 —— 标题居左、右侧只留 ☰ 菜单（收藏/删除收进菜单）
         tvTitle.setTextColor(0xFFFFFFFF);
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
-        tvTitle.setGravity(Gravity.CENTER);
-        // 左右各留出可用空间：左边给浮动返回按钮，右边给「删除/收藏」那 44px 按钮
-        // （按钮距右边缘还有一圈圆角安全内缩，所以右侧要比左侧多留一点）
-        tvTitle.setPadding(px(56), 0, px(96), px(4));
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_title_text_size));
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setGravity(Gravity.START);
+        tvTitle.setPadding(0, 0, px(44), px(4));
         tvTitle.setSingleLine(true);
         tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
@@ -132,96 +131,43 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         tvTitle.setLayoutParams(titleParams);
         titleRow.addView(tvTitle);
 
-        // 删除按钮 —— 贴右上，但要留出「圆角安全内缩」，否则会被物理圆角切掉
-        int corner = WatchUiUtils.cornerInset(this);
-        btnDelete = new ImageView(this);
-        btnDelete.setImageResource(R.drawable.ic_delete);
-        btnDelete.setClickable(true);
-        btnDelete.setFocusable(true);
-        btnDelete.setId(View.generateViewId());
-        // 触控区取 44px（原来 26x28 太小）；图标靠 padding 收到 ~20px 居中
-        android.widget.RelativeLayout.LayoutParams delParams = new android.widget.RelativeLayout.LayoutParams(
-                px(44), px(44));
-        delParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
-        delParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
-        delParams.setMarginEnd(corner);
-        btnDelete.setLayoutParams(delParams);
-        btnDelete.setPadding(px(12), px(12), px(12), px(12));
-        btnDelete.setVisibility(View.GONE);
-        btnDelete.setOnClickListener(v -> onDeletePlaylist());
-        titleRow.addView(btnDelete);
-
-        // 收藏按钮 —— **直接贴父容器右端，不再用 LEFT_OF 删除按钮定位**。
-        //
-        // 原来写的是 LEFT_OF btnDelete，而 updateActionButtons() 里「别人的歌单」那一支
-        // （雷达歌单就属于这种）会把 btnDelete 设为 GONE —— RelativeLayout 中相对一个 GONE
-        // 的视图定位，依赖方会被甩到父容器最左侧。结果收藏按钮跑到左上角，正好压在浮动
-        // 返回按钮底下：位置错、而且点不到。
-        // 两个按钮在任何分支里都不会同时可见，所以各自贴右端即可，不会重叠。
-        btnFav = new ImageView(this);
-        btnFav.setClickable(true);
-        btnFav.setFocusable(true);
-        android.widget.RelativeLayout.LayoutParams favParams = new android.widget.RelativeLayout.LayoutParams(
-                px(44), px(44));
-        favParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
-        favParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
-        favParams.setMarginEnd(corner);
-        btnFav.setLayoutParams(favParams);
-        btnFav.setPadding(px(12), px(12), px(12), px(12));
-        btnFav.setOnClickListener(v -> togglePlaylistFav());
-        // 给收藏按钮一个 id，供「更多」按钮 LEFT_OF 链式避让
-        btnFav.setId(View.generateViewId());
-        titleRow.addView(btnFav);
-
-        // 「更多」：搜索 / 排序。放收藏按钮左侧，链式避让，不会互相顶掉。
-        TextView btnMore = new TextView(this);
-        btnMore.setText(R.string.local_music_more);
-        btnMore.setTextColor(getResources().getColor(R.color.colorPrimary));
-        btnMore.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
-        btnMore.setPadding(px(6), px(6), px(6), px(6));
+        // P3：右上角只保留 ☰ 矢量菜单（搜索 / 排序 / A-Z / 收藏 / 删除 全收进菜单）
+        ImageView btnMore = new ImageView(this);
+        btnMore.setImageResource(R.drawable.ic_menu);
+        btnMore.setColorFilter(getResources().getColor(R.color.colorPrimary));
         btnMore.setClickable(true);
         btnMore.setFocusable(true);
+        btnMore.setContentDescription("更多");
         android.widget.RelativeLayout.LayoutParams moreParams =
-                new android.widget.RelativeLayout.LayoutParams(
-                        android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
-                        android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
-        // 锚点：始终 INVISIBLE（INVISIBLE 仍参与布局，GONE 不参与）——
-        // 原来 LEFT_OF btnFav，而自己创建的歌单会把 btnFav 设成 GONE，
-        // RelativeLayout 甩依赖方到最左侧，「更多」就被返回按钮完全遮挡了。
-        View endAnchor = new View(this);
-        endAnchor.setId(View.generateViewId());
-        android.widget.RelativeLayout.LayoutParams anchorParams =
-                new android.widget.RelativeLayout.LayoutParams(px(44) + corner, px(1));
-        anchorParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
-        anchorParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
-        endAnchor.setLayoutParams(anchorParams);
-        endAnchor.setVisibility(View.INVISIBLE);
-        titleRow.addView(endAnchor);
-
-        moreParams.addRule(android.widget.RelativeLayout.LEFT_OF, endAnchor.getId());
+                new android.widget.RelativeLayout.LayoutParams(px(40), px(40));
+        moreParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
         moreParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         btnMore.setLayoutParams(moreParams);
+        btnMore.setPadding(px(8), px(8), px(8), px(8));
         btnMore.setOnClickListener(v -> showMoreDialog());
         titleRow.addView(btnMore);
 
         root.addView(titleRow);
 
-        // Creator label (always created, visibility depends on data)
+        // P3：独立信息行（口径）——「创建者 · N 首」，搜索时显示命中数；
+        // 原先标题里的「(N首)」与这一行重复，已从标题移除。
         tvCreatorLabel = new TextView(this);
         tvCreatorLabel.setTextColor(0xB3FFFFFF);
         tvCreatorLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
-        tvCreatorLabel.setGravity(Gravity.CENTER);
-        tvCreatorLabel.setPadding(0, 0, 0, px(2));
-        updateCreatorLabel();
+        tvCreatorLabel.setGravity(Gravity.START);
+        tvCreatorLabel.setSingleLine(true);
+        tvCreatorLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tvCreatorLabel.setPadding(px(2), px(2), px(2), px(2));
         root.addView(tvCreatorLabel);
+        updateInfoRow();
 
         // Status text
         tvStatus = new TextView(this);
         tvStatus.setText("正在加载...");
         tvStatus.setTextColor(0x80FFFFFF);
-        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
-        tvStatus.setGravity(Gravity.CENTER);
-        tvStatus.setPadding(0, px(4), 0, px(4));
+        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
+        tvStatus.setGravity(Gravity.START);
+        tvStatus.setPadding(px(2), px(2), px(2), px(2));
         root.addView(tvStatus);
 
         lvSongs = new ListView(this);
@@ -234,6 +180,8 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         root.addView(lvSongs);
 
         setContentView(root);
+        // P3：单行标题栏占位与 G5 标题居左统一机制（浮动返回按钮 / 物理圆角避让）
+        com.qinghe.music163pro.util.WatchBackButton.applySingleRowTitleBarInset(this, titleRow);
 
         adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, displayList) {
             @Override
@@ -294,7 +242,8 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                                     adapter.notifyDataSetChanged();
                                     trackCount = displayList.size();
                                     updateTitleText();
-                                    tvStatus.setText(trackCount + " 首歌曲");
+                                    updateInfoRow();
+                                    updateStatusRow();
                                     Toast.makeText(PlaylistDetailActivity.this,
                                             "已删除", Toast.LENGTH_SHORT).show();
                                 } else {
@@ -544,6 +493,19 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         actions.add(() -> setSortMode(3));
         labels.add("A-Z 跳转");
         actions.add(this::openLetterPicker);
+        // P3：收藏 / 删除也收进同一个 ☰ 菜单（原先是标题栏内联图标）
+        if (canFavoritePlaylist()) {
+            boolean saved = isCloudMode ? isSubscribed
+                    : playlistManager.isPlaylistSaved(playlistId);
+            labels.add(saved ? "取消收藏歌单" : "收藏歌单");
+            actions.add(this::togglePlaylistFav);
+        }
+        int dangerIndex = com.qinghe.music163pro.util.WatchMenuDialog.NO_DANGER;
+        if (canDeletePlaylist()) {
+            labels.add("删除歌单");
+            dangerIndex = labels.size() - 1;
+            actions.add(this::onDeletePlaylist);
+        }
 
         // 统一菜单弹层（标题单行固定 + 列表独立滚动）：修掉长标题与列表重叠的问题；
         // 当前排序项主色高亮（下标 = 前面「搜索歌曲/清除搜索」的条数 + 排序序号）
@@ -551,7 +513,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         int selected = sortBase + Math.max(0, Math.min(3, sortMode));
         com.qinghe.music163pro.util.WatchMenuDialog.show(this,
                 "歌单操作（当前排序：" + sortModeLabel() + "）",
-                labels.toArray(new String[0]), selected, which -> {
+                labels.toArray(new String[0]), selected, dangerIndex, which -> {
                     if (which >= 0 && which < actions.size()) {
                         actions.get(which).run();
                     }
@@ -710,13 +672,8 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             lvSongs.setSelection(Math.min(pendingScrollTo, displayList.size() - 1));
             pendingScrollTo = -1;
         }
-        if (displayList.isEmpty() && searchQuery.isEmpty()) {
-            tvStatus.setText("暂无歌曲");
-        } else if (!searchQuery.isEmpty()) {
-            tvStatus.setText("搜索「" + searchQuery + "」命中 " + displayList.size() + " 首");
-        } else {
-            tvStatus.setText(displayList.size() + " 首歌曲");
-        }
+        updateInfoRow();
+        updateStatusRow();
     }
 
     private void showSearchDialog() {
@@ -729,11 +686,46 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
     }
 
     private void updateTitleText() {
-        String titleText = playlistName != null ? playlistName : "歌单";
-        if (trackCount > 0) {
-            titleText += " (" + trackCount + "首)";
+        // P3：数量移到独立信息行，标题只留歌单名（避免「歌单名 (N首)」+「N 首」重复）
+        tvTitle.setText(playlistName != null ? playlistName : "歌单");
+    }
+
+    /** P3：独立信息行 ——「创建者 · N 首」；搜索时显示命中数。 */
+    private void updateInfoRow() {
+        if (tvCreatorLabel == null) {
+            return;
         }
-        tvTitle.setText(titleText);
+        StringBuilder sb = new StringBuilder();
+        if (creator != null && !creator.isEmpty()) {
+            sb.append("创建者: ").append(creator);
+        }
+        if (!searchQuery.isEmpty()) {
+            if (sb.length() > 0) {
+                sb.append(" · ");
+            }
+            sb.append("搜索命中 ").append(displayList.size()).append(" 首");
+        } else {
+            if (sb.length() > 0) {
+                sb.append(" · ");
+            }
+            int count = displayList.isEmpty() ? trackCount : displayList.size();
+            sb.append(Math.max(0, count)).append(" 首");
+        }
+        tvCreatorLabel.setText(sb.toString());
+        tvCreatorLabel.setVisibility(sb.length() == 0 ? View.GONE : View.VISIBLE);
+    }
+
+    /** P3：状态行只负责「加载中 / 暂无歌曲 / 没有匹配 / 加载失败」，数量交给信息行。 */
+    private void updateStatusRow() {
+        if (tvStatus == null) {
+            return;
+        }
+        if (displayList.isEmpty()) {
+            tvStatus.setVisibility(View.VISIBLE);
+            tvStatus.setText(searchQuery.isEmpty() ? "暂无歌曲" : "没有匹配的曲目");
+        } else {
+            tvStatus.setVisibility(View.GONE);
+        }
     }
 
     /** 歌单动态：在创建者一行后面补上播放量/收藏/评论。 */
@@ -759,6 +751,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                         if (commentCount > 0) {
                             sb.append(" · 评论 ").append(formatCount(commentCount));
                         }
+                        sb.append(" · ").append(trackCount).append(" 首");
                         tvCreatorLabel.setText(sb.toString());
                     }
 
@@ -814,10 +807,12 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                 updateTitleText();
                 updateCreatorLabel();
                 loadPlaylistDynamic(playlistId);
+                updateInfoRow();
                 if (songs.isEmpty()) {
+                    tvStatus.setVisibility(View.VISIBLE);
                     tvStatus.setText("暂无歌曲");
                 } else {
-                    tvStatus.setText(songs.size() + " 首歌曲");
+                    tvStatus.setVisibility(View.GONE);
                     lvSongs.setVisibility(View.VISIBLE);
                 }
 
@@ -838,36 +833,28 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
      *   - My created playlist → no unsub, can delete
      *   - Others' playlist → can sub/unsub (cloud) or local save/remove, no delete
      */
+    /**
+     * P3：收藏 / 删除已收进 ☰ 菜单（不再占用标题栏内联图标），
+     * 这里只刷新信息行；菜单项按 {@link #canFavoritePlaylist()} / {@link #canDeletePlaylist()} 现算。
+     */
     private void updateActionButtons() {
-        if (isLikedPlaylist) {
-            // "我喜欢的音乐" - cannot unsub or delete
-            btnFav.setVisibility(View.GONE);
-            btnDelete.setVisibility(View.GONE);
-        } else if (creatorUserId > 0 && creatorUserId == currentUserId) {
-            // My created playlist - cannot unsub but can delete
-            btnFav.setVisibility(View.GONE);
-            btnDelete.setVisibility(View.VISIBLE);
-        } else {
-            // Others' playlist - can sub/unsub or local save/remove, cannot delete
-            btnFav.setVisibility(View.VISIBLE);
-            btnDelete.setVisibility(View.GONE);
-            updateFavButton();
-        }
+        updateInfoRow();
     }
 
     private void updateFavButton() {
-        if (playlistId <= 0) {
-            btnFav.setVisibility(View.GONE);
-            return;
-        }
-        if (isCloudMode) {
-            btnFav.setImageResource(isSubscribed ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
-            btnFav.setColorFilter(isSubscribed ? 0xFFFF4081 : 0x80FFFFFF);
-        } else {
-            boolean saved = playlistManager.isPlaylistSaved(playlistId);
-            btnFav.setImageResource(saved ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
-            btnFav.setColorFilter(saved ? 0xFFFF4081 : 0x80FFFFFF);
-        }
+        // 收藏态由 ☰ 菜单按需渲染（「收藏歌单 / 取消收藏歌单」），不再有独立图标按钮
+    }
+
+    /** 别人的歌单才可收藏 / 取消收藏（「我喜欢的音乐」与自建歌单不可）。 */
+    private boolean canFavoritePlaylist() {
+        return playlistId > 0 && !isLikedPlaylist
+                && !(creatorUserId > 0 && creatorUserId == currentUserId);
+    }
+
+    /** 只有自建歌单可删除。 */
+    private boolean canDeletePlaylist() {
+        return playlistId > 0 && !isLikedPlaylist
+                && creatorUserId > 0 && creatorUserId == currentUserId;
     }
 
     private void togglePlaylistFav() {
