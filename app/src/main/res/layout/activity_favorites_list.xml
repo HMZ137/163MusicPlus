@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  收藏列表（4-12~4-15）：ViewPager2 + Fragment 迁移后的布局。
+  需求方口径（2026-10-17）：迁到 ViewPager2 + Fragment 的页面不再保留多 Tab 按钮
+  （参考图 去除指示_1.png 圈掉的「单曲 / 歌单 / 专辑」标签行已删除），
+  标题栏只留「返回 / 标题 / 菜单」，页面之间左右滑切换；
+  「其他需要展示的内容」放到标题栏外的独立行（参考图 多Tab实例_1.bmp）。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -6,106 +13,76 @@
     android:orientation="vertical"
     android:padding="6dp">
 
-    <TextView
-        android:id="@+id/tv_favorites_title"
+    <!--
+      标题栏两行（与下载页 L2 同款结构）：
+        第 1 行 = 右侧「更多」菜单。这一行由 WatchBackButton 的 inset 机制撑到浮动返回按钮的
+                 占位高度并留出左侧内边距，返回按钮不会压到它。
+        第 2 行 = 标题，占满整行；左对齐与避开返回按钮由 G5 统一机制处理。
+      为什么用两行而不是把标题和菜单挤一行：「收藏」虽然短，但同款结构已在下载页验证过，
+      标题栏高度占位（本机约 119px）本来按两行算，单行会白留一截空白。
+    -->
+    <LinearLayout
+        android:id="@+id/layout_fav_title_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/favorites"
-        android:textColor="@color/text_primary"
-        android:textSize="@dimen/watch_text_title"
-        android:textStyle="bold"
-        android:letterSpacing="0.05"
-        android:gravity="center"
-        android:paddingBottom="6dp" />
+        android:orientation="vertical"
+        android:paddingBottom="6dp">
 
-    <!-- Tabs: 单曲 / 歌单 / 专辑 -->
-    <LinearLayout
-        android:id="@+id/ll_fav_tabs"
-        android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:orientation="horizontal"
-        android:layout_marginBottom="4dp">
+        <RelativeLayout
+            android:id="@+id/layout_fav_action_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/tab_fav_songs"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="单曲"
-            android:textColor="@color/colorPrimary"
-            android:textSize="@dimen/watch_text_body"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true" android:singleLine="true"
- android:ellipsize="end"
- />
+            <TextView
+                android:id="@+id/btn_fav_menu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="8dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:text="更多"
+                android:textColor="@color/colorPrimary"
+                android:textSize="@dimen/watch_text_caption" />
+        </RelativeLayout>
 
         <TextView
-            android:id="@+id/tab_fav_playlists"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:id="@+id/tv_favorites_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
             android:gravity="center"
-            android:text="歌单"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/watch_text_body"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true" android:singleLine="true"
- android:ellipsize="end"
- />
-
-        <TextView
-            android:id="@+id/tab_fav_albums"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="专辑"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/watch_text_body"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true" android:singleLine="true"
- android:ellipsize="end"
- />
+            android:letterSpacing="0.05"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="@string/favorites"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/watch_text_title"
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <ListView
-        android:id="@+id/lv_favorites"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp" />
-
-    <ListView
-        android:id="@+id/lv_fav_playlists"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp"
-        android:visibility="gone" />
-
-    <ListView
-        android:id="@+id/lv_fav_albums"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@color/divider"
-        android:dividerHeight="0.5dp"
-        android:visibility="gone" />
-
+    <!-- 「其他需要展示的内容」独立行：当前页 · 数量（滑动切页时跟随，由 Activity 回写） -->
     <TextView
-        android:id="@+id/tv_empty"
+        android:id="@+id/tv_fav_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:paddingStart="10dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="2dp"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_caption" />
+
+    <!-- 4-12：三页容器（单曲 / 歌单 / 专辑），左右滑切页；标签行已按「迁移后去 Tab」口径删除 -->
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vp_favorites_tabs"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="暂无收藏"
-        android:textColor="@color/text_secondary"
-        android:textSize="@dimen/watch_text_sub"
-        android:visibility="gone" />
+        android:layout_weight="1" />
 </LinearLayout>

@@ -1,0 +1,319 @@
+package com.qinghe.music163pro.fragment;
+
+import android.content.Intent;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import com.qinghe.music163pro.R;
+import com.qinghe.music163pro.activity.MainActivity;
+import com.qinghe.music163pro.api.MusicApiHelper;
+import com.qinghe.music163pro.manager.FavoritesManager;
+import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.player.MusicPlayerManager;
+import com.qinghe.music163pro.util.LocalTracks;
+import com.qinghe.music163pro.util.MultiSelectController;
+import com.qinghe.music163pro.util.NetworkImageLoader;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 4-13：收藏的「单曲」页（原 {@code FavoritesListActivity} 的第一个标签）。
+ *
+ * <p>行为与改造前逐条对齐：本地收藏优先显示（立即可见），再异步补云端封面/音质等详情；
+ * 收藏模式为云端时显示云端收藏并合并本地收藏；点歌把当前列表设为播放队列并回主界面；
+ * 长按单条取消收藏（本地直接删、云端走 {@code likeTrack} 接口）；
+ * <b>本地收藏</b>额外支持长按进入多选、批量取消收藏（云端收藏不支持批量，控制器会被禁用，
+ * 长按回落到单条取消收藏）。</p>
+ */
+public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
+
+    private FavoritesManager favoritesManager;
+    private final MusicPlayerManager playerManager = MusicPlayerManager.getInstance();
+    private MultiSelectController multiSelect;
+
+    @Override
+    public int pageIndex() {
+        return PAGE_SONGS;
+    }
+
+    @Override
+    protected int itemLayoutRes() {
+        return R.layout.item_song;
+    }
+
+    @Override
+    protected int itemTextRes() {
+        return R.id.tv_item_name;
+    }
+
+    @Override
+    protected String coverUrl(Song item) {
+        return item.getCoverUrl();
+    }
+
+    @Override
+    protected CharSequence emptyText() {
+        return "暂无收藏";
+    }
+
+    @Override
+    protected CharSequence pageName() {
+        return "单曲";
+    }
+
+    @Override
+    protected CharSequence countUnit() {
+        return "首";
+    }
+
+    @Override
+    protected void onListReady() {
+        favoritesManager = new FavoritesManager(requireContext());
+        // 长按进入多选模式。云端收藏不支持批量本地删除，此时控制器会被禁用，
+        // 长按仍然回落到单条「取消收藏」逻辑（见 onItemLongClicked）。
+        multiSelect = MultiSelectController.attach(requireActivity(), listView(),
+                new MultiSelectController.Callback() {
+                    @Override
+                    public List<MultiSelectController.Action> getActions() {
+                        return java.util.Collections.singletonList(
+                                MultiSelectController.Action.delete(requireActivity()));
+                    }
+
+                    @Override
+                    public void onAction(MultiSelectController.Action action, List<Integer> positions) {
+                        if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
+                            confirmDeleteSelected(positions);
+                        }
+                    }
+                });
+    }
+
+    @Override
+    protected void onBeforeReload() {
+        // 列表数据会重载，选中下标可能失效，先退出多选。
+        if (multiSelect != null) {
+            multiSelect.exitSelectionMode();
+        }
+    }
+
+    @Override
+    public boolean handleBackPressed() {
+        return multiSelect != null && multiSelect.handleBackPressed();
+    }
+
+    // ── 行渲染 ──────────────────────────────────────────────────────────────
+
+    @Override
+    protected void bindRow(View row, Song song) {
+        TextView tvName = row.findViewById(R.id.tv_item_name);
+        TextView tvArtist = row.findViewById(R.id.tv_item_artist);
+        ImageView ivCover = row.findViewById(R.id.iv_cover);
+        tvName.setText(song.getDisplayName());
+        // 本地收藏带「本地」标签：它的 id 是路径派生的负数，
+        // 不属于网易云曲目体系（没有云端音质/评论/歌单可用）。
+        if (LocalTracks.isLocalId(song.getId())) {
+            tvName.setText(song.getDisplayName() + " [本地]");
+            tvArtist.setText(LocalTracks.safeName(song.getArtist()));
+        } else {
+            tvArtist.setText(song.getArtist());
+        }
+        if (ivCover != null) {
+            NetworkImageLoader.load(ivCover, song.getCoverUrl());
+        }
+    }
+
+    @Override
+    protected void onItemClicked(int position, Song song) {
+        // 播放队列 = 当前收藏列表（与改造前一致），然后回主界面（播放器页）。
+        List<Song> playlist = new ArrayList<>(items);
+        playerManager.setPlaylist(playlist, position);
+        playerManager.playCurrent();
+        Intent intent = new Intent(requireContext(), MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        requireActivity().finish();
+    }
+
+    @Override
+    protected boolean onItemLongClicked(int position, Song song) {
+        // 多选可用时控制器会先于这里吃掉长按（进入多选）；能走到这里说明是云端收藏模式。
+        showUnfavoriteDialog(song, position);
+        return true;
+    }
+
+    // ── 加载 ────────────────────────────────────────────────────────────────
+
+    @Override
+    protected void loadData() {
+        if (favoritesManager == null) {
+            favoritesManager = new FavoritesManager(requireContext());
+        }
+        boolean isCloud = isCloudMode();
+        // 多选批量删除只针对本地收藏；云端收藏由 API 管理，保持原有的单条「取消收藏」交互。
+        if (multiSelect != null) {
+            multiSelect.setEnabled(!isCloud);
+        }
+        if (isCloud) {
+            loadCloudFavorites();
+        } else {
+            loadLocalFavorites();
+        }
+    }
+
+    private void loadLocalFavorites() {
+        // 先本地立即可见（离线/未登录也能看），再异步补详情。
+        applyItems(favoritesManager.getFavorites());
+        // 快照一份 favorites.json 的内容当兜底：详情回来时用它补「不在 id 索引里」的条目（见下）。
+        final List<Song> localSnapshot = new ArrayList<>(items);
+
+        final List<Long> ids = favoritesManager.getFavoriteIds();
+        if (ids.isEmpty()) {
+            return;
+        }
+        final String cookie = cookie();
+        if (cookie == null || cookie.isEmpty()) {
+            return;
+        }
+        MusicApiHelper.fetchSongsDetails(ids, cookie, new MusicApiHelper.BatchSongDetailsCallback() {
+            @Override
+            public void onResult(java.util.Map<Long, Song> songMap) {
+                if (songMap.isEmpty() || !isViewReady()) {
+                    return;
+                }
+                // 本地收藏优先：先用本地那条，只有本地没有时才用 API 返回的曲目。
+                // 反过来（先放 API 结果）会把本地收藏顶成"在线版本"，
+                // 表现就是本地歌一闪而过、最后只剩在线收藏。
+                java.util.Map<Long, Song> localMap = new java.util.HashMap<>();
+                java.util.Set<Long> idSet = new java.util.HashSet<>(ids);
+                for (Song ls : localSnapshot) {
+                    localMap.put(ls.getId(), ls);
+                }
+                List<Song> updated = new ArrayList<>();
+                for (Long id : ids) {
+                    Song local = localMap.get(id);
+                    if (local != null) {
+                        updated.add(local);
+                        continue;
+                    }
+                    Song s = songMap.get(id);
+                    if (s != null) {
+                        updated.add(s);
+                    }
+                }
+                // ❗顺带修掉的旧缺陷：本地收藏里的**本地曲目**用的是路径派生的负数 id，
+                // FavoritesManager 不会把它们写进 favorite-ids.json（那是给云端同步/查重用的），
+                // 而上面这段「按 ids 重建」只遍历 id 索引 ⇒ 这些条目会被整批丢掉。
+                // 改造前的表现就是「本地收藏的本地歌只在首屏闪一下，随后消失」。
+                // 这里按 favorites.json 的原顺序把它们补到列表末尾，顺序与改造前首屏一致。
+                for (Song local : localSnapshot) {
+                    if (!idSet.contains(local.getId())) {
+                        updated.add(local);
+                    }
+                }
+                applyItems(updated);
+            }
+
+            @Override
+            public void onError(String message) {
+                // 保留本地数据展示，静默忽略（与改造前一致）。
+            }
+        });
+    }
+
+    private void loadCloudFavorites() {
+        showStatus("正在加载云端收藏...");
+        String cookie = cookie();
+        if (cookie == null || cookie.isEmpty()) {
+            showStatus("请先登录以使用云端收藏");
+            return;
+        }
+        MusicApiHelper.getCloudFavorites(cookie, new MusicApiHelper.CloudFavoritesCallback() {
+            @Override
+            public void onResult(List<Song> songs) {
+                if (!isViewReady()) {
+                    return;
+                }
+                // 云端收藏 + 本地收藏 合并显示：本地歌曲不该受"收藏模式"影响，联网也要能看到
+                java.util.Set<Long> cloudIds = new java.util.HashSet<>();
+                for (Song cs : songs) {
+                    cloudIds.add(cs.getId());
+                }
+                List<Song> merged = new ArrayList<>(songs);
+                for (Song local : favoritesManager.getFavorites()) {
+                    if (local != null && !cloudIds.contains(local.getId())) {
+                        merged.add(local);
+                    }
+                }
+                applyItems(merged);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isViewReady()) {
+                    showStatus("加载失败: " + message);
+                }
+            }
+        });
+    }
+
+    // ── 取消收藏 ────────────────────────────────────────────────────────────
+
+    /** 删除选中的本地收藏歌曲（长按多选 → 底部动作栏「删除」）。 */
+    private void confirmDeleteSelected(List<Integer> positions) {
+        final List<Song> targets = new ArrayList<>();
+        for (int position : positions) {
+            if (position >= 0 && position < items.size()) {
+                targets.add(items.get(position));
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        showConfirmDialog("取消收藏",
+                "确定取消收藏选中的 " + targets.size() + " 首歌曲？", () -> {
+                    for (Song song : targets) {
+                        favoritesManager.removeFavorite(song);
+                    }
+                    if (multiSelect != null) {
+                        multiSelect.exitSelectionMode();
+                    }
+                    loadData();
+                    toast("已取消收藏");
+                });
+    }
+
+    private void showUnfavoriteDialog(Song song, int position) {
+        showConfirmDialog("取消收藏", "确定取消收藏「" + song.getName() + "」？", () -> {
+            if (isCloudMode()) {
+                String cookie = cookie();
+                if (cookie == null || cookie.isEmpty()) {
+                    toast("请先登录");
+                    return;
+                }
+                MusicApiHelper.likeTrack(song.getId(), false, cookie,
+                        new MusicApiHelper.LikeCallback() {
+                            @Override
+                            public void onResult(boolean success) {
+                                if (success) {
+                                    removeItemAt(position);
+                                    toast("已取消云端收藏");
+                                } else {
+                                    toast("操作失败");
+                                }
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                toast("操作失败: " + message);
+                            }
+                        });
+            } else {
+                favoritesManager.removeFavorite(song);
+                removeItemAt(position);
+                toast("已取消收藏");
+            }
+        });
+    }
+}

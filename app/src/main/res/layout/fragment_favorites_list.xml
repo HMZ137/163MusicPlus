@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  4-12：收藏列表三页（单曲 / 歌单 / 专辑）共用的「列表 + 空态」布局。
+  三个 Fragment 各自持有自己的 ListView / 空态实例与适配器，视图结构相同，所以不复制三份 XML；
+  列表 id 统一为 lv_fav_list，空态 id 统一为 tv_fav_empty。
+  两层叠在一起：列表非空时空态 GONE；加载中 / 失败 / 未登录时列表 GONE、空态显示状态文案。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ListView
+        android:id="@+id/lv_fav_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:divider="@color/divider"
+        android:dividerHeight="0.5dp" />
+
+    <TextView
+        android:id="@+id/tv_fav_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_sub"
+        android:visibility="gone" />
+</FrameLayout>
