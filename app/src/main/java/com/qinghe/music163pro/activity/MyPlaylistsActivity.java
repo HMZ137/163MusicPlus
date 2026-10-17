@@ -1,6 +1,9 @@
 package com.qinghe.music163pro.activity;
 
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -20,7 +23,10 @@ import android.widget.Toast;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.PlaylistInfo;
+import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
+import com.qinghe.music163pro.util.LocalMetadataIndex;
+import com.qinghe.music163pro.util.LocalMusicLoader;
 import com.qinghe.music163pro.util.LocalPlaylistManager;
 import com.qinghe.music163pro.util.NetworkImageLoader;
 import com.qinghe.music163pro.util.PinyinUtils;
@@ -86,6 +92,14 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     private int[] groupCounts = new int[0];
     /** 字母跳转后，onResume 会重新拉列表，这里先记下目标位，等拉完再跳过去。 */
     private int pendingScrollTo = -1;
+
+    /**
+     * 「批量添加本地歌曲」的扫描批次号（P2）。
+     *
+     * <p>页面关闭或再次触发时自增，用来作废仍在跑的那一轮本地扫描 ——
+     * 否则它会在 Activity 已销毁后回调，出现「往已关闭页面弹 Toast / 写歌单」。</p>
+     */
+    private int localScanGeneration = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -375,11 +389,11 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
                 return true;
             }
             if (pl.getUserId() == currentUserId) {
-                // Own playlist: rename or delete
+                // Own playlist: 改名 / 复制链接 / 删除
                 showOwnPlaylistOptions(pl, cookie);
             } else {
-                // Subscribed playlist: unsubscribe
-                showUnsubscribeDialog(pl, cookie);
+                // Subscribed playlist: 复制链接 / 取消收藏
+                showSubscribedPlaylistOptions(pl, cookie);
             }
             return true;
         });
@@ -684,16 +698,59 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     // ==================== 在线歌单：改名 / 删除 / 取消收藏 / 创建 ====================
 
     private void showOwnPlaylistOptions(PlaylistInfo pl, String cookie) {
-        // 统一菜单弹层：第 1 项（删除）为危险项，红色显示
+        // 统一菜单弹层：改名 / 复制链接 / 删除（删除为危险项，红色）
         com.qinghe.music163pro.util.WatchMenuDialog.show(this, pl.getName(),
-                new String[]{"改名", "删除"}, com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 1,
+                new String[]{"改名", "复制链接", "删除"},
+                com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 2,
                 which -> {
                     if (which == 0) {
                         showRenamePlaylistDialog(pl, cookie);
+                    } else if (which == 1) {
+                        copyPlaylistLink(pl);
                     } else {
                         showDeletePlaylistDialog(pl, cookie);
                     }
                 });
+    }
+
+    /**
+     * 收藏（非本人创建）的在线歌单：复制链接 / 取消收藏。
+     *
+     * <p>原来长按直接弹「取消收藏」确认框（P1 之前的交互）；P2 要求在线歌单的浮层菜单里
+     * 有「复制链接」，所以这里也统一成菜单，保留原有取消收藏能力。</p>
+     */
+    private void showSubscribedPlaylistOptions(PlaylistInfo pl, String cookie) {
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, pl.getName(),
+                new String[]{"复制链接", "取消收藏"},
+                com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 1,
+                which -> {
+                    if (which == 0) {
+                        copyPlaylistLink(pl);
+                    } else {
+                        showUnsubscribeDialog(pl, cookie);
+                    }
+                });
+    }
+
+    /**
+     * 复制在线歌单链接（P2）：标准形式 {@code https://music.163.com/playlist?id=<id>}。
+     *
+     * <p>写进系统剪贴板后 toast 提示 —— 手表上没有「粘贴」入口也没关系，
+     * 这是给跨设备/分享场景用的（与手机端「复制链接」语义一致）。</p>
+     */
+    private void copyPlaylistLink(PlaylistInfo pl) {
+        if (pl == null || pl.getId() <= 0) {
+            Toast.makeText(this, "该歌单没有可用链接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String url = "https://music.163.com/playlist?id=" + pl.getId();
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) {
+            Toast.makeText(this, "复制失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        cm.setPrimaryClip(ClipData.newPlainText("网易云歌单链接", url));
+        Toast.makeText(this, "已复制链接：" + url, Toast.LENGTH_LONG).show();
     }
 
     private void showRenamePlaylistDialog(PlaylistInfo pl, String cookie) {
@@ -864,6 +921,8 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // 作废仍在跑的「批量添加本地歌曲」扫描（避免回调已销毁的页面）
+        localScanGeneration++;
         NetworkImageLoader.cancelAll();
     }
 
@@ -908,14 +967,17 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
     }
 
     private void showLocalPlaylistOptions(PlaylistInfo pl) {
-        // 统一菜单弹层：第 2 项（删除）为危险项
+        // 统一菜单弹层：改名 / 导出 / 批量添加本地歌曲 / 删除（删除为危险项）
         com.qinghe.music163pro.util.WatchMenuDialog.show(this, pl.getName(),
-                new String[]{"改名", "导出", "删除"}, com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 2,
+                new String[]{"改名", "导出", "批量添加本地歌曲", "删除"},
+                com.qinghe.music163pro.util.WatchMenuDialog.NO_SELECTION, 3,
                 which -> {
                     if (which == 0) {
                         showRenameLocalDialog(pl);
                     } else if (which == 1) {
                         exportLocalPlaylist(pl);
+                    } else if (which == 2) {
+                        addAllLocalSongsToPlaylist(pl);
                     } else {
                         showDeleteLocalDialog(pl);
                     }
@@ -987,6 +1049,94 @@ public class MyPlaylistsActivity extends BaseWatchActivity {
         } else {
             Toast.makeText(this, "导出失败", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /**
+     * 批量把本地歌曲加入某个本地歌单（P2 / 任务 7-9）。
+     *
+     * <p>复用 {@link LocalMusicLoader} 的扫描链路（与「本机音乐」页同一套：缓存首屏 → 走目录 →
+     * 补元信息 → 索引回写），扫描完成后一次性 {@link LocalPlaylistManager#addSongs} 进去。
+     * 已有曲目按路径去重（{@code addSongs} 内已实现），重复执行不会产生重复条目。</p>
+     *
+     * <p>先弹确认框再说清代价：本机 500 首冷扫约 3~20s，热索引约 2s。</p>
+     */
+    private void addAllLocalSongsToPlaylist(final PlaylistInfo pl) {
+        final String name = pl.getName();
+        com.qinghe.music163pro.util.WatchConfirmDialog.show(this, "批量添加本地歌曲",
+                "扫描本地音乐并全部加入「" + name + "」？\n已在歌单里的会自动跳过。",
+                () -> startLocalScanForPlaylist(name),
+                com.qinghe.music163pro.util.WatchConfirmDialog.Options.defaultOptions());
+    }
+
+    /** 后台跑一轮本地扫描，收尾时把扫到的歌一次性加进歌单。 */
+    private void startLocalScanForPlaylist(final String playlistName) {
+        final int generation = ++localScanGeneration;
+        LocalMetadataIndex.init(this);
+        Toast.makeText(this, "正在扫描本地音乐…", Toast.LENGTH_SHORT).show();
+        final java.util.concurrent.atomic.AtomicReference<List<Song>> found =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        LocalMusicLoader loader = new LocalMusicLoader(this, generation,
+                new LocalMusicLoader.Callback() {
+                    @Override
+                    public void onFirstPaint(List<Song> cachedSongs) {
+                        // 批量添加不需要首屏：等走完目录、元信息补齐后再统一写歌单
+                    }
+
+                    @Override
+                    public void onWalkDone(List<Song> songs, int misses) {
+                        // 拿到目录走查结果（同一个 list 实例后面会被补上元信息），先记下来
+                        found.set(songs);
+                    }
+
+                    @Override
+                    public void onMetadataProgress(int processed, int total, boolean readingFromDisk) {
+                        // 进度不展示：这一路只在收尾时 toast 一次结果
+                    }
+
+                    @Override
+                    public void onFinished(boolean changed) {
+                        if (generation != localScanGeneration || isFinishing() || isDestroyed()) {
+                            return;
+                        }
+                        List<Song> songs = found.get();
+                        if (songs == null || songs.isEmpty()) {
+                            Toast.makeText(MyPlaylistsActivity.this,
+                                    "没有扫描到本地歌曲", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        final List<Song> snapshot = new ArrayList<>(songs);
+                        final int gen = generation;
+                        new Thread(() -> {
+                            final int added = LocalPlaylistManager.addSongs(playlistName, snapshot);
+                            runOnUiThread(() -> {
+                                if (gen != localScanGeneration || isFinishing() || isDestroyed()) {
+                                    return;
+                                }
+                                Toast.makeText(MyPlaylistsActivity.this,
+                                        added > 0
+                                                ? "已添加 " + added + " 首到「" + playlistName + "」"
+                                                : "这些曲目已在歌单里",
+                                        Toast.LENGTH_LONG).show();
+                                if (activeTab == TAB_LOCAL) {
+                                    loadLocalPlaylists();
+                                }
+                            });
+                        }, "local-playlist-add").start();
+                    }
+
+                    @Override
+                    public boolean isCancelled() {
+                        return generation != localScanGeneration || isFinishing() || isDestroyed();
+                    }
+
+                    @Override
+                    public void onSkippedDirs(List<String> skipped) {
+                        final String message = "已跳过 " + skipped.size() + " 个不可用的自定义扫描目录";
+                        runOnUiThread(() -> Toast.makeText(MyPlaylistsActivity.this, message,
+                                Toast.LENGTH_LONG).show());
+                    }
+                });
+        new Thread(loader::runBlocking, "local-scan-playlist").start();
     }
 
     /**
