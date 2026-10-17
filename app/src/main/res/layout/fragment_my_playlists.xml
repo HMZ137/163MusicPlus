@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  4-16：我的歌单两个页面（在线歌单 / 本地歌单）共用的布局。
+  「N 个歌单」状态行 + 「导入歌单」按钮（只有本地页显示）+ 列表。
+  空列表时列表隐藏、只显示状态行文案（与改造前一致）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
+
+        <TextView
+            android:id="@+id/tv_my_playlists_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="start|center_vertical"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:singleLine="true"
+            android:text="正在加载..."
+            android:textColor="#80FFFFFF"
+            android:textSize="@dimen/watch_text_caption" />
+
+        <!-- 导入歌单：只扫描约定目录 /sdcard/163Music/Import/，仅本地歌单页显示 -->
+        <TextView
+            android:id="@+id/btn_import_playlist"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_letter_cell"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="14dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="4dp"
+            android:text="导入歌单"
+            android:textColor="@color/colorPrimary"
+            android:textSize="@dimen/watch_text_sub"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/lv_my_playlists"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="1dp"
+        android:visibility="gone" />
+</LinearLayout>
