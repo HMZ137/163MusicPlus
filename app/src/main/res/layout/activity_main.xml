@@ -323,6 +323,27 @@
                 android:layout_weight="1" />
 
             <!--
+              需求方 2026-10-17：**播放选项（⋯）与播放模式的位置互换** ——
+              现在中间是 ⋯（播放选项），右侧是播放模式。
+            -->
+            <!--
+              菜单（⋯）：保留原 id `btn_favorite`，避免牵连其它引用
+            -->
+            <ImageView
+                android:id="@+id/btn_favorite"
+                android:layout_width="46dp"
+                android:layout_height="34dp"
+                android:padding="8dp"
+                android:src="@drawable/ic_more_horiz"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!--
               播放模式切换：单曲循环 / 列表循环 / 随机播放。
               图标随当前模式变化（见 MainActivity#updatePlayModeIcon），点击循环切换。
               —— 对应参考图底部中间那个箭头图标（**不是分享**）。
@@ -334,21 +355,6 @@
                 android:padding="8dp"
                 android:src="@drawable/ic_repeat"
                 android:alpha="0.85"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <!-- 菜单（⋯）：保留原 id `btn_favorite`，避免牵连其它引用 -->
-            <ImageView
-                android:id="@+id/btn_favorite"
-                android:layout_width="46dp"
-                android:layout_height="34dp"
-                android:padding="8dp"
-                android:src="@drawable/ic_more_horiz"
                 android:clickable="true"
                 android:focusable="true" />
         </LinearLayout>
