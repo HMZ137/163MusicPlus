@@ -1,7 +1,6 @@
 package com.qinghe.music163pro.util;
 
 import android.app.Activity;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
@@ -85,6 +84,9 @@ public final class MultiSelectController {
     }
 
     private static final int SELECTED_TINT = 0x33BB86FC;
+    /** 与 {@code bg_card_row} 的 inset 对齐：左右 6dp / 上下 3dp。 */
+    private static final int SELECT_INSET_H_DP = 6;
+    private static final int SELECT_INSET_V_DP = 3;
     private static final int CHECK_ACTIVE_COLOR = 0xFFBB86FC;
     private static final int CHECK_INACTIVE_COLOR = 0x80FFFFFF;
     private static final int ACTION_BUTTON_BG = 0xFF2D2D2D;
@@ -110,7 +112,16 @@ public final class MultiSelectController {
         this.activity = activity;
         this.listView = listView;
         this.callback = callback;
-        this.selectedForeground = new ColorDrawable(SELECTED_TINT);
+        // 选中高亮必须跟随行卡片的圆角：行背景是 bg_card_row —— 由 drawable 自身做
+        // 「左右 6dp / 上下 3dp」内缩 + 10dp 圆角（ListView 会忽略 layout_margin，所以
+        // 圆角与缩进都只能由 drawable 承担）。早先这里用直角 ColorDrawable 直接铺满整行，
+        // 选中时就会出现一块方角、盖到卡片之外的紫色矩形（需求方附图 复选着色_1.png）。
+        GradientDrawable selectedShape = new GradientDrawable();
+        selectedShape.setColor(SELECTED_TINT);
+        selectedShape.setCornerRadius(UiKit.dp(activity, UiKit.DP_ROW_RADIUS));
+        this.selectedForeground = new android.graphics.drawable.InsetDrawable(selectedShape,
+                UiKit.dp(activity, SELECT_INSET_H_DP), UiKit.dp(activity, SELECT_INSET_V_DP),
+                UiKit.dp(activity, SELECT_INSET_H_DP), UiKit.dp(activity, SELECT_INSET_V_DP));
         List<Action> declaredActions = callback.getActions();
         if (declaredActions != null) {
             actions.addAll(declaredActions);
