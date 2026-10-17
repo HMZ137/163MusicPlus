@@ -31,9 +31,11 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
     /**
      * F1：表冠旋转。
      *
-     * <p>Wear 上表冠以 {@code ACTION_SCROLL} + {@code AXIS_SCROLL} 送达（源为
-     * {@code SOURCE_ROTARY_ENCODER}）。这里只观察 + 分发，不改变既有行为；
-     * 子类通过 {@link #onCrownScroll(float)} 决定是否消费。</p>
+     * <p>Wear 上表冠一般以 {@code ACTION_SCROLL} 送达，但**不同固件的轴不同**：
+     * 有的走 {@code AXIS_SCROLL}（{@code SOURCE_ROTARY_ENCODER}），有的被系统识别成鼠标滚轮、
+     * 增量在 {@code AXIS_VSCROLL}（本机 OWW211 实测：`source=0x2002` = SOURCE_MOUSE、
+     * `AXIS_SCROLL=0`、只有 `AXIS_VSCROLL` 有值）。这里两个轴都读、取绝对值大的那个，
+     * 只观察 + 分发，不改变既有行为；子类通过 {@link #onCrownScroll(float)} 决定是否消费。</p>
      *
      * <p>前 5 条打日志（TAG=Crown）—— 这是给「表冠到底送不送事件」留的**可观测探针**：
      * adb 无法模拟表冠旋转，只能由人转一下表冠来确认。</p>
@@ -44,13 +46,19 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
             boolean rotary = event.isFromSource(android.view.InputDevice.SOURCE_ROTARY_ENCODER);
             boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
             float axis = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
+            float vscroll = event.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL);
+            if (Math.abs(axis) < 0.01f && Math.abs(vscroll) > 0.01f) {
+                axis = vscroll;   // 鼠标滚轮/表冠：增量在 AXIS_VSCROLL
+            }
             if ((rotary || scroll) && sCrownProbeLogged < 5) {
                 sCrownProbeLogged++;
                 MusicLog.i("Crown", "表冠/滚动事件 #" + sCrownProbeLogged
                         + ": action=" + event.getAction()
                         + " source=0x" + Integer.toHexString(event.getSource())
-                        + " rotary=" + rotary + " AXIS_SCROLL=" + axis
-                        + " 页面=" + getClass().getSimpleName());
+                        + " rotary=" + rotary
+                        + " AXIS_SCROLL=" + event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL)
+                        + " AXIS_VSCROLL=" + vscroll
+                        + " 生效增量=" + axis + " 页面=" + getClass().getSimpleName());
             }
             if ((rotary || scroll) && Math.abs(axis) > 0.01f && onCrownScroll(axis)) {
                 return true;

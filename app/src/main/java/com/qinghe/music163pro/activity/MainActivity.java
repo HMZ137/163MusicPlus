@@ -1459,9 +1459,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static int sCrownProbeLogged = 0;
 
     /**
-     * F1：表冠旋转。Wear 上以 {@code ACTION_SCROLL} + {@code AXIS_SCROLL} 送达
-     * （源为 {@code SOURCE_ROTARY_ENCODER}）；前 5 条打日志（TAG=Crown）作为
+     * F1：表冠旋转。Wear 上以 {@code ACTION_SCROLL} 送达；前 5 条打日志（TAG=Crown）作为
      * 「表冠到底送不送事件」的**可观测探针** —— adb 无法模拟表冠旋转，只能人工确认。
+     *
+     * <p><b>真机实测（2026-10-17 需求方转动表冠）</b>：本机表冠被系统识别成**鼠标滚轮**
+     * （`source=0x2002` = {@code SOURCE_MOUSE}，`action=ACTION_SCROLL`），增量在
+     * **{@code AXIS_VSCROLL}** 里，而 {@code AXIS_SCROLL} 恒为 0 —— 所以之前只读 AXIS_SCROLL
+     * 时表冠「转了没反应」。这里两个轴都读，取绝对值大的那个。</p>
      */
     @Override
     public boolean onGenericMotionEvent(android.view.MotionEvent event) {
@@ -1469,12 +1473,19 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             boolean rotary = event.isFromSource(android.view.InputDevice.SOURCE_ROTARY_ENCODER);
             boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
             float axis = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
+            float vscroll = event.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL);
+            if (Math.abs(axis) < 0.01f && Math.abs(vscroll) > 0.01f) {
+                axis = vscroll;   // 鼠标滚轮/表冠：增量在 AXIS_VSCROLL
+            }
             if ((rotary || scroll) && sCrownProbeLogged < 5) {
                 sCrownProbeLogged++;
                 MusicLog.i("Crown", "表冠/滚动事件 #" + sCrownProbeLogged
                         + ": action=" + event.getAction()
                         + " source=0x" + Integer.toHexString(event.getSource())
-                        + " rotary=" + rotary + " AXIS_SCROLL=" + axis + " 页面=MainActivity");
+                        + " rotary=" + rotary
+                        + " AXIS_SCROLL=" + event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL)
+                        + " AXIS_VSCROLL=" + vscroll
+                        + " 生效增量=" + axis + " 页面=MainActivity");
             }
             if ((rotary || scroll) && Math.abs(axis) > 0.01f && handleCrownScroll(axis)) {
                 return true;
