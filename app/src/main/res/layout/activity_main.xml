@@ -201,16 +201,18 @@
             android:orientation="horizontal">
 
             <!--
-              M4c（需求方 2026-10-17）：「进度条太窄（约 80px）→ 处理左右时间标签以加宽」。
-              固定宽度 44dp→32dp、字号 11sp→10sp、左右边距 2dp→1dp：
-              时间文本仍是「固定宽度」（只是更窄），播放中每秒 setText 不会 requestLayout，
-              主页歌名 marquee 不会被冲回行首。
+              M4c（需求方 2026-10-17）：进度条曾被时间标签挤到约 80px → 标签收窄到 32dp/10sp 加宽了进度条；
+              M4d（需求方 2026-10-17 晚）：「固定宽度遇到长时长会被挤成竖行」→ 改成**按曲目可变宽度**：
+                - XML 里先 wrap_content（首帧由运行时按最长格式写死具体 px）；
+                - 运行时 `syncTimeLabelWidth(duration)` 用 Paint 量出「最长格式」宽度（如 1:02:03），
+                  把两个标签的 LayoutParams.width 固定成该值；
+                - 同一首歌播放期间宽度不变（固定宽 + 固定高 ⇒ setText 不 requestLayout），
+                  所以每秒刷新时间**不会**把主页歌名跑马灯冲回行首。
             -->
             <TextView
                 android:id="@+id/tv_current_time"
-                android:layout_width="32dp"
-                android:layout_height="wrap_content"
-                android:minHeight="16dp"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
                 android:layout_marginStart="1dp"
                 android:layout_marginEnd="1dp"
                 android:fontFeatureSettings="tnum"
@@ -239,9 +241,8 @@
 
             <TextView
                 android:id="@+id/tv_total_time"
-                android:layout_width="32dp"
-                android:layout_height="wrap_content"
-                android:minHeight="16dp"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
                 android:layout_marginStart="1dp"
                 android:layout_marginEnd="1dp"
                 android:fontFeatureSettings="tnum"

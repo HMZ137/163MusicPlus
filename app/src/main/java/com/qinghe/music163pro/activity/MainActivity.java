@@ -109,6 +109,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private View chorusMarkerDot;
     private TextView tvCurrentTime;
     private TextView tvTotalTime;
+    /** M4d：时间标签当前实际宽度（px）；-1 = 还没算过。 */
+    private int timeLabelWidthPx = -1;
     private MusicPlayerManager playerManager;
     private FavoritesManager favoritesManager;
     private AudioManager audioManager;
@@ -475,6 +477,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     int duration = playerManager.getDuration();
                     if (duration > 0) {
                         tvCurrentTime.setText(formatTime((int) ((long) progress * duration / 1000)));
+                        syncTimeLabelWidth(duration);
                     }
                 }
             }
@@ -5598,6 +5601,51 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         Toast.makeText(this, "定时已到，本曲结束后将停止播放", Toast.LENGTH_LONG).show();
     }
 
+    /**
+     * M4d（需求方 2026-10-17 晚）：时间标签「可变宽度」方案 —— 长时长不被挤成竖行，且不影响歌名跑马灯。
+     *
+     * <p>做法：按「本曲最长的时间格式」量一次宽度，把左右两个标签的 {@code LayoutParams.width}
+     * 固定成这个值。宽度会随曲目时长变化（长歌自动变宽），但**同一首歌播放期间宽度恒定** ——
+     * 配合 XML 里固定的 {@code layout_height="18dp"}，{@code TextView.setText()} 不会 requestLayout，
+     * 每秒刷新时间就不会把主标题的 marquee 冲回行首。</p>
+     */
+    private void syncTimeLabelWidth(int durationMs) {
+        if (tvCurrentTime == null || tvTotalTime == null) {
+            return;
+        }
+        String total = tvTotalTime.getText() == null ? "" : tvTotalTime.getText().toString();
+        String current = tvCurrentTime.getText() == null ? "" : tvCurrentTime.getText().toString();
+        String durationText = formatTime(Math.max(durationMs, 0));
+        // 取三者里最长的那串作为测量样本（当前时间进位后可能与总时长一样长）
+        String sample = durationText;
+        if (current.length() > sample.length()) {
+            sample = current;
+        }
+        if (total.length() > sample.length()) {
+            sample = total;
+        }
+        android.text.TextPaint paint = tvTotalTime.getPaint();
+        int width = (int) Math.ceil(paint.measureText(sample)) + dp(4);
+        width = Math.max(width, dp(24));   // 最短 "0:00" 也不至于太挤
+        if (width == timeLabelWidthPx) {
+            return;
+        }
+        timeLabelWidthPx = width;
+        applyTimeLabelWidth(tvCurrentTime, width);
+        applyTimeLabelWidth(tvTotalTime, width);
+    }
+
+    private void applyTimeLabelWidth(TextView view, int width) {
+        if (view == null) {
+            return;
+        }
+        android.view.ViewGroup.LayoutParams lp = view.getLayoutParams();
+        if (lp != null && lp.width != width) {
+            lp.width = width;
+            view.setLayoutParams(lp);
+        }
+    }
+
     private final Runnable seekBarUpdateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -5609,6 +5657,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     seekBar.setProgress((int) (1000L * current / duration));
                     tvCurrentTime.setText(formatTime(current));
                     tvTotalTime.setText(formatTime(duration));
+                    syncTimeLabelWidth(duration);   // M4d：按曲目时长决定标签宽度（播放中不重排）
                     updateChorusMarker(duration);
                     // 播放满 30 秒给服务端打卡（每曲一次），让听歌记录/排行与账号同步
                     playerManager.reportPlayIfNeeded();
