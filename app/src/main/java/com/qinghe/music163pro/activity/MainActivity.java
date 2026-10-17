@@ -1458,33 +1458,45 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      */
     /** F1：表冠事件诊断日志上限（防刷屏）。 */
     private static int sCrownDiagLogged = 0;
-    private static final int CROWN_DIAG_LIMIT = 500;
-    /** 表冠累积值：每达到 1 单位走一步音量。 */
-    private float crownAccum;
-    /** 上一次真正改音量时刻（节流用）。 */
+    private static final int CROWN_DIAG_LIMIT = 600;
+
+    /** F1：两次事件间隔超过它 ⇒ 视为一次新的「旋转手势」，立刻响应一步。 */
+    private static final long CROWN_GESTURE_GAP_MS = 250L;
+    /** F1：持续旋转时，每一步之间的节拍（音量 max=16，约 5 格/秒）。 */
+    private static final long CROWN_STEP_INTERVAL_MS = 200L;
+    /** F1：方向判定所需的最小累计位移（防抖；避免正负抖动来回跳音量）。 */
+    private static final float CROWN_DIR_THRESHOLD = 3f;
+
+    /** 上一次事件时刻（判断手势是否中断）。 */
+    private long crownLastEventMs;
+    /** 上一步音量变化时刻（节拍用）。 */
     private long crownLastStepMs;
-    /** 两步之间的最小间隔：避免一次甩动/事件突发把音量瞬间拉满（0→6 那种）。 */
-    private static final long CROWN_MIN_STEP_INTERVAL_MS = 120L;
+    /** 当前旋转方向：1 变大、-1 变小、0 未知。 */
+    private int crownDir;
+    /** 方向判定用的累计位移。 */
+    private float crownDirAccum;
 
     /**
-     * F1：表冠旋转（转一下 = 调一格音量）。
+     * F1：表冠旋转调音量（转动 = 一格一格连续调）。
      *
-     * <p><b>真机事件特征（2026-10-17 实测）</b>：本机表冠被系统识别成**鼠标滚轮**
-     * （`source=0x2002` = {@code SOURCE_MOUSE}、`action=ACTION_SCROLL`），增量在
-     * **{@code AXIS_VSCROLL}**，{@code AXIS_SCROLL} 恒为 0。</p>
-     *
-     * <p>需求方反馈「识别不准确 / 0→6→0 / 转很久才第二步」之后，这里改成：
-     * <b>累积增量 + 每 1 单位走一步 + 两步之间至少 {@link #CROWN_MIN_STEP_INTERVAL_MS}ms</b>，
-     * 并把**每个事件**的原始轴值与实际音量变化都写进日志（`TAG=CrownDiag`，最多 500 条），
-     * 便于按真实事件分布继续调参。</p>
+     * <p><b>真机事件特征（2026-10-17 实测，`verify/F1round5/app.log`）</b>：</p>
+     * <ul>
+     *   <li>源是**鼠标滚轮**（`source=0x2002` = {@code SOURCE_MOUSE}），增量在
+     *       {@code AXIS_VSCROLL}（{@code AXIS_SCROLL} 恒 0）；</li>
+     *   <li>表冠是**光学自由旋转编码器**：转动时事件以约 **15ms** 间隔连续到来，
+     *       单事件 `AXIS_VSCROLL` 幅值 **1~84**（随转速变化，不是「一格一个事件」）；</li>
+     *   <li>所以既不能「一个事件调一格」（会 0→6 跳变），也不能「累积到固定刻度再走」——
+     *       幅值没有固定刻度。改为**按时间节拍**：持续旋转每
+     *       {@link #CROWN_STEP_INTERVAL_MS}ms 走一格；手势中断（&gt;{@link #CROWN_GESTURE_GAP_MS}ms）
+     *       后第一格立即生效；方向由 {@link #CROWN_DIR_THRESHOLD} 位移确认，避免抖动来回跳。</li>
+     * </ul>
      */
     @Override
     public boolean onGenericMotionEvent(android.view.MotionEvent event) {
         if (event == null) {
             return super.onGenericMotionEvent(event);
         }
-        boolean scroll = event.getAction() == android.view.MotionEvent.ACTION_SCROLL;
-        if (!scroll) {
+        if (event.getAction() != android.view.MotionEvent.ACTION_SCROLL) {
             return super.onGenericMotionEvent(event);
         }
         float rawScroll = event.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
@@ -1497,30 +1509,32 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (Math.abs(delta) < 0.01f) {
             delta = hscroll;
         }
-        // 单次事件最多记 3 个单位，防止异常大值把累积值顶飞
-        if (delta > 3f) {
-            delta = 3f;
-        } else if (delta < -3f) {
-            delta = -3f;
-        }
-        if (Math.abs(delta) > 0.001f) {
-            crownAccum += delta;
+        if (Math.abs(delta) < 0.001f) {
+            return true;   // 只有 action 的空事件：吞掉
         }
 
-        boolean stepped = false;
         long now = SystemClock.uptimeMillis();
-        if (Math.abs(crownAccum) >= 1f && now - crownLastStepMs >= CROWN_MIN_STEP_INTERVAL_MS) {
-            // 一次最多走一格：间隔够了才允许再走（快速甩动会被节流成连续的单格）
-            int dir = crownAccum > 0 ? 1 : -1;
-            crownAccum -= dir;
-            crownLastStepMs = now;
-            stepped = handleCrownScroll(dir);
-        }
-        // 累积值别无限堆积：最多保留 ±3，方向反转时也会自然抵消
-        if (crownAccum > 3f) {
-            crownAccum = 3f;
-        } else if (crownAccum < -3f) {
-            crownAccum = -3f;
+        // 方向防抖：方向由累计位移确认（单事件幅值 1~84 不等，直接取符号容易抖）
+        float clamped = Math.max(-10f, Math.min(10f, delta));
+        crownDirAccum += clamped;
+        boolean stepped = false;
+        if (Math.abs(crownDirAccum) >= CROWN_DIR_THRESHOLD) {
+            int dir = crownDirAccum > 0 ? 1 : -1;
+            crownDirAccum = 0;
+            boolean newGesture = now - crownLastEventMs > CROWN_GESTURE_GAP_MS;
+            crownLastEventMs = now;
+            if (newGesture || dir != crownDir) {
+                // 新手势 / 反向：立刻响应一步（不许「转很久才第一步」）
+                crownDir = dir;
+                crownLastStepMs = now;
+                stepped = handleCrownScroll(dir);
+            } else if (now - crownLastStepMs >= CROWN_STEP_INTERVAL_MS) {
+                // 持续旋转：按节拍一格一格走，不再随事件突发跳变
+                crownLastStepMs = now;
+                stepped = handleCrownScroll(dir);
+            }
+        } else {
+            crownLastEventMs = now;
         }
 
         if (sCrownDiagLogged < CROWN_DIAG_LIMIT) {
@@ -1533,14 +1547,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     + " t=" + event.getEventTime()
                     + " src=0x" + Integer.toHexString(event.getSource())
                     + " S=" + rawScroll + " V=" + vscroll + " H=" + hscroll
-                    + " delta=" + delta + " acc=" + crownAccum
-                    + " stepped=" + stepped + " 音量=" + vol);
+                    + " delta=" + delta + " dirAcc=" + crownDirAccum
+                    + " dir=" + crownDir + " stepped=" + stepped + " 音量=" + vol);
         }
-        return true;   // 表冠事件自己消费，避免再被父类/其它控件当滚轮处理
+        return true;   // 表冠事件自己消费，避免被父类/其它控件再当滚轮处理
     }
 
     /** F1：表冠调音量本体（一步一格；return true = 已消费）。 */
-    private boolean handleCrownScroll(float delta) {
+    private boolean handleCrownScroll(int dir) {
         android.media.AudioManager am =
                 (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
         if (am == null) {
@@ -1548,12 +1562,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
         int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
-        int target = Math.max(0, Math.min(max, cur + (delta > 0 ? 1 : -1)));
+        int target = Math.max(0, Math.min(max, cur + (dir > 0 ? 1 : -1)));
         if (target != cur) {
             applyUserVolume(target, max);   // 复用 M1：含耳机安全音量确认
         }
         showVolumeIndicator();
-        MusicLog.i("Crown", "表冠调音量: delta=" + delta + " 音量 " + cur + " -> " + target
+        MusicLog.i("Crown", "表冠调音量: dir=" + dir + " 音量 " + cur + " -> " + target
                 + " (max=" + max + ")");
         return true;
     }
