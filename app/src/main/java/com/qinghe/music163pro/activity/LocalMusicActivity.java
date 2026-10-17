@@ -24,10 +24,11 @@ import com.qinghe.music163pro.util.WatchBackButton;
  * <p><b>现在</b>：数据侧在 {@code util/LocalMusicLoader}（步骤①），视图与交互在
  * {@code fragment/LocalMusicFragment}（步骤② 建、步骤③-2 补全）。本类只做四件事：</p>
  * <ol>
- *   <li>提供标题栏（搜索 / 排序 / 更多 + 标题 + 下载/本地标签行）—— 返回按钮与标题栏避让的
- *       统一机制都挂在 Activity 上，留在宿主里最稳；</li>
+ *   <li>提供**单行**标题栏（左标题「本地音乐」+ 右 ☰ 菜单 + 下载/本地标签行）—— 返回按钮与
+ *       标题栏避让的统一机制都挂在 Activity 上，留在宿主里最稳；</li>
  *   <li>把内容区交给 {@code LocalMusicFragment(advanced=true)}；</li>
- *   <li>把标题栏动作转调给 Fragment（搜索 / 排序 / 更多都在 Fragment 里实现）；</li>
+ *   <li>把标题栏的 ☰ 转调给 Fragment（搜索 / 排序 / A-Z / 随机 / 局域网传歌 / 刷新缓存
+ *       全部在 {@code LocalMusicFragment.showMoreDialog()} 里）；</li>
  *   <li>多选模式的返回键拦截转调给 Fragment。</li>
  * </ol>
  *
@@ -52,44 +53,16 @@ public class LocalMusicActivity extends BaseWatchActivity implements LocalMusicF
         LocalMetadataIndex.init(this);
         setContentView(R.layout.activity_local_music);
 
-        // 标题栏撑到返回按钮的占位高度：否则按钮会压住第一行的封面（详见该方法注释）
-        // 返回按钮的占位加在**整个标题栏**上（而不是只加给「动作按钮那一行」）：
-        //   · 加给动作行 → 那一行被强行撑到返回按钮的高度（约 101px），下面再叠一行标题，
-        //     整个头部吃掉近 150px，列表只剩两行半；
-        //   · 加给外层 → 外层本来就是返回按钮的占地高度，两行内容正好填进去，
-        //     头部回到「一个返回按钮」的量级，列表多出约一行空间。
+        // 标题栏 = 单行「标题 + ☰ 菜单」（需求方 2026-10-17 口径：不要两行错开、更多用矢量图标）。
+        // 单行版只撑到返回按钮底边；标题栏里还叠着「下载 / 本地」标签行，
+        // 占位高度要把这一行再补上，否则标题会被按剩余高度压缩、字的下半截被切掉（实机确认）。
         View titleBar = findViewById(R.id.layout_local_music_title_bar);
-        // 只有「动作行 + 标题」避让左上角的返回按钮；标题栏里的「下载 / 本地」标签行
-        // 要占满整行宽度（用户明确要求），所以走 applyTitleBarInset 的变体。
-        // 与 D8 同款修复：标题**不再**列为 insetChild —— 那个方法会顺手给标题也留**右侧**占位
-        // （右侧是当年为了让**居中**标题保持居中的），而 G5 之后标题一律左对齐，右侧占位纯属浪费。
-        WatchBackButton.applyTitleBarInset(this, titleBar,
-                findViewById(R.id.layout_local_music_action_row));
-        // 标题栏里还叠了「下载 / 本地」标签行，占位高度要把这一行也算上 ——
-        // 否则标题会被按剩余高度压缩，字的下半截被切掉（实机确认）。
+        WatchBackButton.applySingleRowTitleBarInset(this, titleBar);
         WatchBackButton.addTitleBarExtraHeight(this, titleBar,
                 UiKit.dp(this, UiKit.DP_TAB_ROW_HEIGHT + 4));
 
-        // 动作行只留最常用的 + 「更多」；五个操作（搜索/排序/A-Z/随机/局域网传歌）全在「更多」里。
-        // 搜索 / 排序 / 更多 的实现都在 LocalMusicFragment（advanced=true），这里只转调。
-        View btnSearch = findViewById(R.id.btn_local_search);
-        if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> {
-                LocalMusicFragment f = fragment();
-                if (f != null) {
-                    f.showSearchDialog();
-                }
-            });
-        }
-        View btnSort = findViewById(R.id.btn_local_sort);
-        if (btnSort != null) {
-            btnSort.setOnClickListener(v -> {
-                LocalMusicFragment f = fragment();
-                if (f != null) {
-                    f.showSortDialog();
-                }
-            });
-        }
+        // ☰ 菜单：搜索 / 排序 / A-Z 字母索引 / 随机播放 / 局域网传歌 / 刷新本地缓存
+        // 全部在 LocalMusicFragment.showMoreDialog() 里，这里只转调（标题栏不再放三个文字按钮）。
         View btnMore = findViewById(R.id.btn_local_more);
         if (btnMore != null) {
             btnMore.setOnClickListener(v -> {

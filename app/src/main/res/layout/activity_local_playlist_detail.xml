@@ -27,22 +27,20 @@
             android:letterSpacing="0.05"
             android:gravity="center" />
 
-        <!-- 更多：搜索歌曲 / 排序方式（本页操作不多，收进一个二级菜单即可） -->
-        <TextView
+        <!-- 更多：☰ 矢量图标（需求方 2026-10-17：标题与动作同一行、更多用图标不用文字）；搜索 / 排序收进二级菜单 -->
+        <ImageView
             android:id="@+id/btn_local_playlist_more"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackground"
             android:clickable="true"
+            android:contentDescription="更多"
             android:focusable="true"
-            android:paddingStart="6dp"
-            android:paddingTop="4dp"
-            android:paddingEnd="4dp"
-            android:paddingBottom="4dp"
-            android:text="@string/local_music_more"
-            android:textColor="@color/colorPrimary"
-            android:textSize="11sp" />
+            android:padding="8dp"
+            android:src="@drawable/ic_menu"
+            android:tint="@color/colorPrimary" />
     </RelativeLayout>
 
     <!-- 状态行：搜索时显示命中数（点按清除搜索），平时不占高度 -->

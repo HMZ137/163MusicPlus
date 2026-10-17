@@ -181,6 +181,98 @@ public final class WatchBackButton {
     }
 
     /**
+     * **单行**标题栏（标题 + 右侧矢量动作图标同一行）的占位与对齐。
+     *
+     * <p>与 {@link #applyTitleBarInset} 的区别：**不再把标题栏钉成「两行高」**，只保留
+     * 「返回按钮底边」这一条竖直占位（{@link #getReservedTopHeight}），横向整行让出返回按钮
+     * 与物理圆角；标题由 G5 统一机制居左并自动避开按钮。适用于「标题 + 一个 ☰ 菜单图标」
+     * 这种单行头（收藏页 / 下载页 / 本机音乐页）。</p>
+     *
+     * <p>需求方 2026-10-17 口径：标题要和按钮在**同一行**、不要错开，「更多」用矢量图标。</p>
+     *
+     * @param titleBar 单行标题栏容器；里面的动作图标请用 {@code layout_alignParentEnd} 靠右。
+     */
+    public static void applySingleRowTitleBarInset(Activity activity, View titleBar) {
+        if (activity == null || titleBar == null) {
+            return;
+        }
+        // G3：与两行版同一时机登记「可上滑收起 / 下滑展开」。
+        TitleBarCollapse.register(activity, titleBar);
+        ViewGroup.LayoutParams params = titleBar.getLayoutParams();
+        if (params != null) {
+            // 竖直仍要撑到返回按钮底边，否则紧跟着的信息行 / 列表会被浮动按钮压住
+            int reserved = Math.max(dp(activity, 26), getReservedTopHeight(activity));
+            if (params.height == ViewGroup.LayoutParams.WRAP_CONTENT
+                    || (params.height > 0 && params.height < reserved)) {
+                params.height = reserved;
+                titleBar.setLayoutParams(params);
+            }
+        }
+        // 横向：整行让出浮动返回按钮与圆角（标题通过 G5 的累计内缩自然排在按钮右侧）
+        int inset = WatchUiUtils.cornerInset(activity);
+        int start = Math.max(inset, getReservedStartPadding(activity));
+        titleBar.setPaddingRelative(
+                Math.max(titleBar.getPaddingStart(), start),
+                titleBar.getPaddingTop(),
+                Math.max(titleBar.getPaddingEnd(), inset),
+                titleBar.getPaddingBottom());
+        forceSingleLineTitles(titleBar);
+        alignTitleStart(activity, titleBar);
+        // 单行头里标题的横向空间 = 整行 − 返回按钮占位 − 右侧 ☰。长标题（如「本地音乐管理」）
+        // 在 18sp 下放不进去，这里按实测宽高等比缩到放得下为止（不靠 ellipsize，保证标题完整）。
+        fitTitleTextSize(titleBar);
+    }
+
+    /**
+     * 单行标题栏的标题「放不下就等比缩小」。
+     *
+     * <p>为什么不直接用 TextView 的 autoSize：本工程的 TextView 经 Material/AppCompat 的
+     * inflater 工厂转换后，XML 里的 {@code app:autoSize*} 实测不生效（实机验证：字未缩放、仍被省略）。
+     * 这里在布局完成后按 {@link android.graphics.Paint#measureText} 实测一次，按比例缩字号即可，
+     * 逻辑确定、不依赖 AppCompat 版本。</p>
+     */
+    private static void fitTitleTextSize(final View titleBar) {
+        titleBar.post(() -> {
+            TextView title = findTitleView(titleBar);
+            if (title == null || title.getWidth() <= 0 || title.getText() == null) {
+                return;
+            }
+            int available = title.getWidth() - title.getPaddingStart() - title.getPaddingEnd();
+            if (available <= 0) {
+                return;
+            }
+            float current = title.getTextSize();
+            float needed = title.getPaint().measureText(title.getText().toString());
+            if (needed <= available || current <= 0f) {
+                return;
+            }
+            // 等比缩放到刚好放下；下限 10sp（再小就看不清了，超出部分交给 ellipsize 兜底）
+            float minPx = dp(title.getContext(), 10);
+            float target = Math.max(minPx, current * available / needed);
+            if (target < current) {
+                title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, target);
+            }
+        });
+    }
+
+    /** 在标题栏里找「id 名含 title」的 TextView（与 G5 的标题识别规则一致）。 */
+    private static TextView findTitleView(View node) {
+        if (node instanceof TextView && looksLikeTitle(node)) {
+            return (TextView) node;
+        }
+        if (node instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) node;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                TextView found = findTitleView(group.getChildAt(i));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * 标题栏占位，<b>只让指定的那几行横向避让</b>，其余子视图（例如页内标签行）仍占满整行宽度。
      *
      * <p><b>为什么需要这个变体</b>：避让是靠给标题栏加左内边距实现的，而内边距会作用到

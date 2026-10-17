@@ -68,6 +68,15 @@ public class DownloadListActivity extends BaseWatchActivity
     /** 有下载/整理在进行中时，用来定时刷新列表（进度、新完成的条目）。 */
     private static final long REFRESH_INTERVAL_MS = 1000L;
 
+    // ── L7：下载列表排序（首字符 A-Z 口径，与本地音乐页同一套 ScriptSort 规则） ──
+    private static final int SORT_NAME = 0;
+    private static final int SORT_ARTIST = 1;
+    private static final int SORT_ALBUM = 2;
+    private static final String PREFS = "music163_settings";
+    /** 下载列表排序方式的持久化键（与本地音乐页的 local_sort_mode 分开记）。 */
+    private static final String PREF_DOWNLOAD_SORT_MODE = "download_sort_mode";
+    private int downloadSortMode = SORT_NAME;
+
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     /**
      * 加载代数：读盘在后台跑，连续触发时只认最后一次的结果。
@@ -114,6 +123,9 @@ public class DownloadListActivity extends BaseWatchActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_download_list);
+        // L7：读回上次选的下载列表排序方式（首字符 A-Z 口径）
+        downloadSortMode = getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getInt(PREF_DOWNLOAD_SORT_MODE, SORT_NAME);
         // 4-5 埋点：本页起点。与下面「下载页视图就绪」以及 page1 预加载的时间戳一起，
         // 用来判断 ViewPager2 的预加载是否落在首屏关键路径上（低噪声，每次开页一行）。
         com.qinghe.music163pro.util.MusicLog.i("Vp2", "DownloadListActivity.onCreate 开始");
@@ -121,17 +133,10 @@ public class DownloadListActivity extends BaseWatchActivity
         // 标题栏要撑到浮动返回按钮的占位高度，否则按钮会压住列表第一行的封面
         // 与本地音乐页同理：占位加在**整个标题栏**上。若只加给上面的动作行，那一行会被撑到
         // 返回按钮的高度，再叠一行标题，头部会白吃掉几十像素的列表空间。
+        // 标题栏 = 单行「标题 + ☰ 菜单」（需求方 2026-10-17 口径：不要两行错开、更多用矢量图标）。
+        // 竖直占位要撑到浮动返回按钮的底边，否则按钮会压住下面的信息行/第一行封面。
         View titleBar = findViewById(R.id.layout_downloads_title_bar);
-        // 只有「动作行」避让左上角的返回按钮；标题栏里的「下载 / 本地」标签行
-        // 要占满整行宽度（用户明确要求），所以走 applyTitleBarInset 的变体。
-        //
-        // ⚠️ D8 修复：**标题不再交给这个方法**。原先把标题也列为 insetChild，
-        // 该方法会给它同时留左、右两侧占位（右侧是当年为了让**居中**标题保持居中的）；
-        // 而 G5 之后标题一律**左对齐**，右侧占位纯属浪费 —— 实测把「本地音乐管理」6 个字
-        // 的可用宽压到 222px（需要约 241px），于是被省略成「本地音乐…」。
-        // 这里改成：标题只留**左侧**（返回按钮）占位，右侧归零，可用宽回到约 272px。
-        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, titleBar,
-                findViewById(R.id.layout_downloads_action_row));
+        com.qinghe.music163pro.util.WatchBackButton.applySingleRowTitleBarInset(this, titleBar);
         // L2：迁移 VP2 后标签行已删除（只留 返回/标题/更多），标题栏不再需要为标签行补高度 ——
         // 原先这笔 addTitleBarExtraHeight 会把标题栏撑高约一行 32dp，白吃掉列表空间。
 
@@ -356,11 +361,113 @@ public class DownloadListActivity extends BaseWatchActivity
         }
     }
 
-    /** L2：标题栏右上角「更多」菜单（目前只有「整理文件名」，保留原能力）。 */
+    /** L2：标题栏右上角「更多」菜单。L7：按当前页分发 —— 本地页给本地音乐的完整功能菜单。 */
     private void showDownloadsMenu() {
+        // 「本地」页：搜索 / 排序 / 字母索引 / 随机播放 / 局域网传歌 / 刷新缓存 都在
+        // LocalMusicFragment.showMoreDialog() 里，这里直接转调，避免两套菜单各维护一份。
+        if (vpDownloadTabs != null && vpDownloadTabs.getCurrentItem() == 1) {
+            LocalMusicFragment local = currentLocalMusicFragment();
+            if (local != null) {
+                local.showMoreDialog();
+                return;
+            }
+            Toast.makeText(this, "本地音乐页还没准备好，稍后再试", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // 「下载」页：排序（首字符 A-Z 口径）+ 整理文件名
         com.qinghe.music163pro.util.WatchMenuDialog.show(this, getString(R.string.downloads),
-                new String[]{"整理文件名（song → 曲名 - 曲师）"},
-                which -> confirmTidyFileNames());
+                new String[]{"排序（首字符 A-Z，当前：按" + downloadSortLabel() + "）",
+                        "整理文件名（song → 曲名 - 曲师）"},
+                which -> {
+                    if (which == 0) {
+                        showDownloadSortDialog();
+                    } else {
+                        confirmTidyFileNames();
+                    }
+                });
+    }
+
+    /** 当前可见的「本地」页 Fragment（ViewPager2 的页 1）。 */
+    private LocalMusicFragment currentLocalMusicFragment() {
+        for (Fragment f : getSupportFragmentManager().getFragments()) {
+            if (f instanceof LocalMusicFragment && f.isAdded()) {
+                return (LocalMusicFragment) f;
+            }
+        }
+        return null;
+    }
+
+    // ==================== L7：下载列表排序（首字符 A-Z） ====================
+
+    /** 排序方式的中文名（菜单/对话框标题用）。 */
+    private String downloadSortLabel() {
+        switch (downloadSortMode) {
+            case SORT_ARTIST:
+                return "曲师";
+            case SORT_ALBUM:
+                return "专辑";
+            default:
+                return "曲名";
+        }
+    }
+
+    /**
+     * 下载列表的排序比较器（首字符 A-Z 口径，与本地音乐页完全一致）。
+     *
+     * <p>用 {@link com.qinghe.music163pro.util.ScriptSort#TEXT_ORDER}：先按文字分段
+     * （拉丁 → 汉字 → 假名 → 西里尔 → #）、段内各用自己的序；同一字段值再按曲名兜底，
+     * 保证顺序稳定。比较是**字符级转写**，所以读盘落地那一趟放在后台线程里排（见 loadDownloads）。</p>
+     */
+    private static int compareDownloads(Song left, Song right, int mode) {
+        String leftKey = sortKeyOf(left, mode);
+        String rightKey = sortKeyOf(right, mode);
+        int byKey = com.qinghe.music163pro.util.ScriptSort.TEXT_ORDER.compare(leftKey, rightKey);
+        if (byKey != 0) {
+            return byKey;
+        }
+        String leftName = left == null || left.getName() == null ? "" : left.getName();
+        String rightName = right == null || right.getName() == null ? "" : right.getName();
+        return com.qinghe.music163pro.util.ScriptSort.TEXT_ORDER.compare(leftName, rightName);
+    }
+
+    private static String sortKeyOf(Song song, int mode) {
+        if (song == null) {
+            return "";
+        }
+        switch (mode) {
+            case SORT_ARTIST:
+                return song.getArtist() == null ? "" : song.getArtist();
+            case SORT_ALBUM:
+                return song.getAlbum() == null ? "" : song.getAlbum();
+            default:
+                return song.getName() == null ? "" : song.getName();
+        }
+    }
+
+    /** 用户切换排序方式后，在主线程重排当前列表（下载列表只有几十条，直接排不会卡）。 */
+    private void applyDownloadSort() {
+        final int mode = downloadSortMode;
+        java.util.Collections.sort(downloadedSongs, (left, right) -> compareDownloads(left, right, mode));
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+    /** 选择下载列表排序方式（曲名 / 曲师 / 专辑），会记住。 */
+    private void showDownloadSortDialog() {
+        final String[] options = {"按曲名", "按曲师", "按专辑"};
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this,
+                "排序方式（当前：按" + downloadSortLabel() + "）", options, which -> {
+                    if (which == downloadSortMode) {
+                        return;
+                    }
+                    downloadSortMode = which;
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                            .putInt(PREF_DOWNLOAD_SORT_MODE, downloadSortMode).apply();
+                    applyDownloadSort();
+                    Toast.makeText(this, "已按「按" + downloadSortLabel() + "」排序",
+                            Toast.LENGTH_SHORT).show();
+                });
     }
 
     /** 标题按优先级显示：整理进度 > 下载队列 > 常态标题。 */
@@ -538,6 +645,15 @@ public class DownloadListActivity extends BaseWatchActivity
                 // 单个下载目录读失败不该让整页空掉：已经读到的部分照常显示
                 com.qinghe.music163pro.util.MusicLog.i("Downloads",
                         "gen=" + generation + " 读盘异常: " + t);
+            }
+            // L7：读盘结果是目录顺序，**在后台**按用户选的排序口径（首字符 A-Z）排好再落地。
+            // ScriptSort 的比较是逐字转写，放主线程排几十条会掉帧，放这里没有代价。
+            final int sortModeSnapshot = downloadSortMode;
+            try {
+                java.util.Collections.sort(loaded,
+                        (left, right) -> compareDownloads(left, right, sortModeSnapshot));
+            } catch (Throwable t) {
+                com.qinghe.music163pro.util.MusicLog.i("Downloads", "排序异常: " + t);
             }
             final List<Song> result = loaded;
             com.qinghe.music163pro.util.MusicLog.i("Downloads",

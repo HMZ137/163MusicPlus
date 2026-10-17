@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  4-3 步骤③-2：完整页 LocalMusicActivity 变「薄宿主」。
-  本布局只剩两块：
-    1) 标题栏（动作行 搜索/排序/更多 + 标题「本地音乐」+ 页内标签 下载/本地）；
+  4-3 步骤③-2：完整页 LocalMusicActivity 是「薄宿主」；本布局只剩两块：
+    1) 单行标题栏（左标题「本地音乐」+ 右 ☰ 菜单）+ 页内标签行（下载 / 本地）；
     2) 内容区 FrameLayout —— 由 advanced=true 的 LocalMusicFragment 填充
-       （列表 / 状态行 / 空态；搜索、排序、A-Z、多选、局域网传歌的逻辑也在 Fragment 里）。
-  标题栏的 inset / 额外高度计算保持不变（见 WatchBackButton 的注释），否则标题会被压掉半截。
+       （列表 / 状态行 / 空态；搜索、排序、A-Z、多选、局域网传歌的逻辑也都在这 Fragment 里）。
+  需求方 2026-10-17 口径：标题与动作在**同一行**、不要错开，「更多」用矢量图标；
+  搜索 / 排序 / A-Z / 随机 / 局域网传歌 / 刷新缓存全部收进 ☰ 菜单（LocalMusicFragment.showMoreDialog）。
+  标题栏的竖直占位由 WatchBackButton.applySingleRowTitleBarInset() 统一处理，标签行高度另行补足。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -14,94 +15,54 @@
     android:orientation="vertical"
     android:padding="6dp">
 
-    <!--
-      标题栏两行：
-        第 1 行 = 右侧动作按钮（搜索 / 排序 / 更多）；
-        第 2 行 = 标题「本地音乐」。
-      两行一起被 WatchBackButton.applyTitleBarInset() 撑到「返回按钮占地」的高度（本机约 101px），
-      所以头部总高≈一个返回按钮 —— 不再额外吃掉列表空间。
-    -->
     <LinearLayout
         android:id="@+id/layout_local_music_title_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- 单行：左标题 + 右 ☰ -->
         <RelativeLayout
             android:id="@+id/layout_local_music_action_row"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:paddingBottom="2dp">
 
-            <!-- 搜索：弹搜索框（逻辑在 LocalMusicFragment.showSearchDialog） -->
-            <TextView
-                android:id="@+id/btn_local_search"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_toStartOf="@id/btn_local_sort"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingStart="4dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="4dp"
-                android:paddingBottom="4dp"
-                android:text="@string/search"
-                android:textColor="@color/colorPrimary"
-                android:textSize="11sp" />
-
-            <!-- 排序方式：曲名 / 曲师 / 专辑（选择会记住） -->
-            <TextView
-                android:id="@+id/btn_local_sort"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_toStartOf="@id/btn_local_more"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingStart="4dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="4dp"
-                android:paddingBottom="4dp"
-                android:text="@string/local_music_sort"
-                android:textColor="@color/colorPrimary"
-                android:textSize="11sp" />
-
-            <!-- 更多：五个操作都在这里（搜索 / 排序 / A-Z 字母索引 / 随机播放 / 局域网传歌 + 刷新缓存） -->
-            <TextView
+            <ImageView
                 android:id="@+id/btn_local_more"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackground"
                 android:clickable="true"
+                android:contentDescription="更多"
                 android:focusable="true"
-                android:paddingStart="4dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="4dp"
-                android:paddingBottom="4dp"
-                android:text="@string/local_music_more"
-                android:textColor="@color/colorPrimary"
-                android:textSize="11sp" />
-        </RelativeLayout>
+                android:padding="8dp"
+                android:src="@drawable/ic_menu"
+                android:tint="@color/colorPrimary" />
 
-        <TextView
-            android:id="@+id/tv_local_music_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:letterSpacing="0.05"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:text="@string/local_music"
-            android:textColor="@color/text_primary"
-            android:textSize="@dimen/watch_title_text_size"
-            android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tv_local_music_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="44dp"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:letterSpacing="0.05"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="@string/local_music"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/watch_title_text_size"
+                android:textStyle="bold" />
+        </RelativeLayout>
 
         <!--
           页内二级标签：下载 / 本地。样式与「收藏」页一致（纯文字、无底衬、等宽、仅颜色区分选中）。
-          必须放在**标题栏里面**：标题栏高度被 applyTitleBarInset() 钉成「返回按钮占地」，
-          只够「动作行 + 标题」两行；把标签放在外面时标题会被挤掉下半截（实机确认）。
+          注意：本行高度由 Activity 调 WatchBackButton.addTitleBarExtraHeight() 补进标题栏占位，
+          否则单行标题栏只按「返回按钮底边」算高度，标签行会把标题挤掉下半截。
         -->
         <LinearLayout
             android:id="@+id/ll_local_music_tabs"

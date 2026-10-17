@@ -53,11 +53,10 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
         setContentView(R.layout.activity_favorites_list);
         MusicLog.i("Vp2", "FavoritesListActivity.onCreate（VP2 三页容器）");
 
-        // 标题栏 = 返回 / 标题 / 菜单。标题题注（左对齐 + 避开浮动返回按钮）与
-        // 高度占位都由统一机制处理：只有「动作行」做横向避让，标题行由 G5 自己补 start 间距。
+        // 标题栏 = 单行「标题 + ☰ 菜单」（需求方 2026-10-17 口径：不要两行错开、更多用矢量图标）。
+        // 竖直占位 / 标题避开浮动返回按钮由统一机制处理。
         View titleBar = findViewById(R.id.layout_fav_title_bar);
-        WatchBackButton.applyTitleBarInset(this, titleBar,
-                findViewById(R.id.layout_fav_action_row));
+        WatchBackButton.applySingleRowTitleBarInset(this, titleBar);
 
         tvFavInfo = findViewById(R.id.tv_fav_info);
         View btnMenu = findViewById(R.id.btn_fav_menu);

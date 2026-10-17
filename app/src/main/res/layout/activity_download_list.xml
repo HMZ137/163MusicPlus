@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  下载管理页（4-1/4-2 起是 ViewPager2 容器；L2 去多 Tab；L7 菜单能力回归）。
+
+  需求方口径（2026-10-17 晚）：
+    · 标题与右侧动作在**同一行**、不要错开，「更多」用**矢量图标**（☰）而不是文字；
+    · 「其他需要展示的内容」放标题栏外的独立行（这里显示已下载首数）。
+
+  标题栏占位（撑到返回按钮底边 + 横向避开按钮与圆角）由
+  WatchBackButton.applySingleRowTitleBarInset() 统一处理。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -6,51 +16,33 @@
     android:orientation="vertical"
     android:padding="6dp">
 
-    <!--
-      标题栏改成两行：
-        第 1 行 = 右侧动作按钮（「整理」）。这一行由 WatchBackButton.applyTitleBarInset()
-                  撑到返回按钮的占位高度、并留出左侧内边距，所以浮动返回按钮（X）不会压到按钮。
-        第 2 行 = 标题，占满整行宽度。
-      为什么必须拆行：原先标题与按钮挤在同一行，扣除返回按钮占位（本机约 100px）与按钮宽度之后，
-      留给标题的宽度只剩约 50px —— 六个字「本地音乐管理」在 16sp 下需要约 220px，于是被折成竖排。
-      拆行后标题能拿到整行宽度，单行完整显示。
-
-      「本地」原先是这里的第三个按钮，现已上提为标题下方的页内标签（与「收藏」页同款样式），
-      所以动作行只剩「整理」。
-    -->
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/layout_downloads_title_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="6dp">
+        android:paddingBottom="2dp">
 
-        <RelativeLayout
-            android:id="@+id/layout_downloads_action_row"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:id="@+id/btn_tidy_downloads"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingStart="8dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
-                android:text="更多"
-                android:textColor="@color/colorPrimary"
-                android:textSize="@dimen/watch_text_caption" />
-        </RelativeLayout>
+        <!-- L7：☰ 菜单（内容按当前页分发：下载页 = 排序 + 整理文件名；本地页 = 本地音乐完整菜单） -->
+        <ImageView
+            android:id="@+id/btn_tidy_downloads"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:contentDescription="更多"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_menu"
+            android:tint="@color/colorPrimary" />
 
         <TextView
             android:id="@+id/tv_downloads_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="44dp"
             android:ellipsize="end"
             android:gravity="center"
             android:letterSpacing="0.05"
@@ -60,8 +52,7 @@
             android:textColor="@color/text_primary"
             android:textSize="@dimen/watch_text_title"
             android:textStyle="bold" />
-
-    </LinearLayout>
+    </RelativeLayout>
 
     <!-- L2：「其他需要展示的内容」独立行（多Tab实例_1.bmp）：下载页显示已下载首数，本地页隐藏 -->
     <TextView
@@ -76,11 +67,7 @@
         android:textColor="@color/text_secondary"
         android:textSize="@dimen/watch_text_caption" />
 
-    <!--
-      4-1：内容区改为 ViewPager2 容器，承载「下载 / 本地」两页。
-      「下载」页的 ListView 与空态视图已迁入 res/layout/fragment_download_tab.xml（4-2）；
-      「本地」页目前是桥接占位，真实内容由 4-3 迁入。
-    -->
+    <!-- 4-1：内容区 ViewPager2（第 0 页下载 / 第 1 页本地，没有 Tab 按钮、左右滑切换） -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/vp_download_tabs"
         android:layout_width="match_parent"

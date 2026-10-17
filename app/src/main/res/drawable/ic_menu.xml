@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  标题栏右侧「更多 / 菜单」的矢量图标（三条横线，即 多Tab实例_1.bmp 里那个 ☰）。
+  需求方 2026-10-17：标题与按钮要在同一行、不要错开，「更多」不要用文字、换成矢量图标。
+  颜色由使用处的 android:tint 决定（本工程标题栏动作用 @color/colorPrimary）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M3,18h18v-2H3v2zm0,-5h18v-2H3v2zm0,-7v2h18V6H3z" />
+</vector>
