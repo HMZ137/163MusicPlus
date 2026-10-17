@@ -45,7 +45,10 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="48dp">
+            <!-- 底部留白（D15）：界面缩放 115% 下本页滚到底也露不全最后一行（「黑名单」被切掉一半），
+                 48dp≈93px 足以把最后一项顶进可视区。-->
 
             <!-- F5：响度平衡总开关（默认关；关闭时播放路径完全不变） -->
             <LinearLayout
@@ -177,6 +180,50 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/watch_text_caption"
                     android:singleLine="true" />
+            </LinearLayout>
+
+            <!-- F4：内嵌封面/歌词（把同目录的 cover.jpg / lyrics.lrc 写进音频文件标签） -->
+            <LinearLayout
+                android:id="@+id/btn_settings_embed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_bookmark"
+                    android:alpha="0.7" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="内嵌封面歌词"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/tv_settings_embed_value"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="写入歌曲标签"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_caption"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- F3：本地黑名单入口（行样式与上面各行一致；两行文案按 1-7/1-8 规则截断） -->

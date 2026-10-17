@@ -162,6 +162,16 @@ public final class WatchPopup {
         return this;
     }
 
+    /**
+     * 复选框是否被勾选（没有配置复选框时恒为 false）。
+     *
+     * <p>按钮回调只带输入框文本，需要复选状态时在回调里取本方法即可
+     * （弹层点击按钮后先 dismiss 再执行回调，此时复选框实例与状态仍可读）。</p>
+     */
+    public boolean isCheckboxChecked() {
+        return checkbox != null && checkbox.isChecked();
+    }
+
     // ── 渲染 ────────────────────────────────────────────────────────────────
 
     public void show() {

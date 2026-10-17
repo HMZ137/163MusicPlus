@@ -54,8 +54,23 @@ public final class AudioTagEmbedder {
         }
     }
 
+    /** 进度回调（可选）：每处理完一个歌曲目录回调一次，供设置页回写副标题。 */
+    public interface Listener {
+        /**
+         * @param done   已处理目录数
+         * @param total  目录总数
+         * @param folder 刚处理完的目录名
+         */
+        void onProgress(int done, int total, String folder);
+    }
+
     /** 扫描下载根目录下的所有歌曲目录并内嵌。 */
     public static Result embedAll(File downloadRoot, boolean force) {
+        return embedAll(downloadRoot, force, null);
+    }
+
+    /** 扫描下载根目录下的所有歌曲目录并内嵌（带进度回调）。 */
+    public static Result embedAll(File downloadRoot, boolean force, Listener listener) {
         Result r = new Result();
         if (downloadRoot == null || !downloadRoot.isDirectory()) {
             return r;
@@ -64,6 +79,7 @@ public final class AudioTagEmbedder {
         if (dirs == null) {
             return r;
         }
+        int done = 0;
         for (File dir : dirs) {
             r.total++;
             try {
@@ -79,6 +95,10 @@ public final class AudioTagEmbedder {
                 r.failed++;
                 Log.w(TAG, "内嵌失败: " + dir.getName() + " -> " + e);
             }
+            done++;
+            if (listener != null) {
+                listener.onProgress(done, dirs.length, dir.getName());
+            }
         }
         return r;
     }
@@ -86,11 +106,16 @@ public final class AudioTagEmbedder {
     /**
      * 处理单个歌曲目录。
      *
+     * <p><b>真实下载目录结构</b>（2026-10-17 装机核对）：音频**不在**歌单目录根下，而在
+     * {@code <歌名 - 歌手>/songs/<音质>/<文件>.mp3|flac}；{@code lyrics.lrc} / {@code cover.jpg} /
+     * {@code info.json} 在歌单目录根下。所以这里递归找音频（最多 4 层），一个目录里的同曲多音质副本
+     * 会**逐一内嵌**。</p>
+     *
      * @return 1=已内嵌；0=跳过（无素材 / 已标记且未强制）；-1=失败
      */
     public static int embedFolder(File dir, boolean force) throws IOException {
-        File audio = findAudio(dir);
-        if (audio == null) {
+        List<File> audios = findAudios(dir);
+        if (audios.isEmpty()) {
             return 0;
         }
         File info = new File(dir, INFO_FILE);
@@ -109,21 +134,28 @@ public final class AudioTagEmbedder {
             return 0;
         }
 
-        byte[] original = readAll(audio);
-        String name = audio.getName().toLowerCase(java.util.Locale.ROOT);
-        byte[] updated;
-        if (name.endsWith(".mp3")) {
-            updated = embedMp3(original, cover, lyrics);
-        } else if (name.endsWith(".flac")) {
-            updated = embedFlac(original, cover, lyrics);
-        } else {
-            return 0;
+        int embedded = 0;
+        for (File audio : audios) {
+            byte[] original = readAll(audio);
+            String name = audio.getName().toLowerCase(java.util.Locale.ROOT);
+            byte[] updated;
+            if (name.endsWith(".mp3")) {
+                updated = embedMp3(original, cover, lyrics);
+            } else if (name.endsWith(".flac")) {
+                updated = embedFlac(original, cover, lyrics);
+            } else {
+                continue;
+            }
+            if (updated == null) {
+                continue;
+            }
+            backupOnce(audio);
+            writeAll(audio, updated);
+            embedded++;
         }
-        if (updated == null) {
+        if (embedded == 0) {
             return -1;
         }
-        backupOnce(audio);
-        writeAll(audio, updated);
         mark(info);
         return 1;
     }
@@ -391,20 +423,45 @@ public final class AudioTagEmbedder {
         writeAll(bak, readAll(file));
     }
 
-    private static File findAudio(File dir) {
-        File[] files = dir.listFiles(File::isFile);
+    /**
+     * 递归找歌曲目录下的音频文件（真实结构是 {@code songs/<音质>/xxx.mp3}）。
+     *
+     * <p>深度上限 4 层，避免在异常目录结构下无限下钻；结果按路径排序保证每次处理顺序稳定
+     * （多音质副本都要内嵌）。</p>
+     */
+    private static List<File> findAudios(File dir) {
+        List<File> result = new ArrayList<>();
+        collectAudios(dir, result, 0);
+        java.util.Collections.sort(result, (a, b) ->
+                a.getAbsolutePath().compareTo(b.getAbsolutePath()));
+        return result;
+    }
+
+    private static void collectAudios(File dir, List<File> out, int depth) {
+        if (dir == null || depth > 4) {
+            return;
+        }
+        File[] files = dir.listFiles();
         if (files == null) {
-            return null;
+            return;
         }
         for (File f : files) {
+            if (!f.isFile()) {
+                continue;
+            }
             String n = f.getName().toLowerCase(java.util.Locale.ROOT);
             for (String ext : AUDIO_EXTS) {
                 if (n.endsWith(ext)) {
-                    return f;
+                    out.add(f);
+                    break;
                 }
             }
         }
-        return null;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                collectAudios(f, out, depth + 1);
+            }
+        }
     }
 
     private static byte[] readAll(File f) throws IOException {
