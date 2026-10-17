@@ -161,7 +161,10 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 // 直接写 pref 会漏掉那一步
                 PlaybackMode.setLocalOnly(this, isChecked);
                 // 两种模式互斥：开本地就把「纯在线」关掉（setLocalOnly 内部也会清掉那个键）
-                syncModeSwitches(!isChecked, false);
+                // 修（需求方 2026-10-17：点了不实时变化、要退出重进才刷新）：
+                // 原来这里写成 syncModeSwitches(!isChecked, false)，等于「开启本地模式后立刻把开关可视状态设回关」，
+                // 实际 pref 已生效，所以表现为「看着还是关、重进页面才是开」。
+                syncModeSwitches(isChecked, false);
                 // 收藏模式的值在本地模式下是「锁定」的，切完模式要重新回显一次
                 updateFavModeValue();
                 Toast.makeText(this, isChecked

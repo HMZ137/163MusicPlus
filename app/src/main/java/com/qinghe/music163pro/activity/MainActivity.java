@@ -111,6 +111,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private TextView tvTotalTime;
     /** M4d：时间标签当前实际宽度（px）；-1 = 还没算过。 */
     private int timeLabelWidthPx = -1;
+    /** M4e：拖动进度条时显示的「+/-xx s」浮动提示。 */
+    private TextView seekDeltaView;
+    /** M4e：本次拖动开始时的播放位置（ms），用于算提示里的相对秒数。 */
+    private int seekDragStartMs;
     private MusicPlayerManager playerManager;
     private FavoritesManager favoritesManager;
     private AudioManager audioManager;
@@ -470,14 +474,39 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Changed: "more functions" overlay instead of toggle favorite
         btnFuncMore.setOnClickListener(v -> showFunctionsOverlay());
 
+        // M4e（需求方 2026-10-17）：播放页现在装在 ViewPager2 里，**横向拖动会被 pager 先抢走**，
+        // 于是进度条只剩「点按」能生效、拖不动。按下时禁止父级拦截，抬起/取消再恢复。
+        seekBar.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                case android.view.MotionEvent.ACTION_MOVE:
+                    if (v.getParent() != null) {
+                        v.getParent().requestDisallowInterceptTouchEvent(true);
+                    }
+                    break;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    if (v.getParent() != null) {
+                        v.getParent().requestDisallowInterceptTouchEvent(false);
+                    }
+                    break;
+                default:
+                    break;
+            }
+            return false;   // 不消费，继续交给 SeekBar 自己处理
+        });
+
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 if (fromUser) {
                     int duration = playerManager.getDuration();
                     if (duration > 0) {
-                        tvCurrentTime.setText(formatTime((int) ((long) progress * duration / 1000)));
+                        int targetMs = (int) ((long) progress * duration / 1000);
+                        // 需求方 2026-10-17：拖动时左侧「已播时长」要跟着拖到的位置走
+                        tvCurrentTime.setText(formatTime(targetMs));
                         syncTimeLabelWidth(duration);
+                        updateSeekDeltaHint(targetMs);
                     }
                 }
             }
@@ -485,6 +514,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             @Override
             public void onStartTrackingTouch(SeekBar bar) {
                 isUserSeeking = true;
+                seekDragStartMs = playerManager.getCurrentPosition();
+                showSeekDeltaHint(seekDragStartMs);
             }
 
             @Override
@@ -495,6 +526,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     playerManager.seekTo(seekPos);
                 }
                 isUserSeeking = false;
+                // 「不松手不消失」：松手才收起提示
+                hideSeekDeltaHint();
             }
         });
 
@@ -2722,11 +2755,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      */
     private void showLyricSettingsMenu() {
         final boolean aiOn = aiLyricActive;
-        final boolean romaOn = LyricSettings.isRomanizationEnabled(this);
-        final boolean transOn = LyricSettings.isTranslationEnabled(this);
+        // 用当前实时字段（与歌词页实际显示一致）；不要再用 prefs 重读 ——
+        // 两边万一不同步就会「功能变了、提示没变」（需求方 2026-10-17 反馈的同类问题）。
+        final boolean romaOn = romanizationEnabled;
+        final boolean transOn = translationEnabled;
         final boolean fullscreen = LyricSettings.isFullscreenButtonEnabled(this);
         java.util.List<String> items = new java.util.ArrayList<>();
-        items.add("AI 着色：" + (aiOn ? "开" : "关"));
+        // 点按 AI 后分析是异步的：分析期间显示「分析中」，避免用户以为"点了没反应/恒为关"。
+        items.add("AI 着色：" + (aiOn ? "开" : (aiLyricLoading ? "分析中…" : "关")));
         items.add("音译：" + (romaOn ? "开" : "关"));
         items.add("翻译：" + (transOn ? "开" : "关"));
         if (fullscreen) {
@@ -3031,7 +3067,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * Saves preference persistently.
      */
     private void toggleLyricsTranslation() {
-        if (translationEnabled && translationMap.isEmpty()
+        // ⚠️ 守卫只针对「关 → 开」且这首歌确实没有翻译数据的情况；
+        // 原来写成 `translationEnabled && ...`（当前是开才拦），结果一旦打开就再也关不掉，
+        // 表现成「点了没反应、提示不变」（需求方 2026-10-17 反馈）。
+        if (!translationEnabled && translationMap.isEmpty()
                 && (aiLyricResult == null || aiLyricResult.lines.isEmpty())) {
             Toast.makeText(this, "这首歌没有翻译（可开 AI 生成）", Toast.LENGTH_SHORT).show();
             return;
@@ -3050,8 +3089,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * 与「译」互相独立，可以同时打开 —— 日文歌会同时显示 原文 / 发音 / 翻译 三行。
      */
     private void toggleLyricsRomanization() {
-        if (romanizationEnabled && romanizationMap.isEmpty()) {
-            // 当前是关→开，但这首歌没有音译歌词
+        // 同上：只有「关 → 开」且这首歌没有音译数据时才拦（原来条件写反，打开后就关不掉）
+        if (!romanizationEnabled && romanizationMap.isEmpty()) {
             Toast.makeText(this, "这首歌没有音译歌词", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -5599,6 +5638,67 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     public void onSleepTimerPendingStop() {
         // 「放完当前曲再停」：倒计时到点了，但这一首还没结束
         Toast.makeText(this, "定时已到，本曲结束后将停止播放", Toast.LENGTH_LONG).show();
+    }
+
+    // ───────── M4e：拖动进度条时的「+/-xx s」浮动提示 ─────────
+
+    /**
+     * 需求方 2026-10-17：拖动进度条时要显示相对原位置的 **+/-xx 秒** 提示，且**不松手不消失**。
+     * 提示做成浮层（不参与布局，避免拖动过程中反复 requestLayout 影响歌名跑马灯）。
+     */
+    private void showSeekDeltaHint(int positionMs) {
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
+                .findViewById(android.R.id.content);
+        if (rootView == null) {
+            return;
+        }
+        if (seekDeltaView == null) {
+            TextView hint = new TextView(this);
+            hint.setTextColor(0xFFFFFFFF);
+            hint.setTextSize(13);
+            hint.setShadowLayer(dp(4), 0, dp(1), 0xA0000000);
+            hint.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_volume_indicator));
+            hint.setPadding(dp(10), dp(4), dp(10), dp(4));
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT);
+            lp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
+            hint.setLayoutParams(lp);
+            rootView.addView(hint);
+            seekDeltaView = hint;
+        }
+        // 放在进度条上方：按 seekBar 当前屏幕位置算 topMargin
+        int[] loc = new int[2];
+        seekBar.getLocationOnScreen(loc);
+        android.view.ViewGroup.LayoutParams lp = seekDeltaView.getLayoutParams();
+        if (lp instanceof FrameLayout.LayoutParams) {
+            ((FrameLayout.LayoutParams) lp).topMargin = Math.max(0, loc[1] - dp(34));
+        }
+        seekDeltaView.setVisibility(android.view.View.VISIBLE);
+        updateSeekDeltaHint(positionMs);
+    }
+
+    /** 刷新提示文本：目标位置相对「按下时位置」的秒数差（正负号显示）。 */
+    private void updateSeekDeltaHint(int positionMs) {
+        if (seekDeltaView == null || seekDeltaView.getVisibility() != android.view.View.VISIBLE) {
+            return;
+        }
+        int deltaSec = Math.round((positionMs - seekDragStartMs) / 1000f);
+        String text;
+        if (deltaSec > 0) {
+            text = "+" + deltaSec + "s";
+        } else if (deltaSec < 0) {
+            text = deltaSec + "s";
+        } else {
+            text = "0s";
+        }
+        seekDeltaView.setText(text);
+    }
+
+    private void hideSeekDeltaHint() {
+        if (seekDeltaView != null) {
+            seekDeltaView.setVisibility(android.view.View.GONE);
+        }
     }
 
     /**
