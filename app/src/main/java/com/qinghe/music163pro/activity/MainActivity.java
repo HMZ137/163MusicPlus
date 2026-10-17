@@ -433,6 +433,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String cookie = prefs.getString("cookie", "");
         playerManager.setCookie(cookie);
 
+        // 2026-10-18（需求方）：「音 / 译」按钮的开关状态要持久化 ——
+        // 以前只写 pref、启动时从不读回，导致每次开 App 都得重新点一次；
+        // 这里启动时恢复，歌词装载后再把按钮样式同步成「音✓ / 译✓」。
+        romanizationEnabled = LyricSettings.isRomanizationEnabled(this);
+        translationEnabled = LyricSettings.isTranslationEnabled(this);
+
         // Apply keep screen on setting
         if (prefs.getBoolean("keep_screen_on", false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -2913,10 +2919,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         if (btnTranslationToggle != null) {
             btnTranslationToggle.setVisibility(hasTranslation ? View.VISIBLE : View.GONE);
+            // 持久化恢复后，按钮样式也要跟当前开关一致（否则显示「译」但内容已经开着）
+            applyLyricToggleStyle(btnTranslationToggle,
+                    translationEnabled ? "译✓" : "译", translationEnabled);
         }
         if (btnRomanizationToggle != null) {
             // 没有音译歌词就不显示（保持原设计：按钮只在该歌确实有时才出现）
             btnRomanizationToggle.setVisibility(hasRomanization ? View.VISIBLE : View.GONE);
+            applyLyricToggleStyle(btnRomanizationToggle,
+                    romanizationEnabled ? "音✓" : "音", romanizationEnabled);
         }
 
         displayLyricsInOverlay();
