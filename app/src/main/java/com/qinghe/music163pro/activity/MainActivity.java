@@ -85,8 +85,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
     /** M1：音量浮层自动收起延时（浮层升级为可交互后，比原来的 1500ms 放宽）。 */
     private static final long VOLUME_DISMISS_DELAY_MS = 2500L;
-    /** F1：表冠调音量时，音量条/数字从旧值过渡到新值的时长。 */
-    private static final long VOLUME_STEP_ANIM_MS = 150L;
+    /**
+     * F1：表冠调音量时，音量条/数字从旧值过渡到新值的时长。
+     *
+     * <p>需求方反馈「浮层平滑过渡没出现」——原因是上一版动画只有 150ms，而表冠节拍 340ms，
+     * 每格先「刷」一下再停住近 200ms，肉眼仍是一顿一顿。这里改成**与节拍对齐的 320ms 线性滑动**，
+     * 连续旋转时条和数字几乎一直在匀速移动。</p>
+     */
+    private static final long VOLUME_STEP_ANIM_MS = 320L;
     private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
     private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
     private static final int SAFE_VOLUME_PERCENT = 60;
@@ -1574,11 +1580,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
         int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
         int target = Math.max(0, Math.min(max, cur + (dir > 0 ? 1 : -1)));
+        // ⚠️ 顺序很重要：先把浮层建出来并显示**旧值**，再更新系统音量走动画；
+        // 若像上一版那样先改音量再 showVolumeIndicator()，浮层首次出现时已经被设成新值，
+        // 看不到过渡（这就是需求方反馈「平滑过渡没出现」的直接原因之一）。
+        showVolumeIndicator();
         if (target != cur) {
             animateVolumeUpdate = true;     // 表冠：音量条走平滑过渡
             applyUserVolume(target, max);   // 复用 M1：含耳机安全音量确认
         }
-        showVolumeIndicator();
+        scheduleVolumeDismiss();
         MusicLog.i("Crown", "表冠调音量: dir=" + dir + " 音量 " + cur + " -> " + target
                 + " (max=" + max + ")");
         return true;
@@ -1790,13 +1800,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     ? 0xFFFFA726 : 0xFFFFFFFF);
             return;
         }
-        // 差值越大动画略长一点，但封顶 240ms，保证连续调节时不会越拖越长
-        long duration = Math.min(240L, VOLUME_STEP_ANIM_MS + 40L * Math.abs(
-                targetProgress - volumeDisplayedProgress));
+        long duration = VOLUME_STEP_ANIM_MS;
         android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(
                 volumeDisplayedProgress, targetProgress);
         animator.setDuration(duration);
-        animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        // 线性插值：表冠一格接一格时，条与数字是匀速滑动（Decelerate 会在每格末尾「停一下」）
+        animator.setInterpolator(new android.view.animation.LinearInterpolator());
         animator.addUpdateListener(a -> {
             int shown = (int) a.getAnimatedValue();
             volumeDisplayedProgress = shown;

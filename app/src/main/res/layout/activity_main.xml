@@ -200,20 +200,26 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <!--
+              M4c（需求方 2026-10-17）：「进度条太窄（约 80px）→ 处理左右时间标签以加宽」。
+              固定宽度 44dp→32dp、字号 11sp→10sp、左右边距 2dp→1dp：
+              时间文本仍是「固定宽度」（只是更窄），播放中每秒 setText 不会 requestLayout，
+              主页歌名 marquee 不会被冲回行首。
+            -->
             <TextView
                 android:id="@+id/tv_current_time"
-                android:layout_width="44dp"
+                android:layout_width="32dp"
                 android:layout_height="wrap_content"
                 android:minHeight="16dp"
-                android:layout_marginStart="2dp"
-                android:layout_marginEnd="2dp"
+                android:layout_marginStart="1dp"
+                android:layout_marginEnd="1dp"
                 android:fontFeatureSettings="tnum"
                 android:includeFontPadding="false"
                 android:gravity="center"
-                android:singleLine="true"
+                android:maxLines="1"
                 android:text="0:00"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
 
             <SeekBar
                 android:id="@+id/seek_bar"
@@ -223,6 +229,8 @@
                 android:maxHeight="20dp"
                 android:minHeight="20dp"
                 android:max="100"
+                android:paddingStart="0dp"
+                android:paddingEnd="0dp"
                 android:paddingTop="0dp"
                 android:paddingBottom="0dp"
                 android:progress="0"
@@ -231,18 +239,18 @@
 
             <TextView
                 android:id="@+id/tv_total_time"
-                android:layout_width="44dp"
+                android:layout_width="32dp"
                 android:layout_height="wrap_content"
                 android:minHeight="16dp"
-                android:layout_marginStart="2dp"
-                android:layout_marginEnd="2dp"
+                android:layout_marginStart="1dp"
+                android:layout_marginEnd="1dp"
                 android:fontFeatureSettings="tnum"
                 android:includeFontPadding="false"
                 android:gravity="center"
-                android:singleLine="true"
+                android:maxLines="1"
                 android:text="0:00"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
 
         </LinearLayout>
 
