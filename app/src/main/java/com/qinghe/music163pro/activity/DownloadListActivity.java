@@ -62,6 +62,8 @@ public class DownloadListActivity extends BaseWatchActivity
     private ListView lvDownloads;
     private TextView tvEmpty;
     private TextView tvTitle;
+    /** L2：标题栏外的「其他需要展示的内容」行（下载页显示已下载首数）。 */
+    private TextView tvDownloadsCount;
     private MultiSelectController multiSelect;
 
     /** 有下载/整理在进行中时，用来定时刷新列表（进度、新完成的条目）。 */
@@ -141,6 +143,7 @@ public class DownloadListActivity extends BaseWatchActivity
         // 4-1/4-2：下载列表与空态视图已迁到 ViewPager2 的「下载」页（DownloadTabFragment），
         // 这里不再直接 findViewById —— 该页视图就绪后由 onDownloadListViewsReady() 回调绑定。
         tvTitle = findViewById(R.id.tv_downloads_title);
+        tvDownloadsCount = findViewById(R.id.tv_downloads_count);
         // D8：把标题从上面那个方法的 insetChildren 里摘出来了（不再要**右侧**占位）。
         // 左侧（返回按钮）避让由 G5 的统一机制自己在标题上处理，这里**不要再加 padding** ——
         // 实测叠加会变成双重缩进：盒子 260px、文字区只剩 166px，标题被截得更短（「本地音…」）。
@@ -163,6 +166,15 @@ public class DownloadListActivity extends BaseWatchActivity
         // 预加载限 1：下一页提前建好够用；多建只会白读盘（4-5 会实测首屏耗时再定值）。
         vpDownloadTabs.setOffscreenPageLimit(1);
         vpDownloadTabs.setUserInputEnabled(tabsVisible);
+        // L2：「其他需要展示的内容」行只在下载页显示（本地页自带状态行）
+        vpDownloadTabs.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                if (tvDownloadsCount != null) {
+                    tvDownloadsCount.setVisibility(position == 0 ? View.VISIBLE : View.GONE);
+                }
+            }
+        });
 
         // 适配器在这里就建好（ArrayAdapter 不需要 ListView 即可构造）；
         // 真正 setAdapter/监听/多选都等「下载」页视图就绪后由 onDownloadListViewsReady() 绑定。
@@ -597,6 +609,9 @@ public class DownloadListActivity extends BaseWatchActivity
     }
 
     private void updateEmptyState() {
+        if (tvDownloadsCount != null) {
+            tvDownloadsCount.setText(downloadedSongs.size() + " 首");
+        }
         if (tvEmpty == null || lvDownloads == null) {
             // 4-1 起列表住在 ViewPager2 的页面里：视图可能尚未建好，或该页已被回收。
             // 此时没有可更新的空态，直接返回（否则 NPE）。

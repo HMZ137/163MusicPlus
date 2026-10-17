@@ -63,6 +63,19 @@
 
     </LinearLayout>
 
+    <!-- L2：「其他需要展示的内容」独立行（多Tab实例_1.bmp）：下载页显示已下载首数，本地页隐藏 -->
+    <TextView
+        android:id="@+id/tv_downloads_count"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:singleLine="true"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/watch_text_caption" />
+
     <!--
       4-1：内容区改为 ViewPager2 容器，承载「下载 / 本地」两页。
       「下载」页的 ListView 与空态视图已迁入 res/layout/fragment_download_tab.xml（4-2）；
