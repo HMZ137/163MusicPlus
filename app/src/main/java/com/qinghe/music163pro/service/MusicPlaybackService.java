@@ -6,8 +6,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ComponentName;
+import android.bluetooth.BluetoothA2dp;
+import android.bluetooth.BluetoothHeadset;
+import android.bluetooth.BluetoothProfile;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
@@ -83,6 +89,9 @@ public class MusicPlaybackService extends Service {
     private AudioManager          audioManager;
     private ComponentName         mediaButtonReceiver;
 
+    /** 2026-10-18：耳机/蓝牙断开后自动暂停 —— 监听音频输出变化与蓝牙断开广播。 */
+    private BroadcastReceiver     audioRouteReceiver;
+
     private String  currentSongName  = "";
     private String  currentArtist    = "";
     private String  currentCoverUrl  = "";
@@ -98,6 +107,7 @@ public class MusicPlaybackService extends Service {
         createChannels();
         acquireWakeLock();
         initializeMediaSession();
+        registerAudioRouteReceiver();
         // Start foreground with a minimal keep-alive notification (required by Android)
         startForeground(FOREGROUND_ID, buildKeepAliveNotification());
     }
@@ -183,6 +193,13 @@ public class MusicPlaybackService extends Service {
     public void onDestroy() {
         super.onDestroy();
         cancelAutoCancelAlarm();
+        if (audioRouteReceiver != null) {
+            try {
+                unregisterReceiver(audioRouteReceiver);
+            } catch (Exception ignored) {
+            }
+            audioRouteReceiver = null;
+        }
         if (audioManager != null && mediaButtonReceiver != null) {
             try {
                 audioManager.unregisterMediaButtonEventReceiver(mediaButtonReceiver);
@@ -194,6 +211,67 @@ public class MusicPlaybackService extends Service {
             mediaSession = null;
         }
         releaseWakeLock();
+    }
+
+    /**
+     * 2026-10-18（需求方）：**蓝牙耳机断开连接后自动停止播放**。
+     *
+     * <p>两条触发链路，任一命中且当前正在播放就暂停（保留进度，可手动继续）：</p>
+     * <ol>
+     *   <li>{@code AudioManager.ACTION_AUDIO_BECOMING_NOISY} —— 音频输出被切走
+     *       （蓝牙断开 / 有线耳机拔出 / 外放切换），Android 官方推荐媒体应用在此暂停；</li>
+     *   <li>{@code BluetoothA2dp/BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED} ——
+     *       状态从「已连接」变为「已断开」时补充兜底（部分机型不发 becoming-noisy）。</li>
+     * </ol>
+     */
+    private void registerAudioRouteReceiver() {
+        if (audioRouteReceiver != null) {
+            return;
+        }
+        audioRouteReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null) {
+                    return;
+                }
+                final String action = intent.getAction();
+                String reason = null;
+                if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(action)) {
+                    reason = "音频输出被切走（耳机拔出/蓝牙断开）";
+                } else if (BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED.equals(action)
+                        || BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                    int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1);
+                    int prev = intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, -1);
+                    if (state == BluetoothProfile.STATE_DISCONNECTED
+                            && prev == BluetoothProfile.STATE_CONNECTED) {
+                        reason = "蓝牙耳机断开";
+                    }
+                }
+                if (reason == null) {
+                    return;
+                }
+                MusicPlayerManager player = MusicPlayerManager.getInstance();
+                if (player == null || !player.isPlaying()) {
+                    return;
+                }
+                com.qinghe.music163pro.util.MusicLog.i("AudioRoute",
+                        "检测到" + reason + " → 自动暂停播放");
+                player.pause();
+                updateMediaSession();
+                postXtcCard();
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+        filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
+        filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
+        try {
+            registerReceiver(audioRouteReceiver, filter);
+        } catch (Exception e) {
+            com.qinghe.music163pro.util.MusicLog.w("AudioRoute", "注册耳机断开监听失败: " + e);
+            audioRouteReceiver = null;
+        }
     }
 
     private void initializeMediaSession() {
