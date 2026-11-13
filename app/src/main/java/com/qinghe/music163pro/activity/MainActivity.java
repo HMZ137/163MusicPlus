@@ -1,6 +1,8 @@
 package com.qinghe.music163pro.activity;
 
 import android.Manifest;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -1082,6 +1084,19 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             contentLayout.addView(row7);
         }
 
+        // Row 8: 复制链接（在线歌曲的可播放直链）。
+        // 刻意不跟云端功能一起在 cloudBlocked 时隐藏：本地歌也要能点，点了明确告知
+        // 「没有可用链接」，比整项消失更不容易让人以为功能丢了。见 onFuncCopyLink()。
+        LinearLayout row8 = new LinearLayout(this);
+        row8.setOrientation(LinearLayout.HORIZONTAL);
+        row8.setGravity(Gravity.START);
+        row8.setPadding(0, dp(4), 0, 0);
+        row8.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row8.addView(createFuncItem(R.drawable.ic_link, "复制链接",
+                v -> onFuncCopyLink(song)));
+        contentLayout.addView(row8);
+
         // 统一重排成「每行两个」：分组拼行时（收藏/下载 一行、铃声/定时 一行…）在播放本地歌
         // 这种「云端功能被整体隐藏」的场景下会出现一行只剩一个按钮，看着歪。见 rebalanceOverlayRows()。
         rebalanceOverlayRows(contentLayout);
@@ -1161,6 +1176,94 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             }
             contentLayout.addView(row);
         }
+    }
+
+    // ==================== 复制链接 ====================
+
+    /**
+     * 「复制链接」：把当前在线歌曲**实际正在播放的直链**写入系统剪贴板。
+     *
+     * <p>为什么优先取 {@code song.getUrl()} 而不是每次重新调接口：播放内核在
+     * {@code finishPlay()} 里会把最终采用的地址写回 Song —— 包括「手表网关」解析出来的
+     * 完整链接。重新调一次 {@code getSongUrlInfo} 只会拿到网关之前的试听片段，
+     * 反而比不上用户此刻真正听到的那条。所以只有直链为空（刚入队还没解析、
+     * 或被播放错误重试清空）时才异步补取一次。</p>
+     *
+     * <p>本地歌没有网易云直链；本地播放模式下也不该为了复制而发起网络请求，
+     * 两种情况都给明确提示而不是静默失败。</p>
+     */
+    private void onFuncCopyLink(Song song) {
+        dismissOverlay();
+        if (song == null || LocalTracks.isLocalOnly(song) || song.getId() <= 0) {
+            toastNoSongLink();
+            return;
+        }
+        String playingUrl = song.getUrl();
+        if (isHttpUrl(playingUrl)) {
+            copySongLink(playingUrl);
+            return;
+        }
+        if (PlaybackMode.isLocalOnly(this)) {
+            toastNoSongLink();
+            return;
+        }
+        Toast.makeText(this, "正在获取链接…", Toast.LENGTH_SHORT).show();
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        String quality = prefs.getString("preferred_quality", "exhigh");
+        MusicApiHelper.getSongUrlInfo(song.getId(), playerManager.getCookie(), quality,
+                new MusicApiHelper.SongUrlInfoCallback() {
+                    @Override
+                    public void onResult(String url, boolean trialOnly) {
+                        if (!isHttpUrl(url)) {
+                            toastNoSongLink();
+                            return;
+                        }
+                        copySongLink(url, trialOnly);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        // 接口异常时再看一眼 Song 上的直链（可能刚好解析完成）；
+                        // 仍然没有才提示，避免网络抖动误报成「这首歌没有链接」。
+                        String retryUrl = song.getUrl();
+                        if (isHttpUrl(retryUrl)) {
+                            copySongLink(retryUrl, false);
+                        } else {
+                            toastNoSongLink();
+                        }
+                    }
+                });
+    }
+
+    private static boolean isHttpUrl(String url) {
+        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    private void copySongLink(String url) {
+        copySongLink(url, false);
+    }
+
+    private void copySongLink(String url, boolean trialOnly) {
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) {
+            Toast.makeText(this, "复制失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        cm.setPrimaryClip(ClipData.newPlainText("网易云歌曲链接", url));
+        String hint;
+        if (trialOnly) {
+            hint = "已复制试听片段链接";
+        } else if (url.contains("/song/media/outer/url")) {
+            // getSongUrlInfo 的最后兜底外链：能打开，但未登录时常常只能听片段
+            hint = "已复制歌曲外链（可能仅试听）";
+        } else {
+            hint = "已复制播放链接";
+        }
+        Toast.makeText(this, hint, Toast.LENGTH_SHORT).show();
+    }
+
+    private void toastNoSongLink() {
+        Toast.makeText(this, "当前歌曲没有可用链接", Toast.LENGTH_SHORT).show();
     }
 
     private void showBilibiliFunctionsOverlay(Song song) {
