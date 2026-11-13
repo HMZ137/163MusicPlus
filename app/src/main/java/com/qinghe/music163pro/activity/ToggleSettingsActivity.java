@@ -308,25 +308,25 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         }
         container.addView(buildSectionTitle("显示"));
 
-        // 页面缩放：按 dpi 档位循环（需求方 2026-11-14 要求把百分比改成 dpi）。
-        // 改完需要页面重建才会生效，所以切换后立刻 recreate。
-        final TextView scaleValue = buildStepperRow(container, "界面缩放",
-                UiScale.getDpi(this) + " dpi",
-                () -> {
-                    UiScale.cycle(this);
+        // 界面缩放：点击行弹输入浮窗，直接填 dpi（确认后自动保存并重建页面）。
+        // 需求方 2026-11-14：不要「按一次加一点」，自己填数值。
+        final TextView scaleValue = buildValueRow(container, "界面缩放",
+                UiScale.getDpi(this) + " dpi");
+        final LinearLayout scaleRow = (LinearLayout) scaleValue.getParent();
+        scaleRow.setOnClickListener(v -> {
+            int dpi = UiScale.getDpi(this);
+            com.qinghe.music163pro.util.WatchPopup.input(this, "界面缩放（dpi）",
+                    "320 为原始大小；确认后自动保存并生效", "dpi",
+                    String.valueOf(dpi), "确定", text -> {
+                try {
+                    int value = Integer.parseInt(text.trim());
+                    // 下限 160：再小的界面点不中；上限 640 防止撑爆
+                    value = Math.max(160, Math.min(640, value));
+                    com.qinghe.music163pro.util.UiScale.setDpi(this, value);
                     recreate();
-                },
-                () -> {
-                    UiScale.cycle(this);
-                    recreate();
-                });
-        scaleValue.setText(UiScale.getDpi(this) + " dpi");
-        // 循环档位用整行点击更顺手，−/+ 只是备用入口
-        scaleValue.setOnClickListener(v -> {
-            int dpi = UiScale.cycle(this);
-            com.qinghe.music163pro.util.UiKit.toast(this,
-                    "界面缩放: " + dpi + " dpi（重新进入页面后生效）");
-            recreate();
+                } catch (NumberFormatException ignored) {
+                }
+            });
         });
 
         // 歌词字号：音 / 词 / 译 各一个
@@ -506,6 +506,39 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
      *
      * @return 显示数值的 TextView，交给调用方刷新
      */
+    /** 只有「标题 + 数值」的行，整行可点（没有 −/+ 按钮）。 */
+    private TextView buildValueRow(LinearLayout container, String title, String initialValue) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6));
+        row.setBackground(getResources().getDrawable(R.drawable.bg_card_tile));
+        row.setMinimumHeight(dpToPx(48));
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        textColumn.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        textColumn.addView(tvTitle);
+
+        TextView tvValue = new TextView(this);
+        tvValue.setText(initialValue);
+        tvValue.setTextColor(getResources().getColor(R.color.colorPrimary));
+        tvValue.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        textColumn.addView(tvValue);
+        row.addView(textColumn);
+
+        container.addView(row);
+        return tvValue;
+    }
+
     private TextView buildStepperRow(LinearLayout container, String title, String initialValue,
                                      Runnable onMinus, Runnable onPlus) {
         LinearLayout row = new LinearLayout(this);
