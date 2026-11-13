@@ -449,6 +449,7 @@ public class MusicApiHelper {
                     }
                     Song song = new Song(id, name, artist, album);
                     song.setTransName(pickTransName(s));
+                    song.setFee(s.optInt("fee", 0));
                     if (!coverUrl.isEmpty()) {
                         song.setCoverUrl(coverUrl);
                     }

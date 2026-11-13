@@ -109,6 +109,12 @@ public class SearchSongsFragment extends SearchListFragment<SearchSongsFragment.
         TextView tvName = row.findViewById(R.id.tv_item_name);
         TextView tvArtist = row.findViewById(R.id.tv_item_artist);
         ImageView ivCover = row.findViewById(R.id.iv_cover);
+        // VIP 标识：只有歌曲条目才有（SoundInfo 不是歌曲）
+        View vipBadge = row.findViewById(R.id.tv_vip_badge);
+        if (vipBadge != null) {
+            vipBadge.setVisibility(item.song != null && item.song.isVip()
+                    ? View.VISIBLE : View.GONE);
+        }
         tvName.setText(item.displayName());
         tvArtist.setText(item.displayArtist());
         if (ivCover != null) {

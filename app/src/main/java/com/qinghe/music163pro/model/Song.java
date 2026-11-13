@@ -26,6 +26,8 @@ public class Song implements Serializable {
     private long albumId;
     /** 歌名译名（网易云 tns 字段，首个非空项）。空表示没有译名。 */
     private String transName;
+    /** NetEase fee flag: 1 = VIP 歌曲，0 = 免费等（用于列表的 VIP 标识）。 */
+    private int fee;
 
     public Song() {}
 
@@ -38,6 +40,13 @@ public class Song implements Serializable {
 
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
+
+    public int getFee() { return fee; }
+    public void setFee(int fee) { this.fee = fee; }
+
+    /** 是否 VIP 歌曲（网易 fee == 1）。 */
+    public boolean isVip() { return fee == 1; }
+
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
