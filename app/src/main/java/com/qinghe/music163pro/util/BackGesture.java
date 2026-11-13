@@ -11,6 +11,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SearchEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
@@ -45,6 +46,23 @@ public final class BackGesture implements Application.ActivityLifecycleCallbacks
     public static void install(Application app) {
         if (app == null) return;
         app.registerActivityLifecycleCallbacks(INSTANCE);
+    }
+
+/** 递归查找视图树里第一个 ViewPager2（用于判断当前页是否已无法向左翻）。 */
+    private static androidx.viewpager2.widget.ViewPager2 findPager(View view) {
+        if (view instanceof androidx.viewpager2.widget.ViewPager2) {
+            return (androidx.viewpager2.widget.ViewPager2) view;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                androidx.viewpager2.widget.ViewPager2 pager = findPager(group.getChildAt(i));
+                if (pager != null) {
+                    return pager;
+                }
+            }
+        }
+        return null;
     }
 
     /** 当前开关状态 (默认关). */
@@ -135,6 +153,15 @@ public final class BackGesture implements Application.ActivityLifecycleCallbacks
                             width = activity.getResources().getDisplayMetrics().widthPixels;
                         }
                         if (matches(event.getX(), event.getY(), width)) {
+                            // 需求方 2026-11-14：手势与 fragment-pagerview 冲突 ——
+                            // 只有当前页面已无法向左翻（ViewPager2 在第一页或无分页）时才返回；
+                            // 否则这次滑动交给 ViewPager 自己翻回上一页。
+                            androidx.viewpager2.widget.ViewPager2 pager =
+                                    findPager(activity.getWindow().getDecorView());
+                            if (pager != null && pager.getCurrentItem() > 0) {
+                                tracking = false;
+                                return origin.dispatchTouchEvent(event);
+                            }
                             // 先给子 View 补发 CANCEL, 清掉按下/拖动状态
                             MotionEvent cancel = MotionEvent.obtain(event);
                             cancel.setAction(MotionEvent.ACTION_CANCEL);
