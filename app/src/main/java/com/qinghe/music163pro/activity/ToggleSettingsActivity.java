@@ -179,10 +179,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 syncModeSwitches(isChecked, false);
                 // 收藏模式的值在本地模式下是「锁定」的，切完模式要重新回显一次
                 updateFavModeValue();
-                Toast.makeText(this, isChecked
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked
                                 ? "已切换到本地播放模式，云端功能已隐藏"
-                                : "已切换到云音乐模式",
-                        Toast.LENGTH_SHORT).show();
+                                : "已切换到云音乐模式");
             });
         }
 
@@ -192,10 +191,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 PlaybackMode.setOnlineOnly(this, isChecked);
                 syncModeSwitches(false, isChecked);
                 updateFavModeValue();
-                Toast.makeText(this, isChecked
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked
                                 ? "已切换到纯在线模式，本地功能已隐藏（下载管理保留）"
-                                : "已退出纯在线模式",
-                        Toast.LENGTH_SHORT).show();
+                                : "已退出纯在线模式");
             });
         }
 
@@ -204,19 +202,15 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             switchOledBurnProtection.setOnCheckedChangeListener((btn, isChecked) -> {
                 if (updatingSwitch) return;
                 prefs.edit().putBoolean(PREF_OLED_BURN_PROTECTION, isChecked).apply();
-                Toast.makeText(this,
-                        isChecked ? "已开启 OLED 防烧屏，主页面内容会周期轻微移位"
-                                : "已关闭 OLED 防烧屏",
-                        Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked ? "已开启 OLED 防烧屏，主页面内容会周期轻微移位"
+                                : "已关闭 OLED 防烧屏");
             });
         }
 
         switchSleepTimerExitApp.setOnCheckedChangeListener((btn, isChecked) -> {
             if (updatingSwitch) return;
             prefs.edit().putBoolean(PREF_SLEEP_TIMER_EXIT_APP, isChecked).apply();
-            Toast.makeText(this,
-                    isChecked ? "定时结束后将退出应用" : "定时结束后仅停止播放",
-                    Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, isChecked ? "定时结束后将退出应用" : "定时结束后仅停止播放");
         });
 
         // 应用内返回手势：立即生效（BackGesture 每次触摸都会读 pref）
@@ -225,9 +219,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 if (updatingSwitch) return;
                 prefs.edit().putBoolean(
                         com.qinghe.music163pro.util.BackGesture.KEY_ENABLED, isChecked).apply();
-                Toast.makeText(this, isChecked
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked
                         ? "已开启：从左向右滑动返回上一页"
-                        : "已关闭应用内返回手势", Toast.LENGTH_SHORT).show();
+                        : "已关闭应用内返回手势");
             });
             // 整行点按也能切换（手表上点开关本体比点行更费劲）
             findViewById(R.id.row_back_gesture).setOnClickListener(
@@ -242,9 +236,8 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                         com.qinghe.music163pro.util.WatchBackButton.PREF_SHOW_BACK_BUTTON,
                         isChecked).apply();
                 com.qinghe.music163pro.util.WatchBackButton.syncVisibility(this);
-                Toast.makeText(this, isChecked
-                        ? "已显示返回按钮" : "已隐藏返回按钮，可用右滑手势或系统返回",
-                        Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked
+                        ? "已显示返回按钮" : "已隐藏返回按钮，可用右滑手势或系统返回");
             });
             findViewById(R.id.row_show_back_button).setOnClickListener(
                     v -> switchShowBackButton.toggle());
@@ -258,9 +251,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             switchUseWatchApi.setOnCheckedChangeListener((btn, isChecked) -> {
                 if (updatingSwitch) return;
                 prefs.edit().putBoolean(PREF_USE_WATCH_API, isChecked).apply();
-                Toast.makeText(this,
-                        isChecked ? "试听歌曲将先用手表接口解析完整链接" : "已关闭手表解析，按原逻辑获取URL",
-                        Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked ? "试听歌曲将先用手表接口解析完整链接" : "已关闭手表解析，按原逻辑获取URL");
             });
         }
 
@@ -269,9 +260,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             switchSkipTrialSongs.setOnCheckedChangeListener((btn, isChecked) -> {
                 if (updatingSwitch) return;
                 prefs.edit().putBoolean(PREF_SKIP_TRIAL_SONGS, isChecked).apply();
-                Toast.makeText(this,
-                        isChecked ? "已开启：仅可试听的歌曲自动跳过" : "已关闭：试听歌曲照常播放",
-                        Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, isChecked ? "已开启：仅可试听的歌曲自动跳过" : "已关闭：试听歌曲照常播放");
             });
         }
 
@@ -334,8 +323,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         // 循环档位用整行点击更顺手，−/+ 只是备用入口
         scaleValue.setOnClickListener(v -> {
             int percent = UiScale.cycle(this);
-            Toast.makeText(this, "界面缩放: " + percent + "%（重新进入页面后生效）",
-                    Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "界面缩放: " + percent + "%（重新进入页面后生效）");
             recreate();
         });
 
@@ -462,14 +450,13 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             }
             if (checked && !com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
                 btn.setChecked(false);
-                Toast.makeText(this, "请先在「设置 → 高级歌词翻译」填写 DeepSeek API Key",
-                        Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请先在「设置 → 高级歌词翻译」填写 DeepSeek API Key");
                 return;
             }
             com.qinghe.music163pro.util.AiLyricSettings.setEnabled(this, checked);
-            Toast.makeText(this, checked
+            com.qinghe.music163pro.util.UiKit.toast(this, checked
                     ? "已开启高级歌词翻译：歌词按词性着色，缺翻译的歌交给 AI"
-                    : "已关闭（歌词页仍可用「AI」按钮单次激活）", Toast.LENGTH_SHORT).show();
+                    : "已关闭（歌词页仍可用「AI」按钮单次激活）");
         });
         languageRow.addView(languageSwitch);
         languageRow.setOnClickListener(v -> languageSwitch.toggle());
@@ -608,9 +595,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         boolean next = !current;
         prefs.edit().putBoolean(PREF_RANDOM_SKIP_RANDOM, next).apply();
         updateRandomSkipModeValue();
-        Toast.makeText(this,
-                "随机播放切歌顺序: " + (next ? "随机" : "列表顺序"),
-                Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "随机播放切歌顺序: " + (next ? "随机" : "列表顺序"));
     }
 
     private void updateRandomSkipModeValue() {
@@ -622,14 +607,14 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private void cycleFavMode() {
         // 本地播放模式下这里没有可切的东西：收藏被强制走本地库
         if (PlaybackMode.isLocalOnly(this)) {
-            Toast.makeText(this, "本地播放模式下收藏固定在本地", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "本地播放模式下收藏固定在本地");
             return;
         }
         boolean isCloud = prefs.getBoolean(PREF_FAV_MODE_CLOUD, false);
         boolean newCloud = !isCloud;
         prefs.edit().putBoolean(PREF_FAV_MODE_CLOUD, newCloud).apply();
         updateFavModeValue();
-        Toast.makeText(this, "收藏模式已切换为: " + (newCloud ? "云端" : "本地"), Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "收藏模式已切换为: " + (newCloud ? "云端" : "本地"));
     }
 
     /** 同步两个模式开关的勾选状态（互斥）：一次性设对并用 updatingSwitch 挡住互相触发。 */
@@ -660,7 +645,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         int next = (current + 1) % SLEEP_TIMER_LABELS.length;
         prefs.edit().putInt(PREF_SLEEP_TIMER_MODE, next).apply();
         updateSleepTimerModeValue();
-        Toast.makeText(this, "定时关闭模式: " + SLEEP_TIMER_LABELS[next], Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "定时关闭模式: " + SLEEP_TIMER_LABELS[next]);
     }
 
     private void updateSleepTimerModeValue() {
@@ -679,9 +664,10 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         MusicPlayerManager.getInstance().setSpeedMode(next);
         updateSpeedModeValue();
         String[] modeNames = {"音调不变", "音调改变且速度改变", "音调改变但速度不变"};
-        Toast.makeText(this, "变速模式: " + modeNames[next], Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "变速模式: " + modeNames[next]);
         if (next == 2) {
-            Toast.makeText(this, "注意：此模式变速幅度不能太大，否则播放可能会出问题（如有杂音等）", Toast.LENGTH_LONG).show();
+            com.qinghe.music163pro.util.UiKit.toastLong(this,
+                    "注意：此模式变速幅度不能太大，否则播放可能会出问题（如有杂音等）");
         }
     }
 
@@ -697,7 +683,8 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         prefs.edit().putInt(PREF_RECOGNITION_MODE, next).apply();
         updateRecognitionModeValue();
         String[] labels = {"手动暂停", "自动识别"};
-        Toast.makeText(this, "听歌识曲模式: " + labels[next], Toast.LENGTH_SHORT).show();
+        // 原来这里少了 .show()，提示从来没出现过；顺手换成统一样式
+        com.qinghe.music163pro.util.UiKit.toast(this, "听歌识曲模式: " + labels[next]);
     }
 
     private void updateRecognitionModeValue() {
@@ -714,8 +701,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private void changeLyricOffset(int direction) {
         int offset = LyricSettings.stepOffsetMs(this, direction);
         updateLyricOffsetValue();
-        Toast.makeText(this, "歌词偏移: " + LyricSettings.formatOffset(offset),
-                Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "歌词偏移: " + LyricSettings.formatOffset(offset));
     }
 
     private void updateLyricOffsetValue() {
@@ -731,7 +717,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         prefs.edit().putInt(PREF_LYRIC_SCROLL_MODE, next).apply();
         updateLyricScrollModeValue();
         String[] labels = {"每行", "阻塞"};
-        Toast.makeText(this, "歌词滚动模式: " + labels[next], Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "歌词滚动模式: " + labels[next]);
     }
 
     private void updateLyricScrollModeValue() {
@@ -760,7 +746,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                     }
                     prefs.edit().putInt(PREF_LYRIC_RESUME_INTERVAL, seconds).apply();
                     updateLyricResumeIntervalValue();
-                    Toast.makeText(this, "歌词恢复间隔: " + seconds + "秒", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "歌词恢复间隔: " + seconds + "秒");
                 });
     }
 

@@ -137,6 +137,53 @@ public final class UiKit {
 
     public static int touchMinPx(Context c) { return dp(c, DP_TOUCH_MIN); }
 
+    // ==================== 统一 Toast ====================
+
+    /** 当前正在显示的 Toast；连续调用时先取消，避免两个 Toast 叠在一起。 */
+    private static android.widget.Toast appToast;
+
+    /**
+     * 统一 Toast：深色圆角底、最多 3 行、同一时刻只显示一个。
+     *
+     * <p>系统 Toast 在 MD3 主题下会出现「文字被挤成两行 + 重叠」的观感（需求方
+     * 2026-11-14 截图反馈），而且连续点击会排队叠字。这里固定一套自绘视图：
+     * 圆角与卡片一致、内边距固定、最多 3 行，保证长文案也不会被裁切。</p>
+     */
+    public static void toast(Context c, CharSequence text) {
+        showToast(c, text, android.widget.Toast.LENGTH_SHORT);
+    }
+
+    /** 长 Toast（与 {@link #toast} 同一套样式，只是停留更久）。 */
+    public static void toastLong(Context c, CharSequence text) {
+        showToast(c, text, android.widget.Toast.LENGTH_LONG);
+    }
+
+    private static void showToast(Context c, CharSequence text, int duration) {
+        if (c == null || text == null || text.length() == 0) {
+            return;
+        }
+        Context app = c.getApplicationContext();
+        if (appToast != null) {
+            appToast.cancel();
+        }
+        TextView tv = new TextView(app);
+        tv.setText(text);
+        tv.setTextColor(0xFFFFFFFF);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        tv.setGravity(Gravity.CENTER);
+        tv.setMaxLines(3);
+        tv.setPadding(dp(app, 12), dp(app, 8), dp(app, 12), dp(app, 8));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xEE2A2A2A);
+        bg.setCornerRadius(dp(app, DP_CARD_RADIUS));
+        tv.setBackground(bg);
+        android.widget.Toast t = new android.widget.Toast(app);
+        t.setView(tv);
+        t.setDuration(duration);
+        t.show();
+        appToast = t;
+    }
+
     // ==================== 说明文字：过长先省略 → 点击展开 ====================
 
     /** 「过长先省略、点击展开」的说明文字在布局里的 tag 值（用 tag 免去逐条写 id）。 */
