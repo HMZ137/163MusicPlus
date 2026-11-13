@@ -44,19 +44,19 @@
     </style>
 
     <!-- Filled primary button -->
-    <style name="Widget.App.Button" parent="Widget.MaterialComponents.Button">
+    <style name="Widget.App.Button" parent="Widget.Material3.Button">
         <item name="android:textAllCaps">false</item>
-        <item name="cornerRadius">10dp</item>
+        <item name="cornerRadius">14dp</item>
     </style>
 
     <!-- Outlined button -->
-    <style name="Widget.App.Button.Outlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+    <style name="Widget.App.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:textAllCaps">false</item>
-        <item name="cornerRadius">10dp</item>
+        <item name="cornerRadius">14dp</item>
     </style>
 
     <!-- Text-only button -->
-    <style name="Widget.App.Button.Text" parent="Widget.MaterialComponents.Button.TextButton">
+    <style name="Widget.App.Button.Text" parent="Widget.Material3.Button.TextButton">
         <item name="android:textAllCaps">false</item>
     </style>
 </resources>

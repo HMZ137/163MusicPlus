@@ -48,7 +48,7 @@ public final class UiKit {
     public static final int DP_ROW_RADIUS = 14;
     public static final int DP_DIALOG_RADIUS = 14;
     /** 按钮统一圆角（全 App 唯一值）：与卡片同值，保持观感一致。 */
-    public static final int DP_BUTTON_RADIUS = 10;
+    public static final int DP_BUTTON_RADIUS = 14;
     public static final int DP_BUTTON_HEIGHT = 44;
 
     // ==================== G2 字号与尺寸令牌（技术文档 [1-5]） ====================
