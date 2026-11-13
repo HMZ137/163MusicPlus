@@ -166,7 +166,7 @@ public class SettingsActivity extends BaseWatchActivity {
                 "输入完整路径，例如 /sdcard/Music/我的导出",
                 "/sdcard/…", initial, "确定", path -> {
                     if (path.isEmpty()) {
-                        Toast.makeText(this, "路径不能为空", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(this, "路径不能为空");
                         return;
                     }
                     confirmExport(path);
@@ -188,7 +188,7 @@ public class SettingsActivity extends BaseWatchActivity {
     }
 
     private void runExport(final String targetDir) {
-        Toast.makeText(this, "正在导出…", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在导出…");
         if (tvExportValue != null) {
             tvExportValue.setText("导出中…");
         }
@@ -223,7 +223,7 @@ public class SettingsActivity extends BaseWatchActivity {
                                     message += "，失败 " + failed + " 个";
                                 }
                             }
-                            Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
+                            com.qinghe.music163pro.util.UiKit.toastLong(SettingsActivity.this, message);
                         });
                     }
                 })).start();
@@ -289,7 +289,7 @@ public class SettingsActivity extends BaseWatchActivity {
     }
 
     private void clearCache() {
-        Toast.makeText(this, "正在清理…", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在清理…");
         new Thread(() -> {
             // 清理前后各统计一次，才能报出「释放了多少」而不是「剩下多少」
             final long before = CacheManager.getStat(getApplicationContext()).getTotalBytes();
@@ -310,12 +310,12 @@ public class SettingsActivity extends BaseWatchActivity {
     }
 
     private void checkUpdateManually() {
-        Toast.makeText(this, "正在检测更新...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在检测更新...");
         UpdateChecker.checkVersionInfo(this, new UpdateChecker.VersionCheckCallback() {
             @Override
             public void onResult(UpdateChecker.VersionInfo versionInfo) {
                 if (versionInfo.isLatest()) {
-                    Toast.makeText(SettingsActivity.this, "当前已是最新版本", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(SettingsActivity.this, "当前已是最新版本");
                 } else {
                     Intent intent = new Intent(SettingsActivity.this, UpdateActivity.class);
                     if (versionInfo.getVersionName() != null
@@ -328,7 +328,7 @@ public class SettingsActivity extends BaseWatchActivity {
 
             @Override
             public void onError(String error) {
-                Toast.makeText(SettingsActivity.this, "检测失败: " + error, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(SettingsActivity.this, "检测失败: " + error);
             }
         });
     }

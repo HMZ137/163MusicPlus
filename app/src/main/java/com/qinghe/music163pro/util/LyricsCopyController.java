@@ -340,7 +340,7 @@ public final class LyricsCopyController {
 
     private void copySelected() {
         if (selected.isEmpty()) {
-            Toast.makeText(context, "请先选择歌词行", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(context, "请先选择歌词行");
             return;
         }
         StringBuilder text = new StringBuilder();
@@ -360,16 +360,16 @@ public final class LyricsCopyController {
             copied++;
         }
         if (copied == 0) {
-            Toast.makeText(context, "所选歌词为空", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(context, "所选歌词为空");
             return;
         }
         ClipboardManager cm = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm == null) {
-            Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(context, "复制失败");
             return;
         }
         cm.setPrimaryClip(ClipData.newPlainText("歌词", text.toString()));
-        Toast.makeText(context, "已复制 " + copied + " 行歌词", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(context, "已复制 " + copied + " 行歌词");
         exit();
     }
 

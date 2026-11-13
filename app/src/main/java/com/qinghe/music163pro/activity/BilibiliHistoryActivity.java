@@ -190,14 +190,14 @@ public class BilibiliHistoryActivity extends BaseWatchActivity {
 
     private void confirmClear() {
         if (BilibiliHistoryManager.getAll(this).isEmpty()) {
-            Toast.makeText(this, "历史已经是空的", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "历史已经是空的");
             return;
         }
         com.qinghe.music163pro.util.WatchPopup.confirm(this, "清空 B 站历史",
                 "只清记录，不影响收藏与下载。", "清空", true, () -> {
                     BilibiliHistoryManager.clear(this);
                     renderHistory();
-                    Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "已清空");
                 });
     }
 }

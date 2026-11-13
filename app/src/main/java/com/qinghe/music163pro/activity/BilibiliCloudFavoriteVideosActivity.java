@@ -83,7 +83,7 @@ public class BilibiliCloudFavoriteVideosActivity extends BaseWatchActivity {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         String cookie = prefs.getString("bilibili_cookie", "");
         if (TextUtils.isEmpty(cookie) || !cookie.contains("SESSDATA")) {
-            Toast.makeText(this, "请先登录B站", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录B站");
             finish();
             return;
         }

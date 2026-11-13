@@ -238,7 +238,7 @@ public class AlbumDetailActivity extends BaseWatchActivity {
         }
         String cookie = playerManager.getCookie();
         if (cookie == null || cookie.isEmpty()) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
         final boolean target = !albumSubscribed;
@@ -249,8 +249,7 @@ public class AlbumDetailActivity extends BaseWatchActivity {
                 btnAlbumSub.setEnabled(true);
                 albumSubscribed = subscribed;
                 applyAlbumSubStyle(subscribed);
-                Toast.makeText(AlbumDetailActivity.this,
-                        subscribed ? "已收藏专辑" : "已取消收藏", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(AlbumDetailActivity.this, subscribed ? "已收藏专辑" : "已取消收藏");
             }
 
             @Override

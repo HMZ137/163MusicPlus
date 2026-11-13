@@ -189,8 +189,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
                             }
                             tvStatus.setText("登录成功!");
                             saveBilibiliCookie(cookie);
-                            Toast.makeText(BilibiliLoginActivity.this,
-                                    "B站登录成功", Toast.LENGTH_LONG).show();
+                            com.qinghe.music163pro.util.UiKit.toastLong(BilibiliLoginActivity.this, "B站登录成功");
                             pollHandler.postDelayed(() -> finish(), 1500);
                             break;
                         case 86038:

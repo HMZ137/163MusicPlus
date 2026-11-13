@@ -205,7 +205,7 @@ public class HistoryActivity extends BaseWatchActivity {
                         multiSelect.exitSelectionMode();
                     }
                     loadHistory();
-                    Toast.makeText(HistoryActivity.this, "已删除", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(HistoryActivity.this, "已删除");
                 });
     }
 
@@ -240,8 +240,7 @@ public class HistoryActivity extends BaseWatchActivity {
 
             @Override
             public void onNeedLogin() {
-                Toast.makeText(HistoryActivity.this,
-                        R.string.multi_select_favorite_need_login, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(HistoryActivity.this, R.string.multi_select_favorite_need_login);
             }
         });
     }
@@ -295,7 +294,7 @@ public class HistoryActivity extends BaseWatchActivity {
         showConfirmDialog("确认清空", "确定清空所有播放记录？", () -> {
             HistoryManager.getInstance().clearHistory();
             loadHistory();
-            Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已清空");
         });
     }
     /**

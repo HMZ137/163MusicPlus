@@ -123,13 +123,13 @@ public class TopListDetailActivity extends BaseWatchActivity {
                 displayList.addAll(songs);
                 adapter.notifyDataSetChanged();
                 if (songs.isEmpty()) {
-                    Toast.makeText(TopListDetailActivity.this, "暂无歌曲", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(TopListDetailActivity.this, "暂无歌曲");
                 }
             }
 
             @Override
             public void onError(String message) {
-                Toast.makeText(TopListDetailActivity.this, "加载失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(TopListDetailActivity.this, "加载失败: " + message);
             }
         });
     }

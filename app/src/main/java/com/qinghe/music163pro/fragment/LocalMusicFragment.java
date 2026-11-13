@@ -967,7 +967,7 @@ public class LocalMusicFragment extends Fragment {
     private void toast(CharSequence text) {
         Context context = getContext();
         if (context != null) {
-            Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(context, text);
         }
     }
 }

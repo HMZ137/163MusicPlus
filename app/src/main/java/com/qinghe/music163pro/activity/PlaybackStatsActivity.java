@@ -140,7 +140,7 @@ public class PlaybackStatsActivity extends BaseWatchActivity {
                 "清空累计播放时长和播放次数？此操作不可撤销。",
                 () -> {
                     PlaybackStats.clear(getApplicationContext());
-                    Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "已清空");
                     render();
                 },
                 // 不可撤销，用警示色

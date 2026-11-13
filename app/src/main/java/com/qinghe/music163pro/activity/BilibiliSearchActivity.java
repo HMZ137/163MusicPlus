@@ -105,7 +105,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
     private void searchVideos() {
         String keyword = etKeyword.getText().toString().trim();
         if (TextUtils.isEmpty(keyword)) {
-            Toast.makeText(this, "请输入搜索关键词", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请输入搜索关键词");
             return;
         }
         btnSearch.setEnabled(false);

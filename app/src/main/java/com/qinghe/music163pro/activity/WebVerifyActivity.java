@@ -153,7 +153,7 @@ public class WebVerifyActivity extends BaseWatchActivity {
         Intent result = new Intent();
         result.putExtra(EXTRA_COOKIE, cookieStr);
         setResult(Activity.RESULT_OK, result);
-        Toast.makeText(this, "验证完成，正在重新登录...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "验证完成，正在重新登录...");
         finish();
     }
 

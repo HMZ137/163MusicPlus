@@ -72,7 +72,7 @@ public class ArtistDetailActivity extends BaseWatchActivity implements ArtistPag
         artistId = getIntent().getLongExtra("artist_id", 0);
         artistName = getIntent().getStringExtra("artist_name");
         if (artistId <= 0) {
-            Toast.makeText(this, "缺少歌手信息", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "缺少歌手信息");
             finish();
             return;
         }

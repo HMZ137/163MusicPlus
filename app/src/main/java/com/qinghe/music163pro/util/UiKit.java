@@ -158,6 +158,21 @@ public final class UiKit {
         showToast(c, text, android.widget.Toast.LENGTH_LONG);
     }
 
+    /** 资源 id 版本（原来 `Toast.makeText(ctx, R.string.x, ...)` 的写法可以直接换过来）。 */
+    public static void toast(Context c, int resId) {
+        if (c == null) {
+            return;
+        }
+        showToast(c, c.getResources().getText(resId), android.widget.Toast.LENGTH_SHORT);
+    }
+
+    public static void toastLong(Context c, int resId) {
+        if (c == null) {
+            return;
+        }
+        showToast(c, c.getResources().getText(resId), android.widget.Toast.LENGTH_LONG);
+    }
+
     private static void showToast(Context c, CharSequence text, int duration) {
         if (c == null || text == null || text.length() == 0) {
             return;

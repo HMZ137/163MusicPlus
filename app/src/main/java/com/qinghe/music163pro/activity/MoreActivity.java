@@ -290,10 +290,10 @@ public class MoreActivity extends BaseWatchActivity {
     private void openRadarPlaylist() {
         String cookie = MusicPlayerManager.getInstance().getCookie();
         if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
-        Toast.makeText(this, "正在获取雷达歌单...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在获取雷达歌单...");
         MusicApiHelper.getRadarPlaylist(cookie, new MusicApiHelper.DailyRecommendPlaylistCallback() {
             @Override
             public void onResult(PlaylistInfo playlist) {
@@ -309,7 +309,7 @@ public class MoreActivity extends BaseWatchActivity {
 
             @Override
             public void onError(String message) {
-                Toast.makeText(MoreActivity.this, "获取失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MoreActivity.this, "获取失败: " + message);
             }
         });
     }

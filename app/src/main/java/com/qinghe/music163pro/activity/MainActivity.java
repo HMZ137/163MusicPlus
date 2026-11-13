@@ -848,7 +848,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void showFunctionsOverlay() {
         Song song = playerManager.getCurrentSong();
         if (song == null) {
-            Toast.makeText(this, "暂无歌曲", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "暂无歌曲");
             return;
         }
         if (song.isBilibili()) {
@@ -1212,15 +1212,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String url = "https://music.163.com/song?id=" + song.getId();
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm == null) {
-            Toast.makeText(this, "复制失败", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "复制失败");
             return;
         }
         cm.setPrimaryClip(ClipData.newPlainText("网易云歌曲链接", url));
-        Toast.makeText(this, "已复制歌曲链接", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已复制歌曲链接");
     }
 
     private void toastNoSongLink() {
-        Toast.makeText(this, "当前歌曲没有可用链接", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "当前歌曲没有可用链接");
     }
 
     private void showBilibiliFunctionsOverlay(Song song) {
@@ -2195,7 +2195,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                                         Runnable updateDuration,
                                         @androidx.annotation.Nullable TextView tvChorusRange) {
         if (!hasChorusRange()) {
-            Toast.makeText(this, "暂无高潮数据", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "暂无高潮数据");
             return false;
         }
         int smartStart = millisToFloorSeconds(currentChorusStartMs);
@@ -2204,7 +2204,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             smartEnd = Math.min(totalSec, smartStart + 1);
         }
         if (smartEnd <= smartStart) {
-            Toast.makeText(this, "高潮范围无效", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "高潮范围无效");
             return false;
         }
         startSec[0] = smartStart;
@@ -2249,7 +2249,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String path = song.getUrl();
         long localId = LocalTracks.idForPath(path);
         if (localId == 0) {
-            Toast.makeText(this, "无法收藏：拿不到文件路径", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "无法收藏：拿不到文件路径");
             dismissOverlay();
             return;
         }
@@ -2262,10 +2262,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         if (favoritesManager.isFavorite(localId)) {
             favoritesManager.removeFavorite(entry);
-            Toast.makeText(this, "已取消本地收藏", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已取消本地收藏");
         } else {
             favoritesManager.addFavorite(entry);
-            Toast.makeText(this, "已加入本地收藏", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已加入本地收藏");
         }
         dismissOverlay();
     }
@@ -2279,7 +2279,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             boolean isCurrentlyLiked = isCloudLiked(song.getId());
             String cookie = playerManager.getCookie();
             if (cookie == null || cookie.isEmpty()) {
-                Toast.makeText(this, "请先登录以使用云端收藏", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请先登录以使用云端收藏");
                 dismissOverlay();
                 return;
             }
@@ -2302,7 +2302,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                                 isCurrentlyLiked ? "已取消云端收藏" : "已云端收藏",
                                 Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(MainActivity.this, "操作失败", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "操作失败");
                     }
                 }
                 @Override
@@ -2315,10 +2315,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             // Local mode
             if (favoritesManager.isFavorite(song.getId())) {
                 favoritesManager.removeFavorite(song);
-                Toast.makeText(this, "已取消收藏", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已取消收藏");
             } else {
                 favoritesManager.addFavorite(song);
-                Toast.makeText(this, "已收藏", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已收藏");
             }
         }
         dismissOverlay();
@@ -2327,22 +2327,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void onFuncDownload(Song song) {
         dismissOverlay();
         if (song.isBilibili() && DownloadManager.isDownloaded(song)) {
-            Toast.makeText(this, "歌曲已下载", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "歌曲已下载");
             return;
         }
         if (song.isBilibili()) {
             // Bilibili doesn't have quality tiers, download directly
             String cookie = getDownloadCookieForSong(song);
-            Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "开始下载...");
             DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
                 @Override
                 public void onSuccess(String filePath) {
-                    Toast.makeText(MainActivity.this, "下载完成: " + filePath, Toast.LENGTH_LONG).show();
+                    com.qinghe.music163pro.util.UiKit.toastLong(MainActivity.this, "下载完成: " + filePath);
                 }
 
                 @Override
                 public void onError(String message) {
-                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, message);
                 }
             });
         } else {
@@ -2354,17 +2354,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void showDownloadQualityOptions(Song song) {
         showQualityOptionsInternal(false, song, selectedQuality -> {
             String cookie = getDownloadCookieForSong(song);
-            Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "开始下载...");
             DownloadManager.downloadSong(song, cookie, selectedQuality,
                     new DownloadManager.DownloadCallback() {
                 @Override
                 public void onSuccess(String filePath) {
-                    Toast.makeText(MainActivity.this, "下载完成: " + filePath, Toast.LENGTH_LONG).show();
+                    com.qinghe.music163pro.util.UiKit.toastLong(MainActivity.this, "下载完成: " + filePath);
                 }
 
                 @Override
                 public void onError(String message) {
-                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, message);
                 }
             });
         });
@@ -2402,7 +2402,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 modeName = "列表循环";
                 break;
         }
-        Toast.makeText(this, "播放模式: " + modeName, Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "播放模式: " + modeName);
     }
 
     private void onFuncLyrics() {
@@ -2442,7 +2442,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             startActivity(intent);
         } else {
             // No albumId stored: fetch song detail first to get albumId
-            Toast.makeText(this, "正在获取专辑信息...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在获取专辑信息...");
             String cookie = playerManager.getCookie();
             MusicApiHelper.getSongDetail(song.getId(), cookie, new MusicApiHelper.SongDetailCallback() {
                 @Override
@@ -2461,16 +2461,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                             intent.putExtra("album_cover_url", albumCoverUrl);
                             startActivity(intent);
                         } else {
-                            Toast.makeText(MainActivity.this, "无法获取专辑信息", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "无法获取专辑信息");
                         }
                     } else {
-                        Toast.makeText(MainActivity.this, "无法获取专辑信息", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "无法获取专辑信息");
                     }
                 }
 
                 @Override
                 public void onError(String message) {
-                    Toast.makeText(MainActivity.this, "获取专辑信息失败: " + message, Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "获取专辑信息失败: " + message);
                 }
             });
         }
@@ -2533,10 +2533,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void onFuncAddToPlaylist(Song song) {
         String cookie = playerManager.getCookie();
         if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
-        Toast.makeText(this, "正在加载歌单...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在加载歌单...");
         MusicApiHelper.getUid(cookie, new MusicApiHelper.AccountCallback() {
             @Override
             public void onResult(org.json.JSONObject uidJson) {
@@ -2552,20 +2552,20 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                             }
                         }
                         if (eligible.isEmpty()) {
-                            Toast.makeText(MainActivity.this, "没有可用的自建歌单", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "没有可用的自建歌单");
                             return;
                         }
                         showPlaylistPicker(eligible, song);
                     }
                     @Override
                     public void onError(String message) {
-                        Toast.makeText(MainActivity.this, "获取歌单失败: " + message, Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "获取歌单失败: " + message);
                     }
                 });
             }
             @Override
             public void onError(String message) {
-                Toast.makeText(MainActivity.this, "获取用户信息失败", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "获取用户信息失败");
             }
         });
     }
@@ -2588,15 +2588,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             @Override
             public void onResult(boolean success) {
                 if (success) {
-                    Toast.makeText(MainActivity.this,
-                            "已添加到「" + playlist.getName() + "」", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "已添加到「" + playlist.getName() + "」");
                 } else {
-                    Toast.makeText(MainActivity.this, "添加失败", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "添加失败");
                 }
             }
             @Override
             public void onError(String message) {
-                Toast.makeText(MainActivity.this, "添加失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "添加失败: " + message);
             }
         });
     }
@@ -3234,7 +3233,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // 表现成「点了没反应、提示不变」（需求方 2026-10-17 反馈）。
         if (!translationEnabled && translationMap.isEmpty()
                 && (aiLyricResult == null || aiLyricResult.lines.isEmpty())) {
-            Toast.makeText(this, "这首歌没有翻译（可开 AI 生成）", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "这首歌没有翻译（可开 AI 生成）");
             return;
         }
         translationEnabled = !translationEnabled;
@@ -3253,7 +3252,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void toggleLyricsRomanization() {
         // 同上：只有「关 → 开」且这首歌没有音译数据时才拦（原来条件写反，打开后就关不掉）
         if (!romanizationEnabled && romanizationMap.isEmpty()) {
-            Toast.makeText(this, "这首歌没有音译歌词", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "这首歌没有音译歌词");
             return;
         }
         romanizationEnabled = !romanizationEnabled;
@@ -3512,11 +3511,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     /** 长按 AI：删除本曲缓存并重新分析。 */
     private void reanalyzeCurrentSong() {
         if (aiLyricLoading) {
-            Toast.makeText(this, "AI 正在分析…", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "AI 正在分析…");
             return;
         }
         if (!com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
-            Toast.makeText(this, "请先填写 DeepSeek API Key", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先填写 DeepSeek API Key");
             startActivity(new Intent(this, LanguageLearningActivity.class));
             return;
         }
@@ -3534,13 +3533,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         aiLyricLoading = true;
         updateAiButton();
         runAiAnalysis(true);
-        Toast.makeText(this, "已清除本曲缓存，正在重新分析…", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已清除本曲缓存，正在重新分析…");
     }
 
     /** 「AI」按钮：启用 / 取消；未分析过则先分析。 */
     private void onAiToggleClicked() {
         if (aiLyricLoading) {
-            Toast.makeText(this, "AI 正在分析…", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "AI 正在分析…");
             return;
         }
         if (aiLyricActive) {
@@ -3555,12 +3554,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             updateAiButton();
             displayLyricsInOverlay();
             reapplyCurrentHighlight();
-            Toast.makeText(this, "已启用 AI 歌词", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已启用 AI 歌词");
             return;
         }
         // 没有内存结果：检查 Key → 要么去设置页填写，要么现在分析
         if (!com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
-            Toast.makeText(this, "请先填写 DeepSeek API Key", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先填写 DeepSeek API Key");
             startActivity(new Intent(this, LanguageLearningActivity.class));
             return;
         }
@@ -3791,7 +3790,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void showPlaylistOverlay() {
         java.util.List<Song> playlist = playerManager.getPlaylist();
         if (playlist == null || playlist.isEmpty()) {
-            Toast.makeText(this, "播放列表为空", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "播放列表为空");
             return;
         }
 
@@ -4161,7 +4160,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             counts.put(initial, c == null ? 1 : c + 1);
         }
         if (firstIndex.isEmpty()) {
-            Toast.makeText(this, "没有可跳转的字母", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "没有可跳转的字母");
             return;
         }
         StringBuilder letters = new StringBuilder(firstIndex.size());
@@ -4212,7 +4211,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         actionList.add(() -> {
             if (queued) {
                 playerManager.cancelQueuedNext(song);
-                Toast.makeText(this, "已取消下一首播放", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已取消下一首播放");
                 dismissOverlay();
                 showPlaylistOverlay();
                 return;
@@ -4225,7 +4224,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 dismissOverlay();
                 showPlaylistOverlay();
             } else {
-                Toast.makeText(this, "这一首正在播放", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "这一首正在播放");
             }
         });
 
@@ -4239,7 +4238,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 isCurrent ? "移除正在播放的这首歌？" : "从播放队列移除「" + title + "」？",
                 () -> {
                     playerManager.removeFromPlaylist(index);
-                    Toast.makeText(this, "已移除", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "已移除");
                     dismissOverlay();
                     showPlaylistOverlay();
                 },
@@ -4264,11 +4263,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
         if (seed == null || seed.getId() <= 0) {
-            Toast.makeText(this, "这首歌无法作为起点", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "这首歌无法作为起点");
             return;
         }
         // 不再替换队列、也不再抢播：正在听的这首照常播完，推荐曲安静地排到队尾
-        Toast.makeText(this, "正在准备心动曲目…", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在准备心动曲目…");
         playerManager.startHeartbeat(seed, added -> {
             dismissOverlay();
             if (added > 0) {
@@ -4277,7 +4276,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                         Toast.LENGTH_SHORT).show();
             } else {
                 playerManager.setHeartbeatModeOff();
-                Toast.makeText(MainActivity.this, "没有拿到心动曲目", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "没有拿到心动曲目");
             }
         });
     }
@@ -4328,7 +4327,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             float finalSpeed = speed;
             btn.setOnClickListener(v -> {
                 playerManager.setPlaybackSpeed(finalSpeed);
-                Toast.makeText(this, String.format("播放速度: %.1fx", finalSpeed), Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, String.format("播放速度: %.1fx", finalSpeed));
                 dismissOverlay();
             });
             contentLayout.addView(btn);
@@ -4375,20 +4374,20 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnApply.setOnClickListener(v -> {
             String input = etSpeed.getText().toString().trim();
             if (input.isEmpty()) {
-                Toast.makeText(this, "请输入倍速值", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请输入倍速值");
                 return;
             }
             try {
                 float speed = Float.parseFloat(input);
                 if (speed < 0.1f || speed > 5.0f) {
-                    Toast.makeText(this, "请输入0.1-5.0之间的值", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "请输入0.1-5.0之间的值");
                     return;
                 }
                 playerManager.setPlaybackSpeed(speed);
-                Toast.makeText(this, String.format("播放速度: %.1fx", speed), Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, String.format("播放速度: %.1fx", speed));
                 dismissOverlay();
             } catch (NumberFormatException e) {
-                Toast.makeText(this, "请输入有效的数字", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请输入有效的数字");
             }
         });
         customRow.addView(btnApply);
@@ -4795,7 +4794,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             showRingtoneClipOverlay(new File(mp3Path), song.getName());
         } else {
             // Cache audio to a temp file (don't save to downloads)
-            Toast.makeText(this, "正在缓存歌曲...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在缓存歌曲...");
             String cookie = getDownloadCookieForSong(song);
             SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
             String quality = prefs.getString("preferred_quality", "exhigh");
@@ -4815,7 +4814,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
                 @Override
                 public void onError(String message) {
-                    Toast.makeText(MainActivity.this, "缓存失败，无法设为铃声", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "缓存失败，无法设为铃声");
                 }
             });
         }
@@ -4845,12 +4844,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             durationMs = tmp.getDuration();
             tmp.release();
         } catch (Exception e) {
-            Toast.makeText(this, "无法读取歌曲时长", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "无法读取歌曲时长");
             return;
         }
         final int totalSec = durationMs / 1000;
         if (totalSec <= 0) {
-            Toast.makeText(this, "歌曲时长无效", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "歌曲时长无效");
             return;
         }
 
@@ -5006,7 +5005,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPreview.setLayoutParams(previewParams);
         btnPreview.setOnClickListener(v -> {
             if (endSec[0] <= startSec[0]) {
-                Toast.makeText(this, "请选择有效的时间范围", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请选择有效的时间范围");
                 return;
             }
             previewRingtoneClip(file, startSec[0] * 1000, endSec[0] * 1000);
@@ -5021,7 +5020,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnConfirm.setLayoutParams(confirmParams);
         btnConfirm.setOnClickListener(v -> {
             if (endSec[0] <= startSec[0]) {
-                Toast.makeText(this, "请选择有效的时间范围", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请选择有效的时间范围");
                 return;
             }
             stopRingtonePreview();
@@ -5056,7 +5055,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             final Handler previewHandler = new Handler();
             previewHandler.postDelayed(() -> stopRingtonePreview(), endMs - startMs);
         } catch (Exception e) {
-            Toast.makeText(this, "试听失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "试听失败: " + e.getMessage());
         }
     }
 
@@ -5080,7 +5079,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS);
                     intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
-                    Toast.makeText(this, "请授予修改系统设置权限后重试", Toast.LENGTH_LONG).show();
+                    com.qinghe.music163pro.util.UiKit.toastLong(this, "请授予修改系统设置权限后重试");
                     return;
                 }
             }
@@ -5117,12 +5116,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 // Save ringtone info for management
                 RingtoneManagerHelper ringtoneHelper = new RingtoneManagerHelper(this);
                 ringtoneHelper.addRingtone(title, clipFile.getAbsolutePath(), startSec, endSec);
-                Toast.makeText(this, "已设为铃声", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已设为铃声");
             } else {
-                Toast.makeText(this, "设置铃声失败", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "设置铃声失败");
             }
         } catch (Exception e) {
-            Toast.makeText(this, "设置铃声失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "设置铃声失败: " + e.getMessage());
         }
     }
 
@@ -5337,8 +5336,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             int next = (modeSupplier.getAsInt() + 1) % 3;
             timerPrefs.edit().putInt("sleep_timer_mode", next).apply();
             modeBtn.setText("模式：" + sleepTimerModeLabel(next) + "（点按切换）");
-            Toast.makeText(this, "定时模式：" + sleepTimerModeLabel(next)
-                    + sleepTimerModeHint(next), Toast.LENGTH_LONG).show();
+            com.qinghe.music163pro.util.UiKit.toastLong(this, "定时模式：" + sleepTimerModeLabel(next)
+                    + sleepTimerModeHint(next));
         });
         contentLayout.addView(modeBtn);
 
@@ -5361,7 +5360,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             int finalMin = min;
             btn.setOnClickListener(v -> {
                 playerManager.startSleepTimer(finalMin);
-                Toast.makeText(this, finalMin + "分钟后自动停止播放", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, finalMin + "分钟后自动停止播放");
                 dismissOverlay();
             });
             contentLayout.addView(btn);
@@ -5409,20 +5408,20 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCustom.setOnClickListener(v -> {
             String input = etSeconds.getText().toString().trim();
             if (input.isEmpty()) {
-                Toast.makeText(this, "请输入秒数", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请输入秒数");
                 return;
             }
             try {
                 int seconds = Integer.parseInt(input);
                 if (seconds <= 0) {
-                    Toast.makeText(this, "请输入大于0的秒数", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "请输入大于0的秒数");
                     return;
                 }
                 playerManager.startSleepTimerSeconds(seconds);
-                Toast.makeText(this, seconds + "秒后自动停止播放", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, seconds + "秒后自动停止播放");
                 dismissOverlay();
             } catch (NumberFormatException e) {
-                Toast.makeText(this, "请输入有效的数字", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请输入有效的数字");
             }
         });
         customRow.addView(btnCustom);
@@ -5514,7 +5513,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCancel.setOnClickListener(v -> {
             playerManager.cancelSleepTimer();
             timerDisplayHandler.removeCallbacksAndMessages(null);
-            Toast.makeText(this, "已取消定时", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已取消定时");
             dismissOverlay();
         });
         contentLayout.addView(btnCancel);
@@ -5806,7 +5805,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     @Override
     public void onError(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, message);
     }
 
     @Override
@@ -5824,7 +5823,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     @Override
     public void onSleepTimerPendingStop() {
         // 「放完当前曲再停」：倒计时到点了，但这一首还没结束
-        Toast.makeText(this, "定时已到，本曲结束后将停止播放", Toast.LENGTH_LONG).show();
+        com.qinghe.music163pro.util.UiKit.toastLong(this, "定时已到，本曲结束后将停止播放");
     }
 
     // ───────── M4e：拖动进度条时的「+/-xx s」浮动提示 ─────────

@@ -83,7 +83,7 @@ public class RingtoneListActivity extends BaseWatchActivity {
             showConfirmDialog("确认删除", "确定删除铃声「" + info.title + "」？", () -> {
                 ringtoneManager.removeRingtone(position);
                 loadRingtones();
-                Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已删除");
             });
             return true;
         });

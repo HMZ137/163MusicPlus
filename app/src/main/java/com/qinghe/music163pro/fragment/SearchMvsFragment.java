@@ -94,7 +94,7 @@ public class SearchMvsFragment extends SearchListFragment<MvInfo> {
 
     @Override
     protected void onEmptyFirstPage() {
-        Toast.makeText(requireContext(), R.string.no_mv, Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(requireContext(), getString(R.string.no_mv));
     }
 
     private String formatDuration(long durationMs) {

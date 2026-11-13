@@ -238,7 +238,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             return;
         }
 
-        Toast.makeText(this, "正在获取音频...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在获取音频...");
         List<Song> songs = buildSongsFromPages(fetchedPages);
         playerManager.setPlaylist(songs, index);
         BilibiliApiHelper.BilibiliPage page = fetchedPages.get(index);
@@ -255,8 +255,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
 
                     @Override
                     public void onError(String message) {
-                        Toast.makeText(BilibiliPlaylistActivity.this,
-                                "获取音频失败: " + message, Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(BilibiliPlaylistActivity.this, "获取音频失败: " + message);
                     }
                 });
     }
@@ -303,10 +302,10 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         }
         if (favoritesManager.isFavorite(bvid)) {
             favoritesManager.removeFavorite(bvid);
-            Toast.makeText(this, "已取消收藏BV号", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已取消收藏BV号");
         } else {
             favoritesManager.addFavorite(new BilibiliFavorite(bvid, videoTitle, ownerName));
-            Toast.makeText(this, "已收藏BV号", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已收藏BV号");
         }
         updateFavoriteIcon();
     }

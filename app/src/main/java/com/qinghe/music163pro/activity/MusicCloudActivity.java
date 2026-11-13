@@ -159,12 +159,12 @@ public class MusicCloudActivity extends BaseWatchActivity {
                     ? item.getFileName() : item.getDisplayName(), item.getDownloadUrl());
             return;
         }
-        Toast.makeText(this, "正在获取下载链接...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在获取下载链接...");
         MusicApiHelper.getCloudItemDetail(item.getCloudSongId(), cookie, new MusicApiHelper.CloudItemCallback() {
             @Override
             public void onResult(CloudItem detail) {
                 if (detail.getDownloadUrl() == null || detail.getDownloadUrl().isEmpty()) {
-                    Toast.makeText(MusicCloudActivity.this, "文件暂无下载链接", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MusicCloudActivity.this, "文件暂无下载链接");
                     return;
                 }
                 doDownload(item.getFileName() != null && !item.getFileName().isEmpty()
@@ -173,13 +173,13 @@ public class MusicCloudActivity extends BaseWatchActivity {
 
             @Override
             public void onError(String message) {
-                Toast.makeText(MusicCloudActivity.this, "获取失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MusicCloudActivity.this, "获取失败: " + message);
             }
         });
     }
 
     private void doDownload(String name, String url) {
-        Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "开始下载...");
         new Thread(() -> {
             HttpURLConnection conn = null;
             try {
@@ -221,25 +221,25 @@ public class MusicCloudActivity extends BaseWatchActivity {
     private void deleteCloudItem(CloudItem item) {
         String cookie = MusicPlayerManager.getInstance().getCookie();
         if (cookie == null || cookie.isEmpty()) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
-        Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在删除...");
         MusicApiHelper.deleteCloudItem(item.getCloudSongId(), cookie, new MusicApiHelper.PlaylistActionCallback() {
             @Override
             public void onResult(boolean success) {
                 if (success) {
                     musicItems.remove(item);
                     applyMusicItems();
-                    Toast.makeText(MusicCloudActivity.this, "已删除", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MusicCloudActivity.this, "已删除");
                 } else {
-                    Toast.makeText(MusicCloudActivity.this, "删除失败", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(MusicCloudActivity.this, "删除失败");
                 }
             }
 
             @Override
             public void onError(String message) {
-                Toast.makeText(MusicCloudActivity.this, "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MusicCloudActivity.this, "删除失败: " + message);
             }
         });
     }

@@ -318,7 +318,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
                                 Toast.LENGTH_SHORT).show();
                         loadSongs();
                     } else {
-                        Toast.makeText(this, "移除失败", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(this, "移除失败");
                     }
                 });
     }
@@ -342,8 +342,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
 
             @Override
             public void onNeedLogin() {
-                Toast.makeText(LocalPlaylistDetailActivity.this,
-                        R.string.multi_select_favorite_need_login, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(LocalPlaylistDetailActivity.this, R.string.multi_select_favorite_need_login);
             }
         });
     }
@@ -389,7 +388,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
             }
             loadSongs();
         } else {
-            Toast.makeText(this, "保存顺序失败", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "保存顺序失败");
         }
     }
 
@@ -473,7 +472,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
     private void setSortMode(int mode) {
         sortMode = mode;
         applySearch(searchQuery);
-        Toast.makeText(this, "已按「" + sortModeLabel() + "」排列", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已按「" + sortModeLabel() + "」排列");
     }
 
     // ==================== A-Z 首字母跳转（复用 LetterPickerActivity） ====================
@@ -490,7 +489,7 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
         }
         buildLetterGroups();
         if (groupLetters.isEmpty()) {
-            Toast.makeText(this, "还没有可跳转的字母", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "还没有可跳转的字母");
             return;
         }
         StringBuilder letters = new StringBuilder(groupLetters.size());

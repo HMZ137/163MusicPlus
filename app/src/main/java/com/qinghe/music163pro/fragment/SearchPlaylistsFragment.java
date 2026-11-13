@@ -193,6 +193,6 @@ public class SearchPlaylistsFragment extends SearchListFragment<SearchPlaylistsF
 
     @Override
     protected void onEmptyFirstPage() {
-        Toast.makeText(requireContext(), "暂无歌单或专辑", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(requireContext(), "暂无歌单或专辑");
     }
 }

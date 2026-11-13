@@ -142,7 +142,7 @@ public class SmsLoginActivity extends BaseWatchActivity {
                             saveCookie(cookie, userId);
                             String tip = "成功登录：" + (nickname.isEmpty() ? "未知用户" : nickname);
                             tvStatus.setText(tip);
-                            Toast.makeText(SmsLoginActivity.this, tip, Toast.LENGTH_LONG).show();
+                            com.qinghe.music163pro.util.UiKit.toastLong(SmsLoginActivity.this, tip);
                             handler.postDelayed(SmsLoginActivity.this::finish, 1500);
                         } else {
                             tvStatus.setText("登录失败: " + message);

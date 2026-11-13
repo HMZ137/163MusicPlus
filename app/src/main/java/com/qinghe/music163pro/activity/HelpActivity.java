@@ -79,7 +79,7 @@ public class HelpActivity extends BaseWatchActivity {
             public void onError(String error) {
                 tvStatus.setVisibility(View.VISIBLE);
                 tvStatus.setText("加载帮助失败");
-                Toast.makeText(HelpActivity.this, "加载失败: " + error, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(HelpActivity.this, "加载失败: " + error);
             }
         });
     }

@@ -355,7 +355,7 @@ public class UpdateActivity extends BaseWatchActivity {
     /** 统一的「不提供下载」提示，同时更新页面上的进度文字。 */
     private void showDownloadDisabledNotice() {
         String message = "当前为修改版，不提供下载安装，以免覆盖已有改动";
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        com.qinghe.music163pro.util.UiKit.toastLong(this, message);
         if (tvProgress != null) {
             tvProgress.setVisibility(android.view.View.VISIBLE);
             tvProgress.setText(message);
@@ -369,7 +369,7 @@ public class UpdateActivity extends BaseWatchActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startDownload();
             } else {
-                Toast.makeText(this, "需要存储权限才能下载更新", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "需要存储权限才能下载更新");
             }
         }
     }
@@ -403,7 +403,7 @@ public class UpdateActivity extends BaseWatchActivity {
             }
             startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(this, "安装失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            com.qinghe.music163pro.util.UiKit.toastLong(this, "安装失败: " + e.getMessage());
             resetDownloadState();
         }
     }

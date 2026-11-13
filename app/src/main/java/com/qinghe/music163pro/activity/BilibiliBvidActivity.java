@@ -138,7 +138,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         }
 
         if (bvid.length() < 5) {
-            Toast.makeText(this, "请输入有效的BV号", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请输入有效的BV号");
             return;
         }
 
@@ -242,7 +242,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
     private void playAll(int startIndex) {
         if (fetchedPages.isEmpty()) return;
 
-        Toast.makeText(this, "正在获取音频...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在获取音频...");
 
         // Convert all pages to Songs
         List<Song> songs = new ArrayList<>();
@@ -283,8 +283,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
                     @Override
                     public void onError(String message) {
-                        Toast.makeText(BilibiliBvidActivity.this,
-                                "获取音频失败: " + message, Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(BilibiliBvidActivity.this, "获取音频失败: " + message);
                     }
                 });
     }
@@ -337,10 +336,10 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         }
         if (favoritesManager.isFavorite(currentBvid)) {
             favoritesManager.removeFavorite(currentBvid);
-            Toast.makeText(this, "已取消收藏BV号", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已取消收藏BV号");
         } else {
             favoritesManager.addFavorite(new BilibiliFavorite(currentBvid, currentTitle, currentOwner));
-            Toast.makeText(this, "已收藏BV号", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已收藏BV号");
         }
         updateFavoriteButton();
     }

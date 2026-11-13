@@ -220,7 +220,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startRecognition();
             } else {
-                Toast.makeText(this, "需要录音权限才能识别歌曲", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "需要录音权限才能识别歌曲");
             }
         }
     }
@@ -235,7 +235,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
             runOnUiThread(() -> {
                 if (sessionId != activeSessionId) return;
                 finishRecognitionUi(true, false, "录音失败", false);
-                Toast.makeText(this, "录音失败，请检查麦克风", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "录音失败，请检查麦克风");
             });
             return;
         }
@@ -245,7 +245,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
             runOnUiThread(() -> {
                 if (sessionId != activeSessionId) return;
                 finishRecognitionUi(true, false, MESSAGE_RECORD_TOO_SHORT, false);
-                Toast.makeText(this, MESSAGE_RECORD_TOO_SHORT, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, MESSAGE_RECORD_TOO_SHORT);
             });
             return;
         }
@@ -284,7 +284,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
             int recordedSeconds = calculateRecordedSeconds(totalBytes[0]);
             if (recordedSeconds < MIN_SECONDS) {
                 finishRecognitionUi(true, false, MESSAGE_RECORD_TOO_SHORT, false);
-                Toast.makeText(this, MESSAGE_RECORD_TOO_SHORT, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, MESSAGE_RECORD_TOO_SHORT);
             } else {
                 finishRecognitionUi(true, false, "已停止自动识别", false);
             }
@@ -421,8 +421,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
                                         autoChunkRequestRunning = false;
                                         if (showErrors) {
                                             finishRecognitionUi(true, false, "识别失败，请重试", false);
-                                            Toast.makeText(SongRecognitionActivity.this,
-                                                    "识别失败: " + message, Toast.LENGTH_SHORT).show();
+                                            com.qinghe.music163pro.util.UiKit.toast(SongRecognitionActivity.this, "识别失败: " + message);
                                         } else {
                                             MusicLog.w(TAG, "自动识曲未命中: " + message);
                                             tvStatus.setText("自动识别中，继续监听...");
@@ -441,8 +440,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
                         autoChunkRequestRunning = false;
                         if (showErrors) {
                             finishRecognitionUi(true, false, "指纹生成失败", false);
-                            Toast.makeText(SongRecognitionActivity.this,
-                                    "指纹生成失败: " + message, Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(SongRecognitionActivity.this, "指纹生成失败: " + message);
                         } else {
                             MusicLog.w(TAG, "自动识曲指纹失败: " + message);
                             tvStatus.setText("自动识别中，继续监听...");

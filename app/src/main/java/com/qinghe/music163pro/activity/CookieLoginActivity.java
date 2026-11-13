@@ -112,7 +112,7 @@ public class CookieLoginActivity extends BaseWatchActivity {
                 saveCookie(cookie, userId);
                 String tip = "成功登录：" + (nickname.isEmpty() ? "未知用户" : nickname);
                 tvStatus.setText(tip);
-                Toast.makeText(CookieLoginActivity.this, tip, Toast.LENGTH_LONG).show();
+                com.qinghe.music163pro.util.UiKit.toastLong(CookieLoginActivity.this, tip);
                 handler.postDelayed(() -> finish(), 1500);
             }
 
@@ -149,7 +149,7 @@ public class CookieLoginActivity extends BaseWatchActivity {
         }
         saveCookie(cookie, 0L);
         tvStatus.setText("已保存");
-        Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已保存");
     }
 
     // ==================== Cookie 备份：导出 / 读取（从登录主页挪来） ====================
@@ -181,7 +181,7 @@ public class CookieLoginActivity extends BaseWatchActivity {
         boolean overwriting = CookieBackup.exists(this);
         CookieBackup.Result result = CookieBackup.save(this, toExport);
         if (result != CookieBackup.Result.OK) {
-            Toast.makeText(this, describe(result), Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, describe(result));
             updateBackupHint();
             return;
         }
@@ -194,14 +194,14 @@ public class CookieLoginActivity extends BaseWatchActivity {
         } else if (!typed.isEmpty() && !typed.equals(saved)) {
             message.append("；输入框的改动尚未保存，导出的是已保存的 Cookie");
         }
-        Toast.makeText(this, message.toString(), Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, message.toString());
     }
 
     /** 从备份文件读回 Cookie，填进输入框并直接生效（覆盖已有登录态前先确认）。 */
     private void importCookie() {
         CookieBackup.ReadResult read = CookieBackup.load(this);
         if (read.status != CookieBackup.Result.OK || read.cookie == null || read.cookie.isEmpty()) {
-            Toast.makeText(this, describe(read.status), Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, describe(read.status));
             updateBackupHint();
             return;
         }
@@ -229,7 +229,7 @@ public class CookieLoginActivity extends BaseWatchActivity {
         MusicPlayerManager.getInstance().setCookie(cookie);
 
         if (cookie.contains("MUSIC_U")) {
-            Toast.makeText(this, "已读取并保存 Cookie，登录状态已恢复", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已读取并保存 Cookie，登录状态已恢复");
         } else {
             Toast.makeText(this,
                     "已读取，但内容里没有 MUSIC_U，可能不是有效 Cookie",
@@ -311,7 +311,7 @@ public class CookieLoginActivity extends BaseWatchActivity {
                 pending.run();
             }
         } else {
-            Toast.makeText(this, "没有存储权限，无法读写 Cookie 备份", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "没有存储权限，无法读写 Cookie 备份");
         }
     }
 

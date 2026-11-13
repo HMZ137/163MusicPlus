@@ -132,7 +132,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         if (song == null) {
             BackgroundUtil.clearCoverBackground();
             refreshPreview();
-            Toast.makeText(this, "暂无歌曲，播放歌曲后自动更新", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "暂无歌曲，播放歌曲后自动更新");
             return;
         }
         String coverUrl = song.getCoverUrl();
@@ -141,7 +141,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
             return;
         }
         if (song.getId() > 0) {
-            Toast.makeText(this, "正在获取专辑封面...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在获取专辑封面...");
             final long songId = song.getId();
             MusicApiHelper.fetchSongsDetails(java.util.Collections.singletonList(songId),
                     MusicPlayerManager.getInstance().getCookie(),
@@ -156,8 +156,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
                             } else {
                                 BackgroundUtil.clearCoverBackground();
                                 refreshPreview();
-                                Toast.makeText(BackgroundSettingsActivity.this,
-                                        "获取封面失败，已使用默认背景", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(BackgroundSettingsActivity.this, "获取封面失败，已使用默认背景");
                             }
                         }
 
@@ -165,19 +164,18 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
                         public void onError(String message) {
                             BackgroundUtil.clearCoverBackground();
                             refreshPreview();
-                            Toast.makeText(BackgroundSettingsActivity.this,
-                                    "获取封面失败，已使用默认背景", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(BackgroundSettingsActivity.this, "获取封面失败，已使用默认背景");
                         }
                     });
         } else {
             BackgroundUtil.clearCoverBackground();
             refreshPreview();
-            Toast.makeText(this, "当前无歌曲封面", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "当前无歌曲封面");
         }
     }
 
     private void loadCoverAndPreview(final String coverUrl) {
-        Toast.makeText(this, "正在获取专辑封面...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在获取专辑封面...");
         BackgroundUtil.loadCoverBackground(this, coverUrl, () -> {
             refreshPreview();
             boolean ok = BackgroundUtil.hasCoverBackground(coverUrl);
@@ -191,21 +189,21 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         final Song song = MusicPlayerManager.getInstance().getBackgroundSong();
         if (song == null) {
             refreshPreview();
-            Toast.makeText(this, "暂无歌曲，有封面时自动用封面", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "暂无歌曲，有封面时自动用封面");
             return;
         }
         String coverUrl = song.getCoverUrl();
         if (coverUrl != null && !coverUrl.isEmpty()) {
-            Toast.makeText(this, "正在获取专辑封面...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在获取专辑封面...");
             BackgroundUtil.loadCoverBackground(this, coverUrl, () -> {
                 refreshPreview();
                 boolean ok = BackgroundUtil.hasCoverBackground(coverUrl);
-                Toast.makeText(this, ok ? "有封面时用封面，无封面时用图片"
-                        : "暂无封面，已使用选定图片", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, ok ? "有封面时用封面，无封面时用图片"
+                        : "暂无封面，已使用选定图片");
             });
         } else {
             refreshPreview();
-            Toast.makeText(this, "暂无封面，已使用选定图片", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "暂无封面，已使用选定图片");
         }
     }
 
@@ -215,14 +213,14 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
     private void useFluidBackground() {
         BackgroundUtil.setMode(this, BackgroundUtil.MODE_FLUID);
         refreshPreview();
-        Toast.makeText(this, "已切换到流体背景", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已切换到流体背景");
     }
 
     /** 循环切换模糊档位（关闭 → 弱 → 中 → 强 → 关闭），封面 / 图片背景立即按新档位重算。 */
     private void cycleBlurStrength() {
         int next = BackgroundUtil.cycleBlurLevel(this);
         refreshPreview();
-        Toast.makeText(this, "模糊强度：" + BackgroundUtil.getBlurLabel(next), Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "模糊强度：" + BackgroundUtil.getBlurLabel(next));
     }
 
     private void resetBackground() {
@@ -230,7 +228,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         BackgroundUtil.clearBackground(this);
         BackgroundUtil.clearCoverBackground();
         refreshPreview();
-        Toast.makeText(this, "已恢复默认背景", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已恢复默认背景");
     }
 
     private void refreshPreview() {
@@ -325,7 +323,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
                 BackgroundUtil.saveBackground(this, uri);
                 BackgroundUtil.setMode(this, BackgroundUtil.MODE_CUSTOM);
                 refreshPreview();
-                Toast.makeText(this, "背景已设置", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "背景已设置");
             }
         }
     }

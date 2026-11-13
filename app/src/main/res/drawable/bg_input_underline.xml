@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  弹窗输入框的「下划线」底：透明背景 + 底部 1dp 细线。
+  参考图（浮窗2）里输入区没有圆角色块，只有一条下划线，比圆角输入框更轻。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000" />
+        </shape>
+    </item>
+    <item
+        android:gravity="bottom"
+        android:height="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#66FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

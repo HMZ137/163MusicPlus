@@ -128,8 +128,7 @@ public class CaptchaLoginActivity extends BaseWatchActivity {
                             }
                             tvStatus.setText("登录成功!");
                             saveCookie(cookie);
-                            Toast.makeText(CaptchaLoginActivity.this,
-                                    "登录成功，Cookie已保存", Toast.LENGTH_LONG).show();
+                            com.qinghe.music163pro.util.UiKit.toastLong(CaptchaLoginActivity.this, "登录成功，Cookie已保存");
                             if (sendTimer != null) sendTimer.cancel();
                             findViewById(android.R.id.content).postDelayed(() -> finish(), 1500);
                         } else {

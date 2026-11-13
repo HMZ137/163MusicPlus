@@ -228,10 +228,10 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             showConfirmDialog("确认删除", "确定从歌单中删除「" + song.getName() + "」？", () -> {
                 String cookie = playerManager.getCookie();
                 if (cookie == null || cookie.isEmpty()) {
-                    Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
                     return;
                 }
-                Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "正在删除...");
                 MusicApiHelper.playlistTracks("del", playlistId,
                         new long[]{song.getId()}, cookie,
                         new MusicApiHelper.PlaylistActionCallback() {
@@ -244,18 +244,15 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                                     updateTitleText();
                                     updateInfoRow();
                                     updateStatusRow();
-                                    Toast.makeText(PlaylistDetailActivity.this,
-                                            "已删除", Toast.LENGTH_SHORT).show();
+                                    com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "已删除");
                                 } else {
-                                    Toast.makeText(PlaylistDetailActivity.this,
-                                            "删除失败", Toast.LENGTH_SHORT).show();
+                                    com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "删除失败");
                                 }
                             }
 
                             @Override
                             public void onError(String message) {
-                                Toast.makeText(PlaylistDetailActivity.this,
-                                        "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "删除失败: " + message);
                             }
                         });
             });
@@ -348,16 +345,16 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             return;
         }
         if (isLikedPlaylist) {
-            Toast.makeText(this, "「我喜欢的音乐」不能删除歌曲", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "「我喜欢的音乐」不能删除歌曲");
             return;
         }
         if (creatorUserId <= 0 || creatorUserId != currentUserId) {
-            Toast.makeText(this, "只有自己创建的歌单才能删除歌曲", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "只有自己创建的歌单才能删除歌曲");
             return;
         }
         final String cookie = playerManager.getCookie();
         if (cookie == null || cookie.isEmpty()) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
         String message = targets.size() == 1
@@ -368,7 +365,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             for (int i = 0; i < targets.size(); i++) {
                 ids[i] = targets.get(i).getId();
             }
-            Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在删除...");
             MusicApiHelper.playlistTracks("del", playlistId, ids, cookie,
                     new MusicApiHelper.PlaylistActionCallback() {
                         @Override
@@ -381,18 +378,15 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                                 trackCount = allTracks.size();
                                 applyFilter();
                                 updateTitleText();
-                                Toast.makeText(PlaylistDetailActivity.this,
-                                        "已删除", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "已删除");
                             } else {
-                                Toast.makeText(PlaylistDetailActivity.this,
-                                        "删除失败", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "删除失败");
                             }
                         }
 
                         @Override
                         public void onError(String message) {
-                            Toast.makeText(PlaylistDetailActivity.this,
-                                    "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "删除失败: " + message);
                         }
                     });
         });
@@ -417,8 +411,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
 
             @Override
             public void onNeedLogin() {
-                Toast.makeText(PlaylistDetailActivity.this,
-                        R.string.multi_select_favorite_need_login, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, R.string.multi_select_favorite_need_login);
             }
         });
     }
@@ -431,13 +424,13 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         }
         final String cookie = playerManager.getCookie();
         if (cookie == null || cookie.isEmpty()) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
         if (multiSelect != null) {
             multiSelect.exitSelectionMode();
         }
-        Toast.makeText(this, "开始下载 " + targets.size() + " 首", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "开始下载 " + targets.size() + " 首");
         downloadNext(targets, 0, cookie);
     }
 
@@ -523,7 +516,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
     private void setSortMode(int mode) {
         sortMode = mode;
         applyFilter();
-        Toast.makeText(this, "已按「" + sortModeLabel() + "」排列", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已按「" + sortModeLabel() + "」排列");
     }
 
     private String sortModeLabel() {
@@ -551,11 +544,11 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             // 按曲名分组跳转只有在曲名排序下才有意义，自动切过去
             sortMode = 1;
             applyFilter();
-            Toast.makeText(this, "已切到「曲名」排序", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已切到「曲名」排序");
         }
         buildLetterGroups();
         if (groupLetters.isEmpty()) {
-            Toast.makeText(this, "还没有可跳转的字母", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "还没有可跳转的字母");
             return;
         }
         StringBuilder letters = new StringBuilder(groupLetters.size());
@@ -864,11 +857,11 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             // Cloud mode: toggle between subscribe/unsubscribe based on current state
             String cookie = playerManager.getCookie();
             if (cookie == null || cookie.isEmpty()) {
-                Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
                 return;
             }
             if (isSubscribed) {
-                Toast.makeText(this, "正在取消收藏...", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "正在取消收藏...");
                 MusicApiHelper.subscribePlaylist(playlistId, false, cookie,
                         new MusicApiHelper.PlaylistActionCallback() {
                     @Override
@@ -877,21 +870,18 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                             isSubscribed = false;
                             playlistManager.removePlaylist(playlistId);
                             updateFavButton();
-                            Toast.makeText(PlaylistDetailActivity.this,
-                                    "已取消云端收藏", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "已取消云端收藏");
                         } else {
-                            Toast.makeText(PlaylistDetailActivity.this,
-                                    "取消收藏失败", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "取消收藏失败");
                         }
                     }
                     @Override
                     public void onError(String message) {
-                        Toast.makeText(PlaylistDetailActivity.this,
-                                "取消收藏失败: " + message, Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "取消收藏失败: " + message);
                     }
                 });
             } else {
-                Toast.makeText(this, "正在收藏...", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "正在收藏...");
                 MusicApiHelper.subscribePlaylist(playlistId, true, cookie,
                         new MusicApiHelper.PlaylistActionCallback() {
                     @Override
@@ -899,17 +889,14 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                         if (success) {
                             isSubscribed = true;
                             updateFavButton();
-                            Toast.makeText(PlaylistDetailActivity.this,
-                                    "已收藏到云端", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "已收藏到云端");
                         } else {
-                            Toast.makeText(PlaylistDetailActivity.this,
-                                    "收藏失败", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "收藏失败");
                         }
                     }
                     @Override
                     public void onError(String message) {
-                        Toast.makeText(PlaylistDetailActivity.this,
-                                "收藏失败: " + message, Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "收藏失败: " + message);
                     }
                 });
             }
@@ -918,14 +905,14 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
             boolean saved = playlistManager.isPlaylistSaved(playlistId);
             if (saved) {
                 playlistManager.removePlaylist(playlistId);
-                Toast.makeText(this, "已取消收藏歌单", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已取消收藏歌单");
             } else {
                 PlaylistInfo info = new PlaylistInfo(playlistId,
                         playlistName != null ? playlistName : "",
                         trackCount, creator != null ? creator : "",
                         creatorUserId, true, isLikedPlaylist ? "5" : "0");
                 playlistManager.addPlaylist(info);
-                Toast.makeText(this, "已收藏歌单", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "已收藏歌单");
             }
             updateFavButton();
         }
@@ -934,7 +921,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
     private void onDeletePlaylist() {
         if (playlistId <= 0) return;
         showConfirmDialog("确认删除", "确定从云端删除歌单「" + (playlistName != null ? playlistName : "") + "」？\n此操作不可恢复。", () -> {
-            Toast.makeText(this, "正在删除...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在删除...");
             String cookie = playerManager.getCookie();
             MusicApiHelper.deletePlaylist(playlistId, cookie,
                     new MusicApiHelper.PlaylistActionCallback() {
@@ -942,18 +929,15 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                 public void onResult(boolean success) {
                     if (success) {
                         playlistManager.removePlaylist(playlistId);
-                        Toast.makeText(PlaylistDetailActivity.this,
-                                "已删除歌单", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "已删除歌单");
                         finish();
                     } else {
-                        Toast.makeText(PlaylistDetailActivity.this,
-                                "删除失败", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "删除失败");
                     }
                 }
                 @Override
                 public void onError(String message) {
-                    Toast.makeText(PlaylistDetailActivity.this,
-                            "删除失败: " + message, Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(PlaylistDetailActivity.this, "删除失败: " + message);
                 }
             });
         });

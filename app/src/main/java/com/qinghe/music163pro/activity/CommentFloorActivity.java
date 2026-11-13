@@ -272,8 +272,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                             if (reset && subCommentListLayout.getChildCount() == 0) {
                                 addEmptyHint("加载失败，点击重试");
                             }
-                            Toast.makeText(CommentFloorActivity.this,
-                                    "加载评论失败", Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "加载评论失败");
                         });
                     }
                 });
@@ -439,8 +438,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                                     if (currentLikeCount[0] < 0) currentLikeCount[0] = 0;
                                     updateLikeText(likeTv, isLiked[0], currentLikeCount[0]);
                                 } else {
-                                    Toast.makeText(CommentFloorActivity.this,
-                                            "操作失败", Toast.LENGTH_SHORT).show();
+                                    com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "操作失败");
                                 }
                             });
                         }
@@ -574,8 +572,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                                     if (currentLikeCount[0] < 0) currentLikeCount[0] = 0;
                                     updateLikeText(likeTv, isLiked[0], currentLikeCount[0]);
                                 } else {
-                                    Toast.makeText(CommentFloorActivity.this,
-                                            "操作失败", Toast.LENGTH_SHORT).show();
+                                    com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "操作失败");
                                 }
                             });
                         }
@@ -713,7 +710,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                 (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         if (cm != null) {
             cm.setPrimaryClip(android.content.ClipData.newPlainText("comment", text));
-            Toast.makeText(this, "已复制", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已复制");
         }
     }
 
@@ -724,12 +721,10 @@ public class CommentFloorActivity extends BaseWatchActivity {
                     public void onResult(boolean success) {
                         runOnUiThread(() -> {
                             if (success) {
-                                Toast.makeText(CommentFloorActivity.this,
-                                        "评论已删除", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "评论已删除");
                                 loadFloorComments(true);
                             } else {
-                                Toast.makeText(CommentFloorActivity.this,
-                                        "删除失败", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "删除失败");
                             }
                         });
                     }
@@ -814,12 +809,12 @@ public class CommentFloorActivity extends BaseWatchActivity {
     private void submitReply() {
         String text = inputField.getText().toString().trim();
         if (text.isEmpty()) {
-            Toast.makeText(this, "回复内容不能为空", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "回复内容不能为空");
             return;
         }
 
         if (cookie.isEmpty()) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
 
@@ -841,15 +836,13 @@ public class CommentFloorActivity extends BaseWatchActivity {
                                 inputField.setText("");
                                 exitReplyMode();
                                 hideKeyboard();
-                                Toast.makeText(CommentFloorActivity.this,
-                                        "回复成功", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "回复成功");
                                 // Delay reload slightly so server has time to process
                                 new android.os.Handler().postDelayed(() -> {
                                     loadFloorComments(true);
                                 }, 800);
                             } else {
-                                Toast.makeText(CommentFloorActivity.this,
-                                        "回复失败，请重试", Toast.LENGTH_SHORT).show();
+                                com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "回复失败，请重试");
                             }
                         });
                     }
@@ -860,8 +853,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                             sendButton.setEnabled(true);
                             sendButton.setTextColor(COLOR_ACCENT);
                             MusicLog.e(TAG, "发送回复失败: " + message);
-                            Toast.makeText(CommentFloorActivity.this,
-                                    "发送失败: " + message, Toast.LENGTH_SHORT).show();
+                            com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "发送失败: " + message);
                         });
                     }
                 });

@@ -163,7 +163,7 @@ public class LyricsActivity extends BaseWatchActivity {
 
         Song song = playerManager.getCurrentSong();
         if (song == null) {
-            Toast.makeText(this, "暂无歌曲", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "暂无歌曲");
             finish();
             return;
         }
@@ -685,11 +685,11 @@ public class LyricsActivity extends BaseWatchActivity {
     /** 长按 AI：删除本曲缓存并重新分析。 */
     private void reanalyzeCurrentSong() {
         if (aiLyricLoading) {
-            Toast.makeText(this, "AI 正在分析…", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "AI 正在分析…");
             return;
         }
         if (!com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
-            Toast.makeText(this, "请先填写 DeepSeek API Key", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先填写 DeepSeek API Key");
             startActivity(new android.content.Intent(this, LanguageLearningActivity.class));
             return;
         }
@@ -707,12 +707,12 @@ public class LyricsActivity extends BaseWatchActivity {
         aiLyricLoading = true;
         updateAiButton();
         runAiAnalysis(true);
-        Toast.makeText(this, "已清除本曲缓存，正在重新分析…", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "已清除本曲缓存，正在重新分析…");
     }
 
     private void onAiToggleClicked() {
         if (aiLyricLoading) {
-            Toast.makeText(this, "AI 正在分析…", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "AI 正在分析…");
             return;
         }
         if (aiLyricActive) {
@@ -725,11 +725,11 @@ public class LyricsActivity extends BaseWatchActivity {
             aiLyricActive = true;
             updateAiButton();
             redrawWithAi();
-            Toast.makeText(this, "已启用 AI 歌词", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已启用 AI 歌词");
             return;
         }
         if (!com.qinghe.music163pro.util.AiLyricSettings.hasApiKey(this)) {
-            Toast.makeText(this, "请先填写 DeepSeek API Key", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先填写 DeepSeek API Key");
             startActivity(new android.content.Intent(this, LanguageLearningActivity.class));
             return;
         }

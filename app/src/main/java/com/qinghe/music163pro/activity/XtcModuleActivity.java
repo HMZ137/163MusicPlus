@@ -78,7 +78,7 @@ public class XtcModuleActivity extends BaseWatchActivity {
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             startDownload();
         } else {
-            Toast.makeText(this, "需要存储权限才能下载模块", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "需要存储权限才能下载模块");
         }
     }
 
@@ -88,7 +88,7 @@ public class XtcModuleActivity extends BaseWatchActivity {
         }
         File dir = new File(Environment.getExternalStorageDirectory(), "163Music");
         if (!dir.exists() && !dir.mkdirs()) {
-            Toast.makeText(this, "无法创建下载目录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "无法创建下载目录");
             return;
         }
 
@@ -120,7 +120,7 @@ public class XtcModuleActivity extends BaseWatchActivity {
                 btnDownload.setEnabled(true);
                 progressBar.setVisibility(View.GONE);
                 tvStatus.setText("下载失败: " + error);
-                Toast.makeText(XtcModuleActivity.this, "下载失败: " + error, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(XtcModuleActivity.this, "下载失败: " + error);
             }
         });
     }
@@ -141,7 +141,7 @@ public class XtcModuleActivity extends BaseWatchActivity {
             startActivity(intent);
         } catch (Exception e) {
             tvStatus.setText("下载完成: " + filePath);
-            Toast.makeText(this, "无法自动安装，请手动安装", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "无法自动安装，请手动安装");
         }
     }
 }

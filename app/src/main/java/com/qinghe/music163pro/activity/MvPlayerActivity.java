@@ -66,7 +66,7 @@ public class MvPlayerActivity extends BaseWatchActivity {
         tvTitle.setText(mvName != null && !mvName.isEmpty() ? mvName : "MV播放");
 
         if (mvId <= 0) {
-            Toast.makeText(this, "MV地址无效", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "MV地址无效");
             finish();
             return;
         }
@@ -95,7 +95,7 @@ public class MvPlayerActivity extends BaseWatchActivity {
             @Override
             public void onError(String message) {
                 showLoading(false, "");
-                Toast.makeText(MvPlayerActivity.this, "播放失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MvPlayerActivity.this, "播放失败: " + message);
             }
         });
     }

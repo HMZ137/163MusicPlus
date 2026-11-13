@@ -202,7 +202,7 @@ public class SearchSongsFragment extends SearchListFragment<SearchSongsFragment.
         if (target < 0) {
             Song single = item.playable();
             if (single == null) {
-                Toast.makeText(requireContext(), "该声音暂无可播放的主歌", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(requireContext(), "该声音暂无可播放的主歌");
                 return;
             }
             playlist.clear();
@@ -219,6 +219,6 @@ public class SearchSongsFragment extends SearchListFragment<SearchSongsFragment.
 
     @Override
     protected void onEmptyFirstPage() {
-        Toast.makeText(requireContext(), R.string.no_song, Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(requireContext(), getString(R.string.no_song));
     }
 }

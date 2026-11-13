@@ -123,7 +123,7 @@ public class ScanDirsActivity extends BaseWatchActivity {
                 getString(R.string.scan_dirs_add_prompt),
                 "/sdcard/我的音乐", "", "确定", path -> {
                     if (path.isEmpty()) {
-                        Toast.makeText(this, "路径不能为空", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(this, "路径不能为空");
                         return;
                     }
                     boolean added = LocalScanScope.addCustomDir(this, path);
@@ -139,7 +139,7 @@ public class ScanDirsActivity extends BaseWatchActivity {
     private void remove(String path) {
         if (LocalScanScope.removeCustomDir(this, path)) {
             MusicLog.i("ScanDirs", "移除自定义扫描目录: " + path);
-            Toast.makeText(this, "已移除", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已移除");
             reload();
         }
     }

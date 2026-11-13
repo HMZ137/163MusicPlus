@@ -381,7 +381,7 @@ public class DownloadListActivity extends BaseWatchActivity
                 local.showMoreDialog();
                 return;
             }
-            Toast.makeText(this, "本地音乐页还没准备好，稍后再试", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "本地音乐页还没准备好，稍后再试");
             return;
         }
         // 「下载」页：排序（首字符 A-Z 口径）+ 整理文件名
@@ -532,8 +532,7 @@ public class DownloadListActivity extends BaseWatchActivity
                         multiSelect.exitSelectionMode();
                     }
                     loadDownloads();
-                    Toast.makeText(DownloadListActivity.this,
-                            "已删除 " + deleted + " 首", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(DownloadListActivity.this, "已删除 " + deleted + " 首");
                 });
     }
 
@@ -568,8 +567,7 @@ public class DownloadListActivity extends BaseWatchActivity
 
             @Override
             public void onNeedLogin() {
-                Toast.makeText(DownloadListActivity.this,
-                        R.string.multi_select_favorite_need_login, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(DownloadListActivity.this, R.string.multi_select_favorite_need_login);
             }
         });
     }
@@ -587,7 +585,7 @@ public class DownloadListActivity extends BaseWatchActivity
 
     private void tidyFileNames() {
         tidyInProgress = true;
-        Toast.makeText(this, "正在整理…", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在整理…");
         DownloadManager.migrateLegacyFileNames(new DownloadManager.MigrateCallback() {
             @Override
             public void onProgress(int done, int total, String currentName) {
@@ -614,7 +612,7 @@ public class DownloadListActivity extends BaseWatchActivity
                         message += "，失败 " + failed + " 首";
                     }
                 }
-                Toast.makeText(DownloadListActivity.this, message, Toast.LENGTH_LONG).show();
+                com.qinghe.music163pro.util.UiKit.toastLong(DownloadListActivity.this, message);
                 updateTitleText();
                 loadDownloads();
             }
@@ -796,7 +794,7 @@ public class DownloadListActivity extends BaseWatchActivity
             startActivity(intent);
             finish();
         } catch (Exception e) {
-            Toast.makeText(this, "播放失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "播放失败: " + e.getMessage());
         }
     }
 

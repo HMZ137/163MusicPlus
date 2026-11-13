@@ -164,16 +164,16 @@ public class PersonalFMActivity extends BaseWatchActivity {
     private void startPersonalFM(String mode, String subMode) {
         String cookie = MusicPlayerManager.getInstance().getCookie();
         if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
-        Toast.makeText(this, "正在获取私人漫游...", Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, "正在获取私人漫游...");
 
         MusicApiHelper.PersonalFMCallback callback = new MusicApiHelper.PersonalFMCallback() {
             @Override
             public void onResult(List<com.qinghe.music163pro.model.Song> songs) {
                 if (songs.isEmpty()) {
-                    Toast.makeText(PersonalFMActivity.this, "暂无推荐歌曲", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(PersonalFMActivity.this, "暂无推荐歌曲");
                     return;
                 }
                 MusicPlayerManager playerManager = MusicPlayerManager.getInstance();
@@ -187,7 +187,7 @@ public class PersonalFMActivity extends BaseWatchActivity {
 
             @Override
             public void onError(String message) {
-                Toast.makeText(PersonalFMActivity.this, "获取失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(PersonalFMActivity.this, "获取失败: " + message);
             }
         };
 

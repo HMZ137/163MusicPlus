@@ -52,13 +52,13 @@ public class CloudUploadProgressActivity extends BaseWatchActivity {
         btnDone.setOnClickListener(v -> finish());
 
         if (uri == null) {
-            Toast.makeText(this, "文件无效", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "文件无效");
             finish();
             return;
         }
         String cookie = MusicPlayerManager.getInstance().getCookie();
         if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             finish();
             return;
         }

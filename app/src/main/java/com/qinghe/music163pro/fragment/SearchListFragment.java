@@ -170,7 +170,7 @@ public abstract class SearchListFragment<T> extends Fragment {
             @Override
             public void onError(String message) {
                 if (isAdded()) {
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(requireContext(), message);
                 }
             }
         });
@@ -200,7 +200,7 @@ public abstract class SearchListFragment<T> extends Fragment {
             public void onError(String message) {
                 loadingMore = false;
                 if (isAdded()) {
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(requireContext(), message);
                 }
             }
         });

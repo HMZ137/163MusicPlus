@@ -51,7 +51,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
             btnLoudness.setOnClickListener(v -> {
                 if (LoudnessScan.isRunning()) {
                     LoudnessScan.cancel();
-                    Toast.makeText(this, "正在中断（已完成的部分已保存）", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(this, "正在中断（已完成的部分已保存）");
                     return;
                 }
                 boolean started = LoudnessScan.start(getApplicationContext(),
@@ -126,7 +126,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
     /** F4：确认浮窗（带「强制覆盖已内嵌项」复选）→ 后台把 cover.jpg / lyrics.lrc 写进音频文件标签。 */
     private void promptEmbed(final TextView tvValue) {
         if (embedRunning) {
-            Toast.makeText(this, "正在内嵌，请稍候…", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在内嵌，请稍候…");
             return;
         }
         final com.qinghe.music163pro.util.WatchPopup popup =
@@ -189,8 +189,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
                     if (tvValue != null) {
                         tvValue.setText("写入歌曲标签");
                     }
-                    Toast.makeText(LocalMusicSettingsActivity.this,
-                            "下载目录为空，没有可内嵌的歌曲", Toast.LENGTH_SHORT).show();
+                    com.qinghe.music163pro.util.UiKit.toast(LocalMusicSettingsActivity.this, "下载目录为空，没有可内嵌的歌曲");
                     return;
                 }
                 if (tvValue != null) {
@@ -217,7 +216,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
      */
     private void promptDedupe(final TextView tvValue) {
         if (dedupeRunning) {
-            Toast.makeText(this, "正在处理，请稍候…", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在处理，请稍候…");
             return;
         }
         final com.qinghe.music163pro.util.WatchPopup popup =
@@ -297,8 +296,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
                 if (tvValue != null) {
                     tvValue.setText(msg);
                 }
-                Toast.makeText(LocalMusicSettingsActivity.this,
-                        msg + "，可在 163Music/DuplicatesTrash 找回", Toast.LENGTH_LONG).show();
+                com.qinghe.music163pro.util.UiKit.toastLong(LocalMusicSettingsActivity.this, msg + "，可在 163Music/DuplicatesTrash 找回");
                 // 让下一次进「本机音乐」重新扫描（缓存里还留着被移走的文件）
                 com.qinghe.music163pro.util.LocalLibraryCache.clear();
             });

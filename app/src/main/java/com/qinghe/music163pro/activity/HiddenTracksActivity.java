@@ -109,7 +109,7 @@ public class HiddenTracksActivity extends BaseWatchActivity {
 
     private void removeFromBlacklist(String path) {
         if (LocalMusicHides.unhide(this, path)) {
-            Toast.makeText(this, "已移出黑名单，下次扫描会重新出现", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已移出黑名单，下次扫描会重新出现");
             reload();
         }
     }

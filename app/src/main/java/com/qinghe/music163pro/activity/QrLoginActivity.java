@@ -160,8 +160,7 @@ public class QrLoginActivity extends BaseWatchActivity {
                             }
                             tvStatus.setText("登录成功!");
                             saveCookie(cookie);
-                            Toast.makeText(QrLoginActivity.this,
-                                    "登录成功，Cookie已保存", Toast.LENGTH_LONG).show();
+                            com.qinghe.music163pro.util.UiKit.toastLong(QrLoginActivity.this, "登录成功，Cookie已保存");
                             // Auto-close after brief delay
                             pollHandler.postDelayed(() -> finish(), 1500);
                             break;

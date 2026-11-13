@@ -67,7 +67,7 @@ public class MvDetailActivity extends BaseWatchActivity {
         btnPlay.setOnClickListener(playClickListener);
 
         if (mvId <= 0) {
-            Toast.makeText(this, "MV信息无效", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "MV信息无效");
             finish();
             return;
         }
@@ -89,7 +89,7 @@ public class MvDetailActivity extends BaseWatchActivity {
             @Override
             public void onError(String message) {
                 showLoading(false);
-                Toast.makeText(MvDetailActivity.this, "获取MV详情失败: " + message, Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(MvDetailActivity.this, "获取MV详情失败: " + message);
             }
         });
     }

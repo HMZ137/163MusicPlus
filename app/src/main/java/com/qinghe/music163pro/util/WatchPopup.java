@@ -230,11 +230,18 @@ public final class WatchPopup {
             LinearLayout buttonArea = new LinearLayout(activity);
             boolean horizontal = buttons.size() == 2;
             buttonArea.setOrientation(horizontal ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
-            buttonArea.setGravity(Gravity.CENTER);
+            // 参考图（浮窗1/浮窗2）：按钮靠右（由下面的 weight 占位实现），垂直居中
+            buttonArea.setGravity(Gravity.CENTER_VERTICAL);
             LinearLayout.LayoutParams areaParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             areaParams.topMargin = dp(10);
             buttonArea.setLayoutParams(areaParams);
+            if (horizontal) {
+                // 水平 LinearLayout 里 Gravity.END 遇到 WRAP_CONTENT 子项时不可靠
+                // （实测「确定」会被右边界裁掉），用一个 weight=1 的空 View 把按钮推到右侧。
+                View spacer = new View(activity);
+                buttonArea.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+            }
             for (int i = 0; i < buttons.size(); i++) {
                 buttonArea.addView(createButton(overlay, buttons.get(i), horizontal, i));
             }
@@ -263,7 +270,8 @@ public final class WatchPopup {
         tv.setTextColor(0xFFFFFFFF);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textTitlePx(activity));
         tv.setTypeface(null, android.graphics.Typeface.BOLD);
-        tv.setGravity(Gravity.CENTER);   // 参考图：标题居中
+        // 参考图（浮窗1/浮窗2）：标题左对齐，而不是居中
+        tv.setGravity(Gravity.START);
         tv.setSingleLine(true);
         tv.setEllipsize(TextUtils.TruncateAt.END);
         tv.setPadding(0, 0, 0, dp(4));
@@ -275,7 +283,7 @@ public final class WatchPopup {
         tv.setText(description);
         tv.setTextColor(0xB3FFFFFF);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textCaptionPx(activity));
-        tv.setGravity(Gravity.CENTER);   // 参考图：简要说明在标题下方居中
+        tv.setGravity(Gravity.START);   // 与标题一致左对齐
         tv.setPadding(0, 0, 0, dp(4));
         return tv;
     }
@@ -319,11 +327,9 @@ public final class WatchPopup {
         input.setTextColor(0xFFFFFFFF);
         input.setHintTextColor(0x80FFFFFF);
         input.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textBodyPx(activity));
-        input.setPadding(dp(10), dp(8), dp(10), dp(8));
-        GradientDrawable inputBg = new GradientDrawable();
-        inputBg.setColor(0xFF2A2B31);
-        inputBg.setCornerRadius(dp(10));   // 输入栏同样跟随圆角
-        input.setBackground(inputBg);
+        // 参考图（浮窗2）：输入区只有一条下划线，没有圆角色块
+        input.setPadding(dp(2), dp(8), dp(2), dp(8));
+        input.setBackgroundResource(R.drawable.bg_input_underline);
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         row.addView(input, inputParams);
@@ -364,29 +370,21 @@ public final class WatchPopup {
 
     private TextView createButton(final FrameLayout overlay, final Btn btn,
                                   boolean horizontal, int index) {
-        TextView button;
-        if (btn.style == STYLE_PRIMARY) {
-            button = UiKit.primaryButton(activity, btn.label);
-        } else if (btn.style == STYLE_DANGER) {
-            button = UiKit.secondaryButton(activity, btn.label);
-            button.setTextColor(0xFFCF6679);
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(0x00000000);
-            bg.setStroke(dp(1), 0xFFCF6679);
-            bg.setCornerRadius(dp(10));
-            button.setBackground(bg);
-        } else {
-            button = UiKit.secondaryButton(activity, btn.label);
-        }
+        // 参考图：底部是「文字按钮」（透明底、主色/危险色文字、右对齐），不是等宽实心块
+        TextView button = new TextView(activity);
+        button.setText(btn.label);
+        button.setTextColor(btn.style == STYLE_DANGER ? 0xFFCF6679 : UiKit.COLOR_ACCENT);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textBodyPx(activity));
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(14), dp(8), dp(14), dp(8));
+        button.setBackgroundResource(R.drawable.bg_selectable_rounded);
+        button.setClickable(true);
+        button.setFocusable(true);
         LinearLayout.LayoutParams lp;
         if (horizontal) {
-            lp = new LinearLayout.LayoutParams(0, dp(UiKit.DP_BUTTON_HEIGHT), 1f);
-            int margin = dp(4);
-            if (index == 0) {
-                lp.rightMargin = margin;
-            } else {
-                lp.leftMargin = margin;
-            }
+            lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(UiKit.DP_BUTTON_HEIGHT));
+            lp.leftMargin = dp(8);
         } else {
             lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, dp(UiKit.DP_BUTTON_HEIGHT));

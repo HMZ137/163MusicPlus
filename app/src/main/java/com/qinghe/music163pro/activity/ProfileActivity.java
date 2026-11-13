@@ -448,7 +448,7 @@ public class ProfileActivity extends BaseWatchActivity {
 
     private void changeAvatar() {
         if (cookie.isEmpty()) {
-            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
             return;
         }
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -473,15 +473,15 @@ public class ProfileActivity extends BaseWatchActivity {
                 fos.close();
                 is.close();
             } catch (Exception e) {
-                Toast.makeText(this, "读取图片失败", Toast.LENGTH_SHORT).show();
+                com.qinghe.music163pro.util.UiKit.toast(this, "读取图片失败");
                 return;
             }
-            Toast.makeText(this, "正在上传头像...", Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(this, "正在上传头像...");
             MusicApiHelper.uploadAvatar(avatarFile, cookie, new MusicApiHelper.CommentActionCallback() {
                 @Override
                 public void onResult(boolean success) {
                     runOnUiThread(() -> {
-                        Toast.makeText(ProfileActivity.this, "头像已更新", Toast.LENGTH_SHORT).show();
+                        com.qinghe.music163pro.util.UiKit.toast(ProfileActivity.this, "头像已更新");
                         reloadAccount();
                     });
                 }

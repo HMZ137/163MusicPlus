@@ -396,13 +396,13 @@ public abstract class MyPlaylistsPageFragment extends Fragment {
 
     protected final void toast(CharSequence text) {
         if (isAdded()) {
-            Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(requireContext(), text);
         }
     }
 
     protected final void toastLong(CharSequence text) {
         if (isAdded()) {
-            Toast.makeText(requireContext(), text, Toast.LENGTH_LONG).show();
+            com.qinghe.music163pro.util.UiKit.toastLong(requireContext(), text);
         }
     }
 }

@@ -353,6 +353,6 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
     }
 
     private void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+        com.qinghe.music163pro.util.UiKit.toast(this, msg);
     }
 }

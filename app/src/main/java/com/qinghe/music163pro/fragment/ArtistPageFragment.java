@@ -404,7 +404,7 @@ public abstract class ArtistPageFragment extends Fragment {
 
     protected final void toast(CharSequence text) {
         if (isAdded()) {
-            Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show();
+            com.qinghe.music163pro.util.UiKit.toast(requireContext(), text);
         }
     }
 

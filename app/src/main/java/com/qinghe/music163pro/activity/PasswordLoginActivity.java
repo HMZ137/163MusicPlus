@@ -71,8 +71,7 @@ public class PasswordLoginActivity extends BaseWatchActivity {
                             }
                             tvStatus.setText("登录成功!");
                             saveCookie(cookie);
-                            Toast.makeText(PasswordLoginActivity.this,
-                                    "登录成功，Cookie已保存", Toast.LENGTH_LONG).show();
+                            com.qinghe.music163pro.util.UiKit.toastLong(PasswordLoginActivity.this, "登录成功，Cookie已保存");
                             handler.postDelayed(() -> finish(), 1500);
                         } else {
                             tvStatus.setText("登录失败: " + message);
