@@ -29,6 +29,9 @@ public final class WatchBackButton {
 
     private static final String VIEW_TAG = "watch_floating_back_button";
 
+    /** 子页面浮动返回按钮的显隐开关（设置页可切，默认显示）。 */
+    public static final String PREF_SHOW_BACK_BUTTON = "show_back_button";
+
     /**
      * 设计基准尺寸（320px 宽屏幕下为 48px）。
      *
@@ -537,6 +540,31 @@ public final class WatchBackButton {
     /**
      * 在页面左上角挂载返回按钮。重复调用是安全的（同一页面只会存在一个）。
      */
+    /** 当前是否显示浮动返回按钮（默认显示）。 */
+    public static boolean isBackButtonVisible(Context context) {
+        return context == null || context.getSharedPreferences(
+                "music163_settings", Context.MODE_PRIVATE)
+                .getBoolean(PREF_SHOW_BACK_BUTTON, true);
+    }
+
+    /**
+     * 按当前 pref 同步已挂载按钮的显隐。页面 onResume 时调用一次，
+     * 这样在设置页关掉开关后，返回其它页面立刻生效，不必杀进程。
+     */
+    public static void syncVisibility(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        FrameLayout content = activity.findViewById(android.R.id.content);
+        if (content == null) {
+            return;
+        }
+        View button = content.findViewWithTag(VIEW_TAG);
+        if (button != null) {
+            button.setVisibility(isBackButtonVisible(activity) ? View.VISIBLE : View.GONE);
+        }
+    }
+
     public static void attach(final Activity activity) {
         if (activity == null || activity.isFinishing()) {
             return;
@@ -567,6 +595,9 @@ public final class WatchBackButton {
         params.leftMargin = margin;
         params.topMargin = margin;
         button.setLayoutParams(params);
+        // 设置里关掉「显示返回按钮」时不显示；仍创建但 GONE，方便开关切回来时
+        // syncVisibility 直接改成 VISIBLE（不必重新 attach）。
+        button.setVisibility(isBackButtonVisible(activity) ? View.VISIBLE : View.GONE);
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override

@@ -11,6 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -63,6 +64,10 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private SwitchMaterial switchOnlineOnlyMode;
     private SwitchMaterial switchUseWatchApi;
     private SwitchMaterial switchSkipTrialSongs;
+    /** 应用内返回手势（M3 胶囊开关，与参考图一致）。 */
+    private MaterialSwitch switchBackGesture;
+    /** 子页面浮动返回按钮的显隐。 */
+    private MaterialSwitch switchShowBackButton;
     private TextView tvRandomSkipModeValue;
     private TextView tvFavModeValue;
     private TextView tvSleepTimerModeValue;
@@ -93,6 +98,8 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         addSectionHeader((android.view.View) findViewById(R.id.switch_sleep_timer_exit_app).getParent(), "播放与定时");
         addSectionHeader(findViewById(R.id.row_lyric_scroll_mode), "歌词");
         addSectionHeader(findViewById(R.id.row_recognition_mode), "识别与其它");
+        // 返回手势 / 返回按钮显隐单独成组，位置在「播放与定时」之后
+        addSectionHeader(findViewById(R.id.row_back_gesture), "交互");
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
@@ -108,6 +115,16 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         switchOnlineOnlyMode = findViewById(R.id.switch_online_only_mode);
         switchUseWatchApi = findViewById(R.id.switch_use_watch_api);
         switchSkipTrialSongs = findViewById(R.id.switch_skip_trial_songs);
+
+        switchBackGesture = findViewById(R.id.switch_back_gesture);
+        if (switchBackGesture != null) {
+            switchBackGesture.setChecked(com.qinghe.music163pro.util.BackGesture.isEnabled(this));
+        }
+        switchShowBackButton = findViewById(R.id.switch_show_back_button);
+        if (switchShowBackButton != null) {
+            switchShowBackButton.setChecked(
+                    com.qinghe.music163pro.util.WatchBackButton.isBackButtonVisible(this));
+        }
         tvRandomSkipModeValue = findViewById(R.id.tv_random_skip_mode_value);
         tvFavModeValue = findViewById(R.id.tv_fav_mode_value);
         tvSleepTimerModeValue = findViewById(R.id.tv_sleep_timer_mode_value);
@@ -201,6 +218,37 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                     isChecked ? "定时结束后将退出应用" : "定时结束后仅停止播放",
                     Toast.LENGTH_SHORT).show();
         });
+
+        // 应用内返回手势：立即生效（BackGesture 每次触摸都会读 pref）
+        if (switchBackGesture != null) {
+            switchBackGesture.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.BackGesture.KEY_ENABLED, isChecked).apply();
+                Toast.makeText(this, isChecked
+                        ? "已开启：从左向右滑动返回上一页"
+                        : "已关闭应用内返回手势", Toast.LENGTH_SHORT).show();
+            });
+            // 整行点按也能切换（手表上点开关本体比点行更费劲）
+            findViewById(R.id.row_back_gesture).setOnClickListener(
+                    v -> switchBackGesture.toggle());
+        }
+
+        // 返回按钮显隐：改完立刻同步本页按钮，其它页面在 onResume 时同步
+        if (switchShowBackButton != null) {
+            switchShowBackButton.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (updatingSwitch) return;
+                prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.WatchBackButton.PREF_SHOW_BACK_BUTTON,
+                        isChecked).apply();
+                com.qinghe.music163pro.util.WatchBackButton.syncVisibility(this);
+                Toast.makeText(this, isChecked
+                        ? "已显示返回按钮" : "已隐藏返回按钮，可用右滑手势或系统返回",
+                        Toast.LENGTH_SHORT).show();
+            });
+            findViewById(R.id.row_show_back_button).setOnClickListener(
+                    v -> switchShowBackButton.toggle());
+        }
 
         // Favorites mode: tap to cycle (本地 / 云端)
         if (rowFavMode != null) rowFavMode.setOnClickListener(v -> cycleFavMode());

@@ -296,6 +296,100 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- 应用内返回手势：左 → 右滑返回上一页（主界面除外）。实现见 util/BackGesture -->
+            <LinearLayout
+                android:id="@+id/row_back_gesture"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:layout_marginTop="6dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="应用内返回手势"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="开启后在页面上从左向右滑动返回上一页（主页除外）"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_back_gesture"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textOn=""
+                    android:textOff="" />
+            </LinearLayout>
+
+            <!-- 返回按钮显隐：加了手势之后，按钮可以收起来，只靠手势/系统返回 -->
+            <LinearLayout
+                android:id="@+id/row_show_back_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="@dimen/watch_row_min_height"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:layout_marginTop="6dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="显示返回按钮"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/watch_text_body"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="关闭后子页面左上角的浮动返回按钮隐藏，可改用返回手势或系统返回"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/watch_text_sub"
+                        android:singleLine="true"
+                        android:tag="collapsible_desc"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_show_back_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textOn=""
+                    android:textOff="" />
+            </LinearLayout>
+
             <!-- 1016 合并：使用手表解析接口（试听歌曲先用手表网关拿完整链接，失败回退试听） -->
             <LinearLayout
                 android:layout_width="match_parent"

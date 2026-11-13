@@ -206,6 +206,8 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
         super.onResume();
         // G3 验收要求「返回再进入时状态复位」：进页面一律展开标题栏（收起态不持久化）
         com.qinghe.music163pro.util.TitleBarCollapse.reset(this);
+        // 「显示返回按钮」开关改动后回到页面立即生效
+        com.qinghe.music163pro.util.WatchBackButton.syncVisibility(this);
     }
 
     // ── 返回键拦截 ──────────────────────────────────────────────────────────
