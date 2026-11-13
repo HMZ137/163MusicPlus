@@ -9,6 +9,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -21,6 +22,7 @@ import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.BackgroundUtil;
 import com.qinghe.music163pro.util.LyricSettings;
+import com.qinghe.music163pro.util.LyricsCopyController;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -69,6 +71,10 @@ public class LyricsActivity extends BaseWatchActivity {
     private final List<LyricLine> lyricLines = new ArrayList<>();
     private final List<TextView> lyricViews = new ArrayList<>();
     private int currentHighlightIndex = -1;
+    /** 歌词页根容器（RelativeLayout）：复制模式的操作条挂到它顶部。 */
+    private RelativeLayout lyricsRoot;
+    /** 长按 1 秒进入的歌词多选复制控制器（全屏歌词页实例）。 */
+    private LyricsCopyController lyricsCopy;
 
     private final Handler scrollHandler = new Handler();
     private Runnable scrollRunnable;
@@ -101,6 +107,7 @@ public class LyricsActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_lyrics);
         View rootView = findViewById(R.id.lyrics_root);
+        lyricsRoot = (RelativeLayout) rootView;
         BackgroundUtil.applyBackground(this, rootView);
 
         // Apply keep screen on setting
@@ -126,6 +133,28 @@ public class LyricsActivity extends BaseWatchActivity {
             return true;
         });
         tvTime = findViewById(R.id.tv_lyrics_time);
+
+        // 长按 1 秒进入歌词复制态：操作条盖在顶部歌名行上（ALIGN_PARENT_TOP，
+        // 后添加的子 View 绘制在上层）。只观察触摸、不消费事件，双击与滚动照旧。
+        lyricsCopy = new LyricsCopyController(this, svLyrics, llContainer,
+                new LyricsCopyController.BarHost() {
+                    @Override
+                    public void attach(View bar) {
+                        if (lyricsRoot == null) return;
+                        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
+                                RelativeLayout.LayoutParams.MATCH_PARENT,
+                                RelativeLayout.LayoutParams.WRAP_CONTENT);
+                        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+                        lyricsRoot.addView(bar, lp);
+                    }
+
+                    @Override
+                    public void detach(View bar) {
+                        if (lyricsRoot != null) {
+                            lyricsRoot.removeView(bar);
+                        }
+                    }
+                });
 
         tvSongName.setSelected(true); // enable marquee
 
@@ -179,7 +208,13 @@ public class LyricsActivity extends BaseWatchActivity {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        handleBlockingModeTouch(event);
+        if (lyricsCopy != null) {
+            lyricsCopy.onTouch(event);
+        }
+        // 复制态下跳过双击 detector 与「锁定模式滚动跟踪」，避免点选行时跳进度
+        if (lyricsCopy == null || !lyricsCopy.isActive()) {
+            handleBlockingModeTouch(event);
+        }
         return super.dispatchTouchEvent(event);
     }
 
@@ -259,11 +294,19 @@ public class LyricsActivity extends BaseWatchActivity {
         return nearestIndex;
     }
 
+    /** 复制态优先消费返回：只退出复制态，不关闭全屏歌词页。 */
+    @Override
+    public void onBackPressed() {
+        if (lyricsCopy != null && lyricsCopy.onBack()) return;
+        super.onBackPressed();
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         lyricsGestureDetector = null;
         scrollHandler.removeCallbacksAndMessages(null);
+        if (lyricsCopy != null) lyricsCopy.release();
     }
 
     private void loadLyrics(Song song) {
@@ -488,6 +531,8 @@ public class LyricsActivity extends BaseWatchActivity {
     }
 
     private void displayLyrics() {
+        // 行要重建了：先退出复制态，否则选中下标会打到新行上
+        if (lyricsCopy != null) lyricsCopy.exit();
         llContainer.removeAllViews();
         lyricViews.clear();
 
@@ -551,6 +596,8 @@ public class LyricsActivity extends BaseWatchActivity {
             llContainer.addView(lineBox);
             lyricViews.add(tv);
         }
+        // 行重建完成后刷新可复制文本（原文行，与屏幕主文本一致）
+        if (lyricsCopy != null) lyricsCopy.setLines(aiPlainLyricLines());
         ensureAiPrepared();
     }
 
@@ -790,6 +837,11 @@ public class LyricsActivity extends BaseWatchActivity {
     }
 
     private void showNoLyrics() {
+        // 「暂无歌词」占位行不是歌词行，复制态必须收掉并清空可复制文本
+        if (lyricsCopy != null) {
+            lyricsCopy.exit();
+            lyricsCopy.setLines(null);
+        }
         llContainer.removeAllViews();
         TextView tv = new TextView(this);
         tv.setText("暂无歌词");
@@ -806,6 +858,11 @@ public class LyricsActivity extends BaseWatchActivity {
         scrollRunnable = new Runnable() {
             @Override
             public void run() {
+                // 复制态下只保活计时器：不换高亮、不自动滚动，避免用户点选时歌词跳走
+                if (lyricsCopy != null && lyricsCopy.isActive()) {
+                    scrollHandler.postDelayed(this, 300);
+                    return;
+                }
                 if (playerManager.isPlaying() || playerManager.getCurrentPosition() > 0) {
                     int currentPos = playerManager.getCurrentPosition();
                     int duration = playerManager.getDuration();

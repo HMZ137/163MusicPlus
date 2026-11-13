@@ -61,6 +61,7 @@ import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.util.BackgroundUtil;
 import com.qinghe.music163pro.util.LocalTracks;
 import com.qinghe.music163pro.util.LyricSettings;
+import com.qinghe.music163pro.util.LyricsCopyController;
 import com.qinghe.music163pro.util.PlaybackMode;
 import com.qinghe.music163pro.util.UiScale;
 import com.qinghe.music163pro.util.UiKit;
@@ -320,6 +321,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private int lyricsTouchSlop = 0;
     private TextView tvLyricsSongLabel;
     private TextView tvLyricsTimeRef;
+    /** 歌词页根容器（FrameLayout）：复制模式的操作条挂在它上面，后加的覆盖顶栏。 */
+    private FrameLayout lyricsPageRoot;
+    /** 长按 1 秒进入的歌词多选复制控制器（主页歌词页实例）。 */
+    private LyricsCopyController lyricsCopy;
     // Translation lyrics
     private String currentTlyricText; // Raw translated LRC text for current song
     private boolean translationEnabled; // Whether translation is currently showing
@@ -631,6 +636,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void handleLyricsOverlayTouch(MotionEvent event) {
         if (!lyricsOverlayShowing || lyricsScrollView == null || lyricLines.isEmpty()) {
             return;
+        }
+
+        if (lyricsCopy != null) {
+            lyricsCopy.onTouch(event);
+            // 复制态下不喂双击 detector、也不记录「锁定模式滚动」，
+            // 否则点选歌词行时会误触跳进度或把歌词滚走。
+            if (lyricsCopy.isActive()) return;
         }
 
         if (lyricsGestureDetector != null) {
@@ -1084,7 +1096,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             contentLayout.addView(row7);
         }
 
-        // Row 8: 复制链接（在线歌曲的可播放直链）。
+        // Row 8: 复制链接（网易云歌曲分享页）。
         // 刻意不跟云端功能一起在 cloudBlocked 时隐藏：本地歌也要能点，点了明确告知
         // 「没有可用链接」，比整项消失更不容易让人以为功能丢了。见 onFuncCopyLink()。
         LinearLayout row8 = new LinearLayout(this);
@@ -1181,85 +1193,30 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     // ==================== 复制链接 ====================
 
     /**
-     * 「复制链接」：把当前在线歌曲**实际正在播放的直链**写入系统剪贴板。
+     * 「复制链接」：复制歌曲在网易云的**分享页链接**
+     * {@code https://music.163.com/song?id=<id>}（需求方 2026-11-13 更正口径）。
      *
-     * <p>为什么优先取 {@code song.getUrl()} 而不是每次重新调接口：播放内核在
-     * {@code finishPlay()} 里会把最终采用的地址写回 Song —— 包括「手表网关」解析出来的
-     * 完整链接。重新调一次 {@code getSongUrlInfo} 只会拿到网关之前的试听片段，
-     * 反而比不上用户此刻真正听到的那条。所以只有直链为空（刚入队还没解析、
-     * 或被播放错误重试清空）时才异步补取一次。</p>
+     * <p>刻意不复制可播放直链：那种 URL 会过期、还常常只是试听片段，分享给别人打不开；
+     * 分享页链接稳定、可转发、在未登录设备也能打开。与本项目已有的
+     * 「云歌单复制链接」（{@code music.163.com/playlist?id=}）保持同一套口径。</p>
      *
-     * <p>本地歌没有网易云直链；本地播放模式下也不该为了复制而发起网络请求，
-     * 两种情况都给明确提示而不是静默失败。</p>
+     * <p>本地歌 / 没有网易云 id 的歌曲没有对应页面，一律提示「当前歌曲没有可用链接」；
+     * 全程不发起网络请求，本地播放模式下同样可用（只要有 id）。</p>
      */
     private void onFuncCopyLink(Song song) {
         dismissOverlay();
-        if (song == null || LocalTracks.isLocalOnly(song) || song.getId() <= 0) {
+        if (song == null || song.getId() <= 0 || LocalTracks.isLocalOnly(song)) {
             toastNoSongLink();
             return;
         }
-        String playingUrl = song.getUrl();
-        if (isHttpUrl(playingUrl)) {
-            copySongLink(playingUrl);
-            return;
-        }
-        if (PlaybackMode.isLocalOnly(this)) {
-            toastNoSongLink();
-            return;
-        }
-        Toast.makeText(this, "正在获取链接…", Toast.LENGTH_SHORT).show();
-        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
-        String quality = prefs.getString("preferred_quality", "exhigh");
-        MusicApiHelper.getSongUrlInfo(song.getId(), playerManager.getCookie(), quality,
-                new MusicApiHelper.SongUrlInfoCallback() {
-                    @Override
-                    public void onResult(String url, boolean trialOnly) {
-                        if (!isHttpUrl(url)) {
-                            toastNoSongLink();
-                            return;
-                        }
-                        copySongLink(url, trialOnly);
-                    }
-
-                    @Override
-                    public void onError(String message) {
-                        // 接口异常时再看一眼 Song 上的直链（可能刚好解析完成）；
-                        // 仍然没有才提示，避免网络抖动误报成「这首歌没有链接」。
-                        String retryUrl = song.getUrl();
-                        if (isHttpUrl(retryUrl)) {
-                            copySongLink(retryUrl, false);
-                        } else {
-                            toastNoSongLink();
-                        }
-                    }
-                });
-    }
-
-    private static boolean isHttpUrl(String url) {
-        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
-    }
-
-    private void copySongLink(String url) {
-        copySongLink(url, false);
-    }
-
-    private void copySongLink(String url, boolean trialOnly) {
+        String url = "https://music.163.com/song?id=" + song.getId();
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm == null) {
             Toast.makeText(this, "复制失败", Toast.LENGTH_SHORT).show();
             return;
         }
         cm.setPrimaryClip(ClipData.newPlainText("网易云歌曲链接", url));
-        String hint;
-        if (trialOnly) {
-            hint = "已复制试听片段链接";
-        } else if (url.contains("/song/media/outer/url")) {
-            // getSongUrlInfo 的最后兜底外链：能打开，但未登录时常常只能听片段
-            hint = "已复制歌曲外链（可能仅试听）";
-        } else {
-            hint = "已复制播放链接";
-        }
-        Toast.makeText(this, hint, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "已复制歌曲链接", Toast.LENGTH_SHORT).show();
     }
 
     private void toastNoSongLink() {
@@ -2738,6 +2695,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             // 离开歌词页：停掉同步计时器（歌词数据保留，下次进来直接复用）
             lyricsScrollHandler.removeCallbacksAndMessages(null);
             lyricsScrollRunnable = null;
+            // 复制态是歌词页专属，翻走时必须收掉操作条与行监听（保留已缓存的歌词文本）
+            if (lyricsCopy != null) lyricsCopy.exit();
             return;
         }
         // 歌词页是全屏内容，其它浮层不应盖在上面
@@ -2778,6 +2737,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      */
     private View createLyricsPageView() {
         FrameLayout page = new FrameLayout(this);
+        this.lyricsPageRoot = page;
         // 透明：主界面的背景（含封面/自定义图）由 content 根布局统一绘制，歌词页沿用同一背景
         page.setBackgroundColor(android.graphics.Color.TRANSPARENT);
 
@@ -2837,6 +2797,27 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsContainer.setPadding(dp(12), dp(40), dp(12), dp(56));
         lyricsScrollView.addView(lyricsContainer);
         column.addView(lyricsScrollView);
+
+        // 长按 1 秒进入歌词复制态：操作条叠在歌词页顶部（FrameLayout 后加的在上层）。
+        // 只观察触摸、不消费事件，双击跳进度 / 滚动 / ViewPager 翻页全部照旧。
+        lyricsCopy = new LyricsCopyController(this, lyricsScrollView, lyricsContainer,
+                new LyricsCopyController.BarHost() {
+                    @Override
+                    public void attach(View bar) {
+                        if (lyricsPageRoot == null) return;
+                        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP);
+                        lyricsPageRoot.addView(bar, lp);
+                    }
+
+                    @Override
+                    public void detach(View bar) {
+                        if (lyricsPageRoot != null) {
+                            lyricsPageRoot.removeView(bar);
+                        }
+                    }
+                });
 
         // 双击歌词行跳转（沿用原歌词浮层的交互）
         lyricsGestureDetector = new GestureDetector(this,
@@ -3344,11 +3325,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void displayLyricsInOverlay() {
         if (lyricsContainer == null) return;
+        // 行要重建了：先退出复制态，否则选中下标会打到新行上
+        if (lyricsCopy != null) lyricsCopy.exit();
         lyricsContainer.removeAllViews();
         lyricViews.clear();
         currentHighlightIndex = -1;
 
         if (lyricLines.isEmpty()) {
+            if (lyricsCopy != null) lyricsCopy.setLines(null);
             showNoLyricsInOverlay();
             return;
         }
@@ -3427,6 +3411,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             lyricsContainer.addView(lineLayout);
         }
+        // 行重建完成后刷新可复制文本（原文行，与屏幕主文本一致）
+        if (lyricsCopy != null) lyricsCopy.setLines(plainLyricLines());
     }
 
     // ==================== AI 歌词（语言学习模式） ====================
@@ -3672,6 +3658,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void showNoLyricsInOverlay() {
         if (lyricsContainer == null) return;
+        // 「暂无歌词」占位行不是歌词行，复制态必须收掉并清空可复制文本
+        if (lyricsCopy != null) {
+            lyricsCopy.exit();
+            lyricsCopy.setLines(null);
+        }
         lyricsContainer.removeAllViews();
         lyricViews.clear();
         TextView tv = new TextView(this);
@@ -3690,6 +3681,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             @Override
             public void run() {
                 if (!lyricsOverlayShowing || lyricsContainer == null) return;
+                // 复制态下只保活计时器：不换高亮、不自动滚动，避免用户点选时歌词跳走。
+                // 必须重新 post，否则这个 Runnable 会 return 后彻底断掉。
+                if (lyricsCopy != null && lyricsCopy.isActive()) {
+                    lyricsScrollHandler.postDelayed(this, 300);
+                    return;
+                }
                 if (playerManager.isPlaying() || playerManager.getCurrentPosition() > 0) {
                     int currentPos = playerManager.getCurrentPosition();
                     int duration = playerManager.getDuration();
@@ -6077,6 +6074,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             dismissOverlay();
             return;
         }
+        // 歌词复制态优先消费返回：只退出复制态，不翻页也不退出应用
+        if (lyricsCopy != null && lyricsCopy.onBack()) return;
         // M2：歌词页上按返回键先回播放页（ViewPager 第 0 页），不直接退出应用
         if (lyricsOverlayShowing) {
             gotoPlayerPage();
@@ -6110,6 +6109,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         stopRingtonePreview();
         stopSeekBarUpdate();
         lyricsScrollHandler.removeCallbacksAndMessages(null);
+        if (lyricsCopy != null) lyricsCopy.release();
         volumeHandler.removeCallbacksAndMessages(null);
         dismissVolumeIndicator();
         stopMarquee();
