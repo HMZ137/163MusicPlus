@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   代码 / XML 里替代 ?attr/selectableItemBackground 的圆角版本。
-  系统那个是矩形 ripple，铺在圆角卡片上按下时会露出直角；这里用同半径的
-  圆角 mask 把涟漪裁进圆角里，透明底不影响原有卡片背景。
+
+  不用 ripple：只有 mask、没有 content item 的 ripple 在部分 API / 容器上会退化成矩形，
+  长按时按控件矩形铺开、四角是直角（需求方 2026-11-14 反馈「几乎所有圆角页面还是直角」）。
+  这里改成 state_pressed 直接切换成圆角 shape，四角必然圆；常态透明，不影响原有底色。
 -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="#33BB86FC">
-    <item android:id="@android:id/mask">
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="#FFFFFFFF" />
+            <solid android:color="#33BB86FC" />
             <corners android:radius="10dp" />
         </shape>
     </item>
-</ripple>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</selector>
