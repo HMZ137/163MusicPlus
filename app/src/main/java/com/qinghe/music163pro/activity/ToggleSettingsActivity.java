@@ -590,12 +590,30 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     /** 1016：随机播放切歌顺序（随机 / 列表顺序）在两种取值间切换。 */
+    /** 单选浮窗：与对比版仓库同一实现（MaterialAlertDialogBuilder + setSingleChoiceItems）。 */
+    private void showChoiceDialog(String title, String[] labels, int checked, IntPicker onPick) {
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    onPick.pick(which);
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private interface IntPicker {
+        void pick(int which);
+    }
+
     private void cycleRandomSkipMode() {
         boolean current = prefs.getBoolean(PREF_RANDOM_SKIP_RANDOM, false);
-        boolean next = !current;
-        prefs.edit().putBoolean(PREF_RANDOM_SKIP_RANDOM, next).apply();
-        updateRandomSkipModeValue();
-        com.qinghe.music163pro.util.UiKit.toast(this, "随机播放切歌顺序: " + (next ? "随机" : "列表顺序"));
+        showChoiceDialog("随机播放切歌顺序", new String[]{"列表顺序", "随机"}, current ? 1 : 0, which -> {
+            prefs.edit().putBoolean(PREF_RANDOM_SKIP_RANDOM, which == 1).apply();
+            updateRandomSkipModeValue();
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "随机播放切歌顺序: " + (which == 1 ? "随机" : "列表顺序"));
+        });
     }
 
     private void updateRandomSkipModeValue() {
@@ -611,10 +629,12 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             return;
         }
         boolean isCloud = prefs.getBoolean(PREF_FAV_MODE_CLOUD, false);
-        boolean newCloud = !isCloud;
-        prefs.edit().putBoolean(PREF_FAV_MODE_CLOUD, newCloud).apply();
-        updateFavModeValue();
-        com.qinghe.music163pro.util.UiKit.toast(this, "收藏模式已切换为: " + (newCloud ? "云端" : "本地"));
+        showChoiceDialog("收藏模式", new String[]{"本地", "云端"}, isCloud ? 1 : 0, which -> {
+            prefs.edit().putBoolean(PREF_FAV_MODE_CLOUD, which == 1).apply();
+            updateFavModeValue();
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "收藏模式: " + (which == 1 ? "云端" : "本地"));
+        });
     }
 
     /** 同步两个模式开关的勾选状态（互斥）：一次性设对并用 updatingSwitch 挡住互相触发。 */
@@ -642,10 +662,12 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
     private void cycleSleepTimerMode() {
         int current = prefs.getInt(PREF_SLEEP_TIMER_MODE, SLEEP_TIMER_TOTAL);
-        int next = (current + 1) % SLEEP_TIMER_LABELS.length;
-        prefs.edit().putInt(PREF_SLEEP_TIMER_MODE, next).apply();
-        updateSleepTimerModeValue();
-        com.qinghe.music163pro.util.UiKit.toast(this, "定时关闭模式: " + SLEEP_TIMER_LABELS[next]);
+        showChoiceDialog("定时关闭模式", SLEEP_TIMER_LABELS, current, which -> {
+            prefs.edit().putInt(PREF_SLEEP_TIMER_MODE, which).apply();
+            updateSleepTimerModeValue();
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "定时关闭模式: " + SLEEP_TIMER_LABELS[which]);
+        });
     }
 
     private void updateSleepTimerModeValue() {
@@ -658,17 +680,18 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     private void cycleSpeedMode() {
+        final String[] modeNames = {"音调不变", "音调改变且速度改变", "音调改变但速度不变"};
         int current = prefs.getInt("speed_mode", 0);
-        int next = (current + 1) % 3;
-        prefs.edit().putInt("speed_mode", next).apply();
-        MusicPlayerManager.getInstance().setSpeedMode(next);
-        updateSpeedModeValue();
-        String[] modeNames = {"音调不变", "音调改变且速度改变", "音调改变但速度不变"};
-        com.qinghe.music163pro.util.UiKit.toast(this, "变速模式: " + modeNames[next]);
-        if (next == 2) {
-            com.qinghe.music163pro.util.UiKit.toastLong(this,
-                    "注意：此模式变速幅度不能太大，否则播放可能会出问题（如有杂音等）");
-        }
+        showChoiceDialog("变速模式", modeNames, current, which -> {
+            prefs.edit().putInt("speed_mode", which).apply();
+            MusicPlayerManager.getInstance().setSpeedMode(which);
+            updateSpeedModeValue();
+            com.qinghe.music163pro.util.UiKit.toast(this, "变速模式: " + modeNames[which]);
+            if (which == 2) {
+                com.qinghe.music163pro.util.UiKit.toastLong(this,
+                        "注意：此模式变速幅度不能太大，否则播放可能会出问题（如有杂音等）");
+            }
+        });
     }
 
     private void updateSpeedModeValue() {
@@ -678,13 +701,13 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     private void cycleRecognitionMode() {
+        final String[] labels = {"手动暂停", "自动识别"};
         int current = prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO);
-        int next = (current + 1) % 2;
-        prefs.edit().putInt(PREF_RECOGNITION_MODE, next).apply();
-        updateRecognitionModeValue();
-        String[] labels = {"手动暂停", "自动识别"};
-        // 原来这里少了 .show()，提示从来没出现过；顺手换成统一样式
-        com.qinghe.music163pro.util.UiKit.toast(this, "听歌识曲模式: " + labels[next]);
+        showChoiceDialog("听歌识曲模式", labels, current, which -> {
+            prefs.edit().putInt(PREF_RECOGNITION_MODE, which).apply();
+            updateRecognitionModeValue();
+            com.qinghe.music163pro.util.UiKit.toast(this, "听歌识曲模式: " + labels[which]);
+        });
     }
 
     private void updateRecognitionModeValue() {
@@ -712,12 +735,13 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     private void cycleLyricScrollMode() {
+        final String[] labels = {"每行", "阻塞"};
         int current = prefs.getInt(PREF_LYRIC_SCROLL_MODE, LYRIC_MODE_BLOCK);
-        int next = (current + 1) % 2;
-        prefs.edit().putInt(PREF_LYRIC_SCROLL_MODE, next).apply();
-        updateLyricScrollModeValue();
-        String[] labels = {"每行", "阻塞"};
-        com.qinghe.music163pro.util.UiKit.toast(this, "歌词滚动模式: " + labels[next]);
+        showChoiceDialog("歌词滚动模式", labels, current, which -> {
+            prefs.edit().putInt(PREF_LYRIC_SCROLL_MODE, which).apply();
+            updateLyricScrollModeValue();
+            com.qinghe.music163pro.util.UiKit.toast(this, "歌词滚动模式: " + labels[which]);
+        });
     }
 
     private void updateLyricScrollModeValue() {
