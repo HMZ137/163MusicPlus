@@ -308,9 +308,10 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         }
         container.addView(buildSectionTitle("显示"));
 
-        // 页面缩放：循环切换档位。改完需要页面重建才会生效，所以切换后立刻 recreate。
+        // 页面缩放：按 dpi 档位循环（需求方 2026-11-14 要求把百分比改成 dpi）。
+        // 改完需要页面重建才会生效，所以切换后立刻 recreate。
         final TextView scaleValue = buildStepperRow(container, "界面缩放",
-                "100%",
+                UiScale.getDpi(this) + " dpi",
                 () -> {
                     UiScale.cycle(this);
                     recreate();
@@ -319,11 +320,12 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                     UiScale.cycle(this);
                     recreate();
                 });
-        scaleValue.setText(UiScale.getPercent(this) + "%");
+        scaleValue.setText(UiScale.getDpi(this) + " dpi");
         // 循环档位用整行点击更顺手，−/+ 只是备用入口
         scaleValue.setOnClickListener(v -> {
-            int percent = UiScale.cycle(this);
-            com.qinghe.music163pro.util.UiKit.toast(this, "界面缩放: " + percent + "%（重新进入页面后生效）");
+            int dpi = UiScale.cycle(this);
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "界面缩放: " + dpi + " dpi（重新进入页面后生效）");
             recreate();
         });
 

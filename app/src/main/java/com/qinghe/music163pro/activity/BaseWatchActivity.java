@@ -147,7 +147,7 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
      * 只在缩放 &gt; 100% 时启用 —— 100% 缩放下没有这个现象，不必平白多出空白。</p>
      */
     private void applyScrollBottomInset() {
-        if (UiScale.getPercent(this) <= 100) {
+        if (UiScale.getDpi(this) <= UiScale.BASE_DPI) {
             return;
         }
         final View content = findViewById(android.R.id.content);
