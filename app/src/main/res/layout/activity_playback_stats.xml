@@ -43,5 +43,5 @@
         android:paddingBottom="8dp"
         android:clickable="true"
         android:focusable="true"
-        android:background="?attr/selectableItemBackground" />
+        android:background="@drawable/bg_selectable_rounded" />
 </LinearLayout>

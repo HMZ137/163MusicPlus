@@ -60,7 +60,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         LinearLayout qrCard = new LinearLayout(this);
         qrCard.setOrientation(LinearLayout.VERTICAL);
         qrCard.setGravity(Gravity.CENTER_HORIZONTAL);
-        qrCard.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        qrCard.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(qrCard.getContext(), getResources().getColor(R.color.surface_elevated)));
         qrCard.setPadding(px(10), px(10), px(10), px(10));
         qrCard.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -71,6 +71,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(qrSize, qrSize);
         qrParams.gravity = Gravity.CENTER_HORIZONTAL;
         ivQrCode.setLayoutParams(qrParams);
+        // 二维码本身是方形，圆角底色会把四角露白，反而影响扫码；这里保持直角纯色。
         ivQrCode.setBackgroundColor(getResources().getColor(R.color.qr_background));
         ivQrCode.setPadding(px(4), px(4), px(4), px(4));
         qrCard.addView(ivQrCode);

@@ -164,21 +164,27 @@ public final class UiKit {
         tv.setClickable(true);
         tv.setFocusable(true);
         setDescriptionCollapsed(tv, true);
-        tv.setOnClickListener(v -> setDescriptionCollapsed(tv, tv.getMaxLines() != 1));
+        // 用 ellipsize 表达状态，不用 getMaxLines()：部分设备 / API 上 setSingleLine(false)
+        // 之后 getMaxLines() 未必按预期变化，会让「再点收起」永远走不到（点击像没反应）。
+        // 折叠态 ellipsize=END，展开态为 null，这个判据在 API 23~27 上稳定。
+        tv.setOnClickListener(v -> setDescriptionCollapsed(tv, tv.getEllipsize() == null));
     }
 
     /**
      * 折叠 / 展开一段说明文字。
      *
-     * <p>{@code setSingleLine(true)} 会把 maxLines 设为 1 并置于结尾省略；
-     * {@code setSingleLine(false)} 会把 maxLines 放开为 {@code Integer.MAX_VALUE}。</p>
+     * <p>显式写全 {@code maxLines} / {@code ellipsize} / {@code horizontallyScrolling}，
+     * 不依赖 {@code setSingleLine(false)} 的内部副作用 —— 展开态必须真的能换行，
+     * 否则「点了展开却还是一行省略」。</p>
      */
     public static void setDescriptionCollapsed(TextView tv, boolean collapsed) {
         if (tv == null) {
             return;
         }
         tv.setSingleLine(collapsed);
+        tv.setMaxLines(collapsed ? 1 : Integer.MAX_VALUE);
         tv.setEllipsize(collapsed ? android.text.TextUtils.TruncateAt.END : null);
+        tv.setHorizontallyScrolling(collapsed);
     }
 
     /** 遍历视图树，把所有 tag 为 {@link #TAG_COLLAPSIBLE_DESC} 的 TextView 接上折叠行为。 */
@@ -221,6 +227,17 @@ public final class UiKit {
     /** 卡片背景（圆角 {@link #DP_CARD_RADIUS}）。 */
     public static GradientDrawable card(Context c) {
         return rounded(c, COLOR_CARD, DP_CARD_RADIUS);
+    }
+
+    /**
+     * 圆角纯色背景 —— 用来替换 {@code View.setBackgroundColor()}。
+     *
+     * <p>选中态 / 当前项常常用 {@code setBackgroundColor(0x33BB86FC)} 直接刷一层纯色，
+     * 那是**矩形**：圆角卡片一按下就露出四个直角（需求方所谓「假圆角」）。
+     * 这里用同一套圆角半径生成 GradientDrawable，颜色完全一致，只是四角变圆。</p>
+     */
+    public static GradientDrawable roundedFill(Context c, int color) {
+        return rounded(c, color, DP_CARD_RADIUS);
     }
 
     /** 弹窗背景（圆角 {@link #DP_DIALOG_RADIUS}）。 */
@@ -327,10 +344,9 @@ public final class UiKit {
      * （纯文字标签没有底衬，仍需要按下涟漪作为反馈）。
      */
     private static void applySelectableItemBackground(Context c, View v) {
-        android.util.TypedValue out = new android.util.TypedValue();
-        if (c.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, out, true)
-                && out.resourceId != 0) {
-            v.setBackgroundResource(out.resourceId);
-        }
+        // 系统 ?attr/selectableItemBackground 是矩形 ripple，铺在圆角行上按下会露直角。
+        // 换成同半径圆角 mask 的版本，透明底不影响原有卡片背景。
+        v.setBackgroundResource(
+                com.qinghe.music163pro.R.drawable.bg_selectable_rounded);
     }
 }

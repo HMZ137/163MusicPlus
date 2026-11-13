@@ -133,7 +133,7 @@ public class BilibiliHistoryActivity extends BaseWatchActivity {
         item.setLayoutParams(params);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setPadding(px(12), px(10), px(12), px(10));
-        item.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        item.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(item.getContext(), getResources().getColor(R.color.surface_elevated)));
         item.setClickable(true);
         item.setFocusable(true);
         item.setOnClickListener(v -> openEntry(entry));

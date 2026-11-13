@@ -87,11 +87,6 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(
                 this, findViewById(R.id.tv_toggle_settings_title));
 
-        // 设置项下方的说明：过长先省略（…），点一下展开全文、再点收起。
-        // 状态不持久化 ⇒ 重新进入本页自动回到折叠态（需求方要求「重进再次折叠」）。
-        com.qinghe.music163pro.util.UiKit.makeDescriptionsCollapsible(
-                findViewById(R.id.layout_toggle_settings_content));
-
         // T1：按「用户会去哪里找」分区（页面数量不变，仅加小标题）
         addSectionHeader((android.view.View) findViewById(R.id.switch_local_only_mode).getParent(), "播放模式");
         addSectionHeader((android.view.View) findViewById(R.id.switch_keep_screen_on).getParent(), "屏幕与外观");
@@ -253,6 +248,19 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         // 界面缩放与歌词字号：这几项结构完全一样（标题 + 数值 + −/+ 或循环切换），
         // 用代码生成，免得在布局里堆四份重复的 XML。
         buildDisplaySettings();
+
+        // 折叠注册必须放在 buildDisplaySettings() 之后：那几行说明是代码动态 addView 的，
+        // 早注册时视图树里根本没有它们，所以「显示」分区的说明一直点不开。
+        // 状态不持久化 ⇒ 重新进入本页自动回到折叠态（需求方要求「重进再次折叠」）。
+        com.qinghe.music163pro.util.UiKit.makeDescriptionsCollapsible(
+                findViewById(R.id.layout_toggle_settings_content));
+    }
+
+    /** 代码自绘的说明文字：打上与 XML 相同的 tag + 折叠初态，交给 UiKit 统一注册。 */
+    private void markCollapsibleHint(TextView tv) {
+        tv.setTag(com.qinghe.music163pro.util.UiKit.TAG_COLLAPSIBLE_DESC);
+        tv.setSingleLine(true);
+        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
     }
 
     /** 界面缩放 + 原文/音译/翻译 三类歌词字号。 */
@@ -317,6 +325,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         backdropHint.setText("给歌词/音/译加半透明底，避免背景太亮看不清");
         backdropHint.setTextColor(getResources().getColor(R.color.text_secondary));
         backdropHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        markCollapsibleHint(backdropHint);
         backdropText.addView(backdropHint);
 
         backdropRow.addView(backdropText);
@@ -352,6 +361,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         fullscreenHint.setText("歌词层显示「全屏」按钮，可进入沉浸式大字歌词");
         fullscreenHint.setTextColor(getResources().getColor(R.color.text_secondary));
         fullscreenHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        markCollapsibleHint(fullscreenHint);
         fullscreenText.addView(fullscreenHint);
         fullscreenRow.addView(fullscreenText);
         com.google.android.material.switchmaterial.SwitchMaterial fullscreenSwitch =
@@ -390,6 +400,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         languageHint.setText("歌词词性着色 / 自动翻译；设置在「设置 → 高级歌词翻译」");
         languageHint.setTextColor(getResources().getColor(R.color.text_secondary));
         languageHint.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        markCollapsibleHint(languageHint);
         languageText.addView(languageHint);
         languageRow.addView(languageText);
         // 功能开关留在这里；详细设置（Key / 模型 / 缓存 / 图例）在「设置 → 高级歌词翻译」

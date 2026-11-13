@@ -158,7 +158,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -417,7 +416,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -462,7 +460,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -507,7 +504,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -552,7 +548,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -594,7 +589,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -663,7 +657,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 
@@ -707,7 +700,6 @@
                         android:textColor="@color/colorPrimary"
                         android:textSize="@dimen/watch_text_sub"
                         android:singleLine="true"
-                        android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
 

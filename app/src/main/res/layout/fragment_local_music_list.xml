@@ -24,7 +24,7 @@
         android:id="@+id/tv_status_row"
         android:layout_width="match_parent"
         android:layout_height="32dp"
-        android:background="?attr/selectableItemBackground"
+        android:background="@drawable/bg_selectable_rounded"
         android:clickable="true"
         android:ellipsize="end"
         android:focusable="true"
@@ -39,7 +39,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:divider="@color/divider"
+        android:divider="@null"
         android:dividerHeight="0.5dp" />
 
     <TextView

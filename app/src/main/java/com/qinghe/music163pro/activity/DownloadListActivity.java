@@ -191,8 +191,18 @@ public class DownloadListActivity extends BaseWatchActivity
                     TextView tvName = view.findViewById(R.id.tv_item_name);
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getDisplayName());
-                    tvArtist.setText(song.getArtist());
+                    if (song.isBilibili()) {
+                        // B 站下载：info.json 的 name 是内部文件名（studio_video_xxx），
+                        // 真正的视频标题写在 album 里。按 name 显示会变成一串认不出的 ID，
+                        // 需求方据此反馈「下载管理不显示 B 站下载」。这里改用视频标题，
+                        // 并在副标题标明来源；只改展示，不动 Song 数据（不影响目录定位/删除/播放）。
+                        tvName.setText(displayTitleOf(song));
+                        String up = song.getArtist() == null ? "" : song.getArtist();
+                        tvArtist.setText("B站 · " + up);
+                    } else {
+                        tvName.setText(song.getDisplayName());
+                        tvArtist.setText(song.getArtist());
+                    }
                     if (ivCover != null) {
                         // coverUrl may be local file:// path or remote URL
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
@@ -425,9 +435,23 @@ public class DownloadListActivity extends BaseWatchActivity
         if (byKey != 0) {
             return byKey;
         }
-        String leftName = left == null || left.getName() == null ? "" : left.getName();
-        String rightName = right == null || right.getName() == null ? "" : right.getName();
-        return com.qinghe.music163pro.util.ScriptSort.TEXT_ORDER.compare(leftName, rightName);
+        return com.qinghe.music163pro.util.ScriptSort.TEXT_ORDER.compare(
+                displayTitleOf(left), displayTitleOf(right));
+    }
+
+    /**
+     * 列表里真正该显示的标题。B 站下载的 {@code name} 是内部文件名
+     * （{@code studio_video_xxx}），视频标题在 {@code album}，所以那类条目一律用 album。
+     * 展示与排序共用这一个口径，避免「按 A-Z 找视频标题却找不到」。
+     */
+    private static String displayTitleOf(Song song) {
+        if (song == null) {
+            return "";
+        }
+        if (song.isBilibili() && song.getAlbum() != null && !song.getAlbum().isEmpty()) {
+            return song.getAlbum();
+        }
+        return song.getName() == null ? "" : song.getName();
     }
 
     private static String sortKeyOf(Song song, int mode) {
@@ -440,7 +464,7 @@ public class DownloadListActivity extends BaseWatchActivity
             case SORT_ALBUM:
                 return song.getAlbum() == null ? "" : song.getAlbum();
             default:
-                return song.getName() == null ? "" : song.getName();
+                return displayTitleOf(song);
         }
     }
 

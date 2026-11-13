@@ -54,7 +54,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        card.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(card.getContext(), getResources().getColor(R.color.surface_elevated)));
         card.setPadding(px(12), px(12), px(12), px(12));
         root.addView(card);
 
@@ -68,7 +68,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
         etKeyword.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
         ((LinearLayout.LayoutParams) etKeyword.getLayoutParams()).topMargin = px(6);
-        etKeyword.setBackgroundColor(getResources().getColor(R.color.bg_dark));
+        etKeyword.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etKeyword.getContext(), getResources().getColor(R.color.bg_dark)));
         etKeyword.setHint("输入标题、UP主、关键词");
         etKeyword.setHintTextColor(getResources().getColor(R.color.text_disabled));
         etKeyword.setTextColor(getResources().getColor(R.color.text_primary));
@@ -149,7 +149,7 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
         item.setLayoutParams(params);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setPadding(px(12), px(10), px(12), px(10));
-        item.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        item.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(item.getContext(), getResources().getColor(R.color.surface_elevated)));
         item.setClickable(true);
         item.setFocusable(true);
         item.setOnClickListener(v -> {

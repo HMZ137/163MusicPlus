@@ -74,6 +74,7 @@
                         android:singleLine="true"
                         android:ellipsize="end" />
                     <TextView
+                        android:tag="collapsible_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/settings_loudness_balance_desc"
@@ -121,6 +122,7 @@
                         android:singleLine="true"
                         android:ellipsize="end" />
                     <TextView
+                        android:tag="collapsible_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/scan_dirs_hint"
@@ -164,6 +166,7 @@
                         android:singleLine="true"
                         android:ellipsize="end" />
                     <TextView
+                        android:tag="collapsible_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/settings_loudness_desc"
@@ -302,6 +305,7 @@
                         android:singleLine="true"
                         android:ellipsize="end" />
                     <TextView
+                        android:tag="collapsible_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/settings_hidden_tracks_desc"

@@ -2,4 +2,10 @@
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#40FFFFFF">
     <item android:drawable="@drawable/bg_back_button" />
+    <!-- 圆角 mask：涟漪只在圆角内扩散；缺了它按下时会露出矩形直角 -->
+    <item android:id="@android:id/mask">
+            <shape android:shape="oval">
+                <solid android:color="#FFFFFFFF" />
+            </shape>
+    </item>
 </ripple>

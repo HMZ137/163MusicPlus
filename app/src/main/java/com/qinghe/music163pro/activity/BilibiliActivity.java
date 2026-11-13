@@ -111,7 +111,7 @@ public class BilibiliActivity extends BaseWatchActivity {
         row.setPadding(px(14), 0, px(14), 0);
         row.setClickable(true);
         row.setFocusable(true);
-        row.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), getResources().getColor(R.color.surface_elevated)));
         row.setOnClickListener(v -> onClick.run());
 
         ImageView icon = new ImageView(this);

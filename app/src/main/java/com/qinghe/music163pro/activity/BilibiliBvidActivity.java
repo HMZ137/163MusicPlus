@@ -68,7 +68,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         LinearLayout inputCard = new LinearLayout(this);
         inputCard.setOrientation(LinearLayout.VERTICAL);
-        inputCard.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        inputCard.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(inputCard.getContext(), getResources().getColor(R.color.surface_elevated)));
         inputCard.setPadding(px(10), px(10), px(10), px(10));
         container.addView(inputCard);
 
@@ -84,7 +84,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         etBvid = new EditText(this);
         etBvid.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, px(44)));
-        etBvid.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        etBvid.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etBvid.getContext(), getResources().getColor(R.color.surface_elevated)));
         etBvid.setHint("BV1xxxxxxxxx");
         etBvid.setTextColor(getResources().getColor(R.color.text_primary));
         etBvid.setHintTextColor(getResources().getColor(R.color.text_disabled));
@@ -194,7 +194,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                     row.setPadding(px(12), px(10), px(12), px(10));
                     row.setClickable(true);
                     row.setFocusable(true);
-                    row.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+                    row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), getResources().getColor(R.color.surface_elevated)));
                     row.setOnClickListener(v -> playAll(index));
 
                     TextView tvNum = new TextView(BilibiliBvidActivity.this);

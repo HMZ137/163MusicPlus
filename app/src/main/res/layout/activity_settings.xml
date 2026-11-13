@@ -127,6 +127,7 @@
                         android:singleLine="true"
                         android:ellipsize="end" />
                     <TextView
+                        android:tag="collapsible_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/settings_local_music_desc"

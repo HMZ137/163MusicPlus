@@ -29,6 +29,10 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_local_music_settings);
 
+        // 与 SettingsActivity 同口径：本页 4 处说明此前被截断却点不开，统一接上折叠展开。
+        com.qinghe.music163pro.util.UiKit.makeDescriptionsCollapsible(
+                findViewById(android.R.id.content));
+
         View titleBar = findViewById(R.id.layout_local_music_settings_title_bar);
         WatchBackButton.applyTitleBarInset(this, titleBar);
 

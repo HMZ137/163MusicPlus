@@ -284,7 +284,7 @@ public final class MultiSelectController {
 
         LinearLayout bar = new LinearLayout(activity);
         bar.setOrientation(LinearLayout.VERTICAL);
-        bar.setBackgroundColor(0xF21E1E1E);
+        bar.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(bar.getContext(), 0xF21E1E1E));
         bar.setPadding(px(6), px(4), px(6), px(5));
         bar.setClickable(true);
 
@@ -328,6 +328,11 @@ public final class MultiSelectController {
         final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         params.gravity = Gravity.BOTTOM;
+        // 左右留白：动作栏本身是圆角 drawable，贴满屏宽时左右两个圆角被切掉，
+        // 看起来仍是一条直角横条（实机截图确认）。
+        params.leftMargin = px(8);
+        params.rightMargin = px(8);
+        params.bottomMargin = px(4);
 
         content.addView(bar, params);
         actionBar = bar;

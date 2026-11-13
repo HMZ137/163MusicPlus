@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  代码 / XML 里替代 ?attr/selectableItemBackground 的圆角版本。
+  系统那个是矩形 ripple，铺在圆角卡片上按下时会露出直角；这里用同半径的
+  圆角 mask 把涟漪裁进圆角里，透明底不影响原有卡片背景。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33BB86FC">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</ripple>

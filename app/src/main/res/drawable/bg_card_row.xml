@@ -1,12 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  列表行卡片底：ripple + inset 内缩（左右 6dp / 上下 3dp）。
+  列表行卡片底：常态深色 / 按下淡紫，两态都是**同一个内缩圆角形状**。
+
+  为什么不用 ripple：ripple 的涟漪是画在 View bounds 里的，即使加了圆角 mask，
+  不同 API / 不同父容器下裁剪行为并不一致 —— 实机长按会看到高亮铺满整行、
+  四角变直角（需求方 2026-11-14 反馈「长按是直角、选中后是圆角」）。
+  改成 selector 后按下态直接换成圆角 shape，四角必然圆，没有裁剪依赖。
+
   为什么必须用 inset 而不是 layout_margin：这些行都跑在 ListView 里，
   AbsListView.LayoutParams 不支持 margin，XML 里的 layout_margin 会被静默丢弃；
   inset 是 drawable 自身内缩，在 ListView 里依然生效，行与行之间才会露出页面底色。
 -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="#33BB86FC">
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <inset
+            android:insetLeft="6dp"
+            android:insetTop="3dp"
+            android:insetRight="6dp"
+            android:insetBottom="3dp">
+            <shape android:shape="rectangle">
+                <solid android:color="#33BB86FC" />
+                <corners android:radius="10dp" />
+            </shape>
+        </inset>
+    </item>
     <item>
         <inset
             android:insetLeft="6dp"
@@ -19,4 +36,4 @@
             </shape>
         </inset>
     </item>
-</ripple>
+</selector>

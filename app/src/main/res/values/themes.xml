@@ -13,6 +13,9 @@
         <item name="android:navigationBarColor">@color/surface</item>
         <item name="android:windowBackground">@color/bg_dark</item>
         <!-- Ripple / selection -->
+        <!-- 系统 listSelector 是矩形高亮，长按圆角行时会露出直角；
+             按下反馈改由各 item 自己的圆角 ripple 提供。 -->
+        <item name="android:listSelector">@null</item>
         <item name="android:colorControlHighlight">#33BB86FC</item>
     </style>
 

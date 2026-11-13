@@ -2513,7 +2513,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             textView.setTextColor(0xFFFFFFFF);
             textView.setTextSize(12);
             textView.setPadding(dp(10), dp(8), dp(10), dp(8));
-            textView.setBackgroundColor(0xFF2D2D2D);
+            textView.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(textView.getContext(), 0xFF2D2D2D));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             params.bottomMargin = dp(4);
@@ -3873,7 +3873,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(8), dp(6), dp(8), dp(6));
-        row.setBackgroundColor(0xFF26262B);
+        row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), 0xFF26262B));
 
         TextView tv = new TextView(this);
         tv.setText("心动续播中 · 已续 " + playerManager.getHeartbeatCount() + " 首");
@@ -3999,7 +3999,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             itemLayout.setFocusable(true);
 
             if (realIndex == curReal) {
-                itemLayout.setBackgroundColor(0xFF2D2D2D);
+                itemLayout.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(itemLayout.getContext(), 0xFF2D2D2D));
             }
 
             ImageView ivCover = new ImageView(this);
@@ -4318,7 +4318,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackgroundColor(Math.abs(currentSpeed - speed) < 0.01f ? 0xFFBB86FC : 0xFF2D2D2D);
+            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), Math.abs(currentSpeed - speed) < 0.01f ? 0xFFBB86FC : 0xFF2D2D2D));
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -4355,7 +4355,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         etSpeed.setHintTextColor(0xFF888888);
         etSpeed.setTextSize(14);
         etSpeed.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        etSpeed.setBackgroundColor(0xFF2D2D2D);
+        etSpeed.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etSpeed.getContext(), 0xFF2D2D2D));
         etSpeed.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -4369,7 +4369,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnApply.setTextSize(14);
         btnApply.setGravity(Gravity.CENTER);
         btnApply.setPadding(dp(12), dp(8), dp(12), dp(8));
-        btnApply.setBackgroundColor(0xFFBB86FC);
+        btnApply.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnApply.getContext(), 0xFFBB86FC));
         btnApply.setClickable(true);
         btnApply.setFocusable(true);
         btnApply.setOnClickListener(v -> {
@@ -4532,7 +4532,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
-            row.setBackgroundColor(isSelected ? 0x33BB86FC : 0xFF2D2D2D);
+            row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), isSelected ? 0x33BB86FC : 0xFF2D2D2D));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             rowParams.bottomMargin = dp(4);
@@ -4641,7 +4641,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
             int bgColor = disabledForSelection ? 0xFF222222 : (isSelected ? 0x33BB86FC : 0xFF2D2D2D);
-            row.setBackgroundColor(bgColor);
+            row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), bgColor));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             rowParams.bottomMargin = dp(4);
@@ -5323,7 +5323,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         modeBtn.setTextSize(13);
         modeBtn.setGravity(Gravity.CENTER);
         modeBtn.setPadding(0, dp(10), 0, dp(10));
-        modeBtn.setBackgroundColor(0xFF2D2D2D);
+        modeBtn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(modeBtn.getContext(), 0xFF2D2D2D));
         LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         modeParams.bottomMargin = dp(8);
@@ -5351,7 +5351,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackgroundColor(0xFF2D2D2D);
+            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), 0xFF2D2D2D));
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -5389,7 +5389,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         etSeconds.setHintTextColor(0xFF888888);
         etSeconds.setTextSize(14);
         etSeconds.setInputType(InputType.TYPE_CLASS_NUMBER);
-        etSeconds.setBackgroundColor(0xFF2D2D2D);
+        etSeconds.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etSeconds.getContext(), 0xFF2D2D2D));
         etSeconds.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -5403,7 +5403,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCustom.setTextSize(14);
         btnCustom.setGravity(Gravity.CENTER);
         btnCustom.setPadding(dp(12), dp(8), dp(12), dp(8));
-        btnCustom.setBackgroundColor(0xFFBB86FC);
+        btnCustom.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnCustom.getContext(), 0xFFBB86FC));
         btnCustom.setClickable(true);
         btnCustom.setFocusable(true);
         btnCustom.setOnClickListener(v -> {
@@ -5505,7 +5505,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCancel.setTextSize(14);
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setPadding(0, dp(10), 0, dp(10));
-        btnCancel.setBackgroundColor(0xFFBB86FC);
+        btnCancel.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnCancel.getContext(), 0xFFBB86FC));
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         btnCancel.setLayoutParams(cancelParams);
