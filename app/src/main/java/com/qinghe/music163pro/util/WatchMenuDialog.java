@@ -83,7 +83,7 @@ public final class WatchMenuDialog {
             TextView tvTitle = new TextView(context);
             tvTitle.setText(title);
             tvTitle.setTextColor(0xFFFFFFFF);
-            tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
             tvTitle.setTypeface(null, Typeface.BOLD);
             tvTitle.setSingleLine(true);
             tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -137,7 +137,7 @@ public final class WatchMenuDialog {
 
             TextView label = new TextView(context);
             label.setText(items[i]);
-            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
             label.setSingleLine(true);
             label.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if (danger) {
@@ -179,7 +179,7 @@ public final class WatchMenuDialog {
         TextView cancel = new TextView(context);
         cancel.setText("取消");
         cancel.setTextColor(0xFFB0B0B0);
-        cancel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        cancel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         cancel.setGravity(Gravity.CENTER);
         cancel.setPadding(0, UiKit.dp(context, 10), 0, UiKit.dp(context, 10));
         cancel.setClickable(true);

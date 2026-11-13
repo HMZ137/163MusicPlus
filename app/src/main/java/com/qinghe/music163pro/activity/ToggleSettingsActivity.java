@@ -591,15 +591,18 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
     /** 1016：随机播放切歌顺序（随机 / 列表顺序）在两种取值间切换。 */
     /** 单选浮窗：与对比版仓库同一实现（MaterialAlertDialogBuilder + setSingleChoiceItems）。 */
+    /**
+     * 单选浮窗。
+     *
+     * <p><b>为什么不用 MaterialAlertDialogBuilder</b>：那个组件按 M3 规范最小宽度 280dp，
+     * 本机屏只有 378px（≈189dp），实测会被压成「竖排单字 + 选项被裁」，`setLayout` 也压不住。
+     * 改用项目自绘的 {@link com.qinghe.music163pro.util.WatchMenuDialog}：尺寸跟随屏幕、
+     * 当前项有主色条标记，点一项即生效。</p>
+     */
     private void showChoiceDialog(String title, String[] labels, int checked, IntPicker onPick) {
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-                .setTitle(title)
-                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    dialog.dismiss();
-                    onPick.pick(which);
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, title, labels, checked,
+                com.qinghe.music163pro.util.WatchMenuDialog.NO_DANGER,
+                which -> onPick.pick(which));
     }
 
     private interface IntPicker {

@@ -268,7 +268,7 @@ public final class WatchPopup {
         TextView tv = new TextView(activity);
         tv.setText(title);
         tv.setTextColor(0xFFFFFFFF);
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textTitlePx(activity));
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.sp(activity, 12f));
         tv.setTypeface(null, android.graphics.Typeface.BOLD);
         // 参考图（浮窗1/浮窗2）：标题左对齐，而不是居中
         tv.setGravity(Gravity.START);
@@ -374,7 +374,7 @@ public final class WatchPopup {
         TextView button = new TextView(activity);
         button.setText(btn.label);
         button.setTextColor(btn.style == STYLE_DANGER ? 0xFFCF6679 : UiKit.COLOR_ACCENT);
-        button.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textBodyPx(activity));
+        button.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.sp(activity, 12f));
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(14), dp(8), dp(14), dp(8));
         button.setBackgroundResource(R.drawable.bg_selectable_rounded);
