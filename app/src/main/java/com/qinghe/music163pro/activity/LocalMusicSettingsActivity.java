@@ -5,7 +5,7 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.LoudnessBalance;
 import com.qinghe.music163pro.util.LoudnessScan;
@@ -37,7 +37,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
         WatchBackButton.applyTitleBarInset(this, titleBar);
 
         // ==================== F5：响度平衡总开关 ====================
-        SwitchMaterial swLoudnessBalance = findViewById(R.id.switch_loudness_balance);
+        MaterialSwitch swLoudnessBalance = findViewById(R.id.switch_loudness_balance);
         if (swLoudnessBalance != null) {
             swLoudnessBalance.setChecked(LoudnessBalance.isEnabled(this));
             swLoudnessBalance.setOnCheckedChangeListener((buttonView, isChecked) ->

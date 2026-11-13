@@ -12,7 +12,7 @@ import android.widget.Toast;
 
 
 import com.google.android.material.materialswitch.MaterialSwitch;
-import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.LyricSettings;
@@ -21,7 +21,7 @@ import com.qinghe.music163pro.util.UiScale;
 
 /**
  * Toggle settings activity - contains boolean/toggle options:
- * - Keep screen on (SwitchMaterial)
+ * - Keep screen on (MaterialSwitch)
  * - Favorites mode local/cloud (cyclic selection)
  * - Sleep timer mode total/net playback (cyclic selection)
  * - Speed mode 3-value cyclic row (tap to cycle)
@@ -57,13 +57,13 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     private static final int FAV_MODE_LOCAL = 0;
     private static final int FAV_MODE_CLOUD = 1;
 
-    private SwitchMaterial switchKeepScreenOn;
-    private SwitchMaterial switchSleepTimerExitApp;
-    private SwitchMaterial switchOledBurnProtection;
-    private SwitchMaterial switchLocalOnlyMode;
-    private SwitchMaterial switchOnlineOnlyMode;
-    private SwitchMaterial switchUseWatchApi;
-    private SwitchMaterial switchSkipTrialSongs;
+    private MaterialSwitch switchKeepScreenOn;
+    private MaterialSwitch switchSleepTimerExitApp;
+    private MaterialSwitch switchOledBurnProtection;
+    private MaterialSwitch switchLocalOnlyMode;
+    private MaterialSwitch switchOnlineOnlyMode;
+    private MaterialSwitch switchUseWatchApi;
+    private MaterialSwitch switchSkipTrialSongs;
     /** 应用内返回手势（M3 胶囊开关，与参考图一致）。 */
     private MaterialSwitch switchBackGesture;
     /** 子页面浮动返回按钮的显隐。 */
@@ -378,7 +378,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
         backdropRow.addView(backdropText);
 
-        SwitchMaterial backdropSwitch = new SwitchMaterial(this);
+        MaterialSwitch backdropSwitch = new MaterialSwitch(this);
         backdropSwitch.setChecked(LyricSettings.isBackdropEnabled(this));
         backdropSwitch.setOnCheckedChangeListener((button, checked) ->
                 LyricSettings.setBackdropEnabled(this, checked));
@@ -412,8 +412,8 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         markCollapsibleHint(fullscreenHint);
         fullscreenText.addView(fullscreenHint);
         fullscreenRow.addView(fullscreenText);
-        com.google.android.material.switchmaterial.SwitchMaterial fullscreenSwitch =
-                new com.google.android.material.switchmaterial.SwitchMaterial(this);
+        com.google.android.material.materialswitch.MaterialSwitch fullscreenSwitch =
+                new com.google.android.material.materialswitch.MaterialSwitch(this);
         fullscreenSwitch.setChecked(LyricSettings.isFullscreenButtonEnabled(this));
         fullscreenSwitch.setOnCheckedChangeListener((btn, checked) -> {
             if (updatingSwitch) {
@@ -452,8 +452,8 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         languageText.addView(languageHint);
         languageRow.addView(languageText);
         // 功能开关留在这里；详细设置（Key / 模型 / 缓存 / 图例）在「设置 → 高级歌词翻译」
-        com.google.android.material.switchmaterial.SwitchMaterial languageSwitch =
-                new com.google.android.material.switchmaterial.SwitchMaterial(this);
+        com.google.android.material.materialswitch.MaterialSwitch languageSwitch =
+                new com.google.android.material.materialswitch.MaterialSwitch(this);
         languageSwitch.setChecked(
                 com.qinghe.music163pro.util.AiLyricSettings.isEnabled(this));
         languageSwitch.setOnCheckedChangeListener((btn, checked) -> {

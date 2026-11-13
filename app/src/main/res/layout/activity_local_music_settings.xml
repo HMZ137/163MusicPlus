@@ -83,10 +83,15 @@
                         android:maxLines="1"
                         android:ellipsize="end" />
                 </LinearLayout>
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_loudness_balance"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- L6：自定义扫描目录管理（文档 L6 改动要点 3：入口就在本页之下） -->

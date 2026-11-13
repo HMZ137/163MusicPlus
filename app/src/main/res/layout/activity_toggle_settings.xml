@@ -77,10 +77,15 @@
                         android:ellipsize="end" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_local_only_mode"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- 纯在线模式：与「本地播放模式」互斥。隐藏所有本地/离线功能，但**下载管理保留** -->
@@ -118,10 +123,15 @@
                         android:tag="collapsible_desc"
                         android:ellipsize="end" />
                 </LinearLayout>
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_online_only_mode"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- 1016 合并：随机播放切歌顺序（随机 / 列表顺序，点按循环；只在随机播放模式下影响上下键） -->
@@ -205,10 +215,15 @@
                         android:ellipsize="end" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_keep_screen_on"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- OLED 防烧屏：SwitchMaterial row -->
@@ -248,10 +263,15 @@
                         android:ellipsize="end" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_oled_burn_protection"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <LinearLayout
@@ -290,10 +310,15 @@
                         android:ellipsize="end" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_sleep_timer_exit_app"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- 应用内返回手势：左 → 右滑返回上一页（主界面除外）。实现见 util/BackGesture -->
@@ -340,7 +365,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textOn=""
-                    android:textOff="" />
+                    android:textOff="" 
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- 返回按钮显隐：加了手势之后，按钮可以收起来，只靠手势/系统返回 -->
@@ -387,7 +415,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textOn=""
-                    android:textOff="" />
+                    android:textOff="" 
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- 1016 合并：使用手表解析接口（试听歌曲先用手表网关拿完整链接，失败回退试听） -->
@@ -427,10 +458,15 @@
                         android:ellipsize="end" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_use_watch_api"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- 1016 合并：跳过试听歌曲（仅可试听的歌自动跳过，跳过时不提示） -->
@@ -470,10 +506,15 @@
                         android:ellipsize="end" />
                 </LinearLayout>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switch_skip_trial_songs"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content" 
+                    android:textOn=""
+                    android:textOff=""
+                    android:scaleX="0.8"
+                    android:scaleY="0.8"
+                    />
             </LinearLayout>
 
             <!-- Favorites mode: cyclic selection row (本地/云端) -->
