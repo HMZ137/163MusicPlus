@@ -334,22 +334,20 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
                 UiScale.getFontPercent(this) + "%");
         final LinearLayout fontRow = (LinearLayout) fontValue.getParent();
         fontRow.setOnClickListener(v -> {
-            String[] labels = new String[UiScale.FONT_STEPS.length];
-            int checked = 0;
-            int current = UiScale.getFontPercent(this);
-            for (int i = 0; i < UiScale.FONT_STEPS.length; i++) {
-                labels[i] = UiScale.FONT_STEPS[i] + "%";
-                if (UiScale.FONT_STEPS[i] == current) {
-                    checked = i;
+            int percent = UiScale.getFontPercent(this);
+            // 需求方 2026-11-14：字号也自己填（与界面缩放一致），不要档位浮窗
+            com.qinghe.music163pro.util.WatchPopup.input(this, "页面字号（%）",
+                    "100 为原始大小；确认后自动保存并生效", "%",
+                    String.valueOf(percent), "确定", text -> {
+                try {
+                    int value = Integer.parseInt(text.trim());
+                    // 下限 80：再小看不清；上限 200 防止文字溢出布局
+                    value = Math.max(80, Math.min(200, value));
+                    com.qinghe.music163pro.util.UiScale.setFontPercent(this, value);
+                    recreate();
+                } catch (NumberFormatException ignored) {
                 }
-            }
-            com.qinghe.music163pro.util.WatchMenuDialog.show(this, "页面字号", labels, checked,
-                    com.qinghe.music163pro.util.WatchMenuDialog.NO_DANGER,
-                    which -> {
-                        com.qinghe.music163pro.util.UiScale.setFontPercent(this,
-                                UiScale.FONT_STEPS[which]);
-                        recreate();
-                    });
+            });
         });
 
         // 歌词字号：音 / 词 / 译 各一个
