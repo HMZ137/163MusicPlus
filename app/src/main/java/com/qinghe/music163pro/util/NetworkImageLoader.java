@@ -92,17 +92,18 @@ public final class NetworkImageLoader {
         MEMORY_CACHE.evictAll();
     }
 
-    /** 把位图包成圆角 drawable：加载出真封面后也保持圆角（之前只有占位背景是圆角）。 */
-    private static android.graphics.drawable.Drawable rounded(ImageView imageView, Bitmap bitmap) {
-        android.content.Context ctx = imageView.getContext();
-        androidx.core.graphics.drawable.RoundedBitmapDrawable drawable =
-                androidx.core.graphics.drawable.RoundedBitmapDrawableFactory.create(
-                        ctx.getResources(), bitmap);
-        drawable.setCornerRadius(
-                com.qinghe.music163pro.util.UiKit.DP_CARD_RADIUS
-                        * ctx.getResources().getDisplayMetrics().density);
-        drawable.setAntiAlias(true);
-        return drawable;
+    /**
+     * 给封面 ImageView 挂「恒定圆角」裁剪。
+     *
+     * <p>之前用 RoundedBitmapDrawable 按 UiKit.DP_CARD_RADIUS 裁位图，但源图是几百像素的
+     * 大图，缩到缩略图尺寸后圆角被同比缩小（需求方 2026-11-14 截图：歌单封面圆角明显
+     * 小于卡片）。改用 clipToOutline：View 级裁剪与 Bitmap 尺寸无关，显示圆角恒定。</p>
+     */
+    private static void applyRoundedOutline(ImageView imageView) {
+        imageView.setClipToOutline(true);
+        if (imageView.getBackground() == null) {
+            imageView.setBackgroundResource(com.qinghe.music163pro.R.drawable.bg_cover_rounded);
+        }
     }
 
     public static void load(ImageView imageView, String imageUrl) {
@@ -114,6 +115,7 @@ public final class NetworkImageLoader {
                 && imageView.getDrawable() != null) {
             return;
         }
+        applyRoundedOutline(imageView);
         imageView.setTag(imageUrl);
         imageView.setImageDrawable(null);
         if (imageUrl == null || imageUrl.trim().isEmpty()) {
@@ -121,7 +123,7 @@ public final class NetworkImageLoader {
         }
         Bitmap cached = MEMORY_CACHE.get(imageUrl);
         if (cached != null) {
-            imageView.setImageDrawable(rounded(imageView, cached));
+            imageView.setImageBitmap(cached);
             return;
         }
         synchronized (ACTIVE_REQUESTS) {
@@ -157,7 +159,7 @@ public final class NetworkImageLoader {
                     final ImageView target = view;
                     target.post(() -> {
                         if (finalBitmap != null && imageUrl.equals(target.getTag())) {
-                            target.setImageDrawable(rounded(target, finalBitmap));
+                            target.setImageBitmap(finalBitmap);
                         }
                     });
                 }
