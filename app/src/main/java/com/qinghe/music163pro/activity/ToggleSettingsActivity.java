@@ -328,6 +328,30 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             });
         });
 
+        // 页面字号：与界面缩放独立，只放大文字（fontScale），不动 dp 布局。
+        // 需求方 2026-11-14：控制其他页面的字体大小。
+        final TextView fontValue = buildValueRow(container, "页面字号",
+                UiScale.getFontPercent(this) + "%");
+        final LinearLayout fontRow = (LinearLayout) fontValue.getParent();
+        fontRow.setOnClickListener(v -> {
+            String[] labels = new String[UiScale.FONT_STEPS.length];
+            int checked = 0;
+            int current = UiScale.getFontPercent(this);
+            for (int i = 0; i < UiScale.FONT_STEPS.length; i++) {
+                labels[i] = UiScale.FONT_STEPS[i] + "%";
+                if (UiScale.FONT_STEPS[i] == current) {
+                    checked = i;
+                }
+            }
+            com.qinghe.music163pro.util.WatchMenuDialog.show(this, "页面字号", labels, checked,
+                    com.qinghe.music163pro.util.WatchMenuDialog.NO_DANGER,
+                    which -> {
+                        com.qinghe.music163pro.util.UiScale.setFontPercent(this,
+                                UiScale.FONT_STEPS[which]);
+                        recreate();
+                    });
+        });
+
         // 歌词字号：音 / 词 / 译 各一个
         final TextView originalValue = buildStepperRow(container, "歌词字号·原文",
                 "", () -> stepFont(0, -1), () -> stepFont(0, 1));

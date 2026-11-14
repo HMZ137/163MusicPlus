@@ -95,6 +95,35 @@ public final class UiScale {
         return next;
     }
 
+    /** 页面字号档位（百分比，作用于 fontScale——只放大 sp 文字，不动 dp 布局）。 */
+    public static final int[] FONT_STEPS = {100, 110, 120, 130};
+    private static final String KEY_FONT_PERCENT = "ui_font_percent";
+    private static volatile int cachedFontPercent = -1;
+
+    /** 当前页面字号百分比（默认 100）。 */
+    public static int getFontPercent(Context context) {
+        int cached = cachedFontPercent;
+        if (cached > 0) {
+            return cached;
+        }
+        if (context == null) {
+            return FONT_STEPS[0];
+        }
+        int percent = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_FONT_PERCENT, FONT_STEPS[0]);
+        cachedFontPercent = percent;
+        return percent;
+    }
+
+    public static void setFontPercent(Context context, int percent) {
+        if (context == null) {
+            return;
+        }
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putInt(KEY_FONT_PERCENT, percent).apply();
+        cachedFontPercent = percent;
+    }
+
     /** 相对基准 dpi 的倍数（给按屏幕宽度换算的 {@link WatchUiUtils#px} 用）。 */
     public static float getScale(Context context) {
         return getDpi(context) / (float) BASE_DPI;
@@ -117,12 +146,15 @@ public final class UiScale {
             if (baseDensityDpi <= 0) {
                 baseDensityDpi = resources.getDisplayMetrics().densityDpi;
             }
-            if (dpi == baseDensityDpi) {
+            // 页面字号（需求方 2026-11-14）：fontScale 只放大 sp 文字、不动 dp 布局，
+            // 与 dpi 缩放（整体缩放）是两个独立维度，叠加使用。
+            float fontScale = configuration.fontScale * getFontPercent(base) / 100f;
+            if (dpi == baseDensityDpi
+                    && Math.abs(fontScale - configuration.fontScale) < 0.001f) {
                 return base;
             }
             configuration.densityDpi = dpi;
-            // sp 依赖 densityDpi（scaledDensity = density × fontScale），改 dpi 后文字会自动
-            // 跟着缩放，所以这里**不再额外乘 fontScale**（否则文字会被放大两次）。
+            configuration.fontScale = fontScale;
             return base.createConfigurationContext(configuration);
         } catch (Exception e) {
             // 缩放只是观感功能，出问题就退回原始 Context，别把页面带崩

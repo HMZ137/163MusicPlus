@@ -52,12 +52,13 @@
                 android:textStyle="bold"
                 android:visibility="gone" />
 
-            <TextView
+            <com.qinghe.music163pro.util.MarqueeTextView
                 android:id="@+id/tv_item_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:ellipsize="end"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
                 android:singleLine="true"
                 android:textColor="@color/text_primary"
                 android:textSize="@dimen/watch_text_body" />
