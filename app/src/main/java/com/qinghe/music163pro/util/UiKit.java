@@ -44,7 +44,7 @@ public final class UiKit {
     /** 标签行高度（与「收藏」页一致）。 */
     public static final int DP_TAB_ROW_HEIGHT = 32;
 
-    public static final int DP_CARD_RADIUS = 14;
+    public static final int DP_CARD_RADIUS = 10;
     public static final int DP_ROW_RADIUS = 14;
     public static final int DP_DIALOG_RADIUS = 14;
     /** 按钮统一圆角（全 App 唯一值）：与卡片同值，保持观感一致。 */

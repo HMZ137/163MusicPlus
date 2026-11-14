@@ -92,6 +92,19 @@ public final class NetworkImageLoader {
         MEMORY_CACHE.evictAll();
     }
 
+    /** 把位图包成圆角 drawable：加载出真封面后也保持圆角（之前只有占位背景是圆角）。 */
+    private static android.graphics.drawable.Drawable rounded(ImageView imageView, Bitmap bitmap) {
+        android.content.Context ctx = imageView.getContext();
+        androidx.core.graphics.drawable.RoundedBitmapDrawable drawable =
+                androidx.core.graphics.drawable.RoundedBitmapDrawableFactory.create(
+                        ctx.getResources(), bitmap);
+        drawable.setCornerRadius(
+                com.qinghe.music163pro.util.UiKit.DP_CARD_RADIUS
+                        * ctx.getResources().getDisplayMetrics().density);
+        drawable.setAntiAlias(true);
+        return drawable;
+    }
+
     public static void load(ImageView imageView, String imageUrl) {
         if (imageView == null) {
             return;
@@ -108,7 +121,7 @@ public final class NetworkImageLoader {
         }
         Bitmap cached = MEMORY_CACHE.get(imageUrl);
         if (cached != null) {
-            imageView.setImageBitmap(cached);
+            imageView.setImageDrawable(rounded(imageView, cached));
             return;
         }
         synchronized (ACTIVE_REQUESTS) {
@@ -144,7 +157,7 @@ public final class NetworkImageLoader {
                     final ImageView target = view;
                     target.post(() -> {
                         if (finalBitmap != null && imageUrl.equals(target.getTag())) {
-                            target.setImageBitmap(finalBitmap);
+                            target.setImageDrawable(rounded(target, finalBitmap));
                         }
                     });
                 }
