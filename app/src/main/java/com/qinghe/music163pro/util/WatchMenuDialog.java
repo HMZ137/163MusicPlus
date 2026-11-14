@@ -125,15 +125,22 @@ public final class WatchMenuDialog {
             row.setFocusable(true);
             row.setMinimumHeight(UiKit.dp(context, ROW_HEIGHT_DP));
 
-            // 当前项左侧主色条
-            View bar = new View(context);
-            int barW = UiKit.dp(context, 3);
-            LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(barW, 0);
-            barLp.setMargins(0, UiKit.dp(context, 8), UiKit.dp(context, 8), UiKit.dp(context, 8));
+            // 当前项左侧单选圆圈（参考 浮窗1：选中填充主色，未选中空心）
+            View circle = new View(context);
+            android.graphics.drawable.GradientDrawable circleBg =
+                    new android.graphics.drawable.GradientDrawable();
+            circleBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            int circleSize = UiKit.dp(context, 16);
             if (selected) {
-                bar.setBackgroundColor(UiKit.COLOR_ACCENT);
+                circleBg.setColor(UiKit.COLOR_ACCENT);
+            } else {
+                circleBg.setColor(0x00000000);
+                circleBg.setStroke(UiKit.dp(context, 1), 0x66FFFFFF);
             }
-            row.addView(bar, barLp);
+            circle.setBackground(circleBg);
+            LinearLayout.LayoutParams circleLp = new LinearLayout.LayoutParams(circleSize, circleSize);
+            circleLp.setMargins(0, 0, UiKit.dp(context, 10), 0);
+            row.addView(circle, circleLp);
 
             TextView label = new TextView(context);
             label.setText(items[i]);

@@ -24,11 +24,12 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <TextView
+        <com.qinghe.music163pro.util.MarqueeTextView
             android:id="@+id/tv_cloud_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
+            android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
             android:singleLine="true"
             android:textColor="@color/text_primary"
             android:textSize="13sp" />
