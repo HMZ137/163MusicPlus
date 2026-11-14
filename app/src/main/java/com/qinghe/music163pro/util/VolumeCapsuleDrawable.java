@@ -14,7 +14,7 @@ import android.graphics.drawable.Drawable;
  * <p>形态：</p>
  * <ul>
  *   <li>整条是两端半圆的胶囊；</li>
- *   <li>已填充部分**白色**，未填充部分**灰色**；</li>
+ *   <li>已填充部分**主色紫**（M3 colorPrimary），未填充部分**灰**（M3 surfaceVariant）；</li>
  *   <li>条上一条**橙色竖线**标出「音量告警阈值」（对应 {@code SAFE_VOLUME_PERCENT}）；</li>
  *   <li>颜色规则（需求方 2026-10-17 补充）：音量数字/填充**默认不是橙色**，
  *       只有当前音量**超过阈值**时才变橙色；橙线本身始终是阈值标记。</li>
@@ -25,8 +25,9 @@ import android.graphics.drawable.Drawable;
  */
 public class VolumeCapsuleDrawable extends Drawable {
 
-    private static final int TRACK_COLOR = 0xFF4A4B52;
-    private static final int FILL_COLOR = 0xFFFFFFFF;
+    // M3 配色（对齐仓库版 LinearProgressIndicator：indicator=主色紫，track=surfaceVariant）
+    private static final int TRACK_COLOR = 0xFF49454F;
+    private static final int FILL_COLOR = 0xFFBB86FC;
     private static final int FILL_OVER_THRESHOLD_COLOR = 0xFFFFA726;
     private static final int THRESHOLD_COLOR = 0xFFFFA726;
 

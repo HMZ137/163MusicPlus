@@ -1812,7 +1812,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // M1：由「只读进度条」升级为**可拖拽 / 可点击**的 SeekBar（拖动即改音量）。
         SeekBar progressBar = new SeekBar(this);
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
-                0, dp(24), 1f);
+                0, dp(32), 1f);
         progressBar.setLayoutParams(progressParams);
         // M1b：按 音量条示例.png —— 胶囊条（白填充 / 灰底）+ 橙色告警阈值竖线；
         // 不画 thumb（参考图只有胶囊与数值），但 SeekBar 仍负责拖动 / 点击交互。
