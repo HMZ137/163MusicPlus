@@ -1214,6 +1214,7 @@ public class MusicApiHelper {
             String cover = al != null ? al.optString("picUrl", "") : "";
             long albumId = al != null ? al.optLong("id", 0) : 0;
             Song song = new Song(id, name, artistSb.toString(), album);
+            song.setFee(s.optInt("fee", 0));
             if (!cover.isEmpty()) {
                 song.setCoverUrl(cover);
             }
@@ -2920,7 +2921,9 @@ public class MusicApiHelper {
                         if (albumObj != null) {
                             album = albumObj.optString("name", "");
                         }
-                        songs.add(new Song(id, name, artist, album));
+                        Song fmSong = new Song(id, name, artist, album);
+                        fmSong.setFee(s.optInt("fee", 0));
+                        songs.add(fmSong);
                     }
                 }
 
@@ -2970,7 +2973,9 @@ public class MusicApiHelper {
                         if (albumObj != null) {
                             album = albumObj.optString("name", "");
                         }
-                        songs.add(new Song(id, name, artist, album));
+                        Song fmSong = new Song(id, name, artist, album);
+                        fmSong.setFee(s.optInt("fee", 0));
+                        songs.add(fmSong);
                     }
                 }
 
@@ -4293,6 +4298,7 @@ public class MusicApiHelper {
             return null;
         }
         Song parsedSong = new Song(songId, songName, artist, album);
+        parsedSong.setFee(songObj.optInt("fee", 0));
         parsedSong.setTransName(pickTransName(songObj));
         if (!coverUrl.isEmpty()) {
             parsedSong.setCoverUrl(coverUrl);
@@ -4546,7 +4552,9 @@ public class MusicApiHelper {
         if (songName.isEmpty()) {
             return null;
         }
-        return new Song(songId, songName, artist, album);
+        Song parsed = new Song(songId, songName, artist, album);
+        parsed.setFee(songObj.optInt("fee", 0));
+        return parsed;
     }
 
     // ==================== Playlist Subscribe / Unsubscribe ====================

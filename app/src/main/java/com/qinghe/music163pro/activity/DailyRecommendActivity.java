@@ -51,6 +51,11 @@ public class DailyRecommendActivity extends BaseWatchActivity {
                     ImageView ivCover = view.findViewById(R.id.iv_cover);
                     tvName.setText((position + 1) + ". " + song.getDisplayName());
                     tvArtist.setText(song.getArtist());
+                    // VIP 标识（与搜索页一致）
+                    View vipBadge = view.findViewById(R.id.tv_vip_badge);
+                    if (vipBadge != null) {
+                        vipBadge.setVisibility(song.isVip() ? View.VISIBLE : View.GONE);
+                    }
                     if (ivCover != null) {
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
                     }
