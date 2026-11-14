@@ -734,7 +734,14 @@ async function uploadLrcFile(file, row) {
   const state = row.querySelector('.fi-state');
   state.textContent = '上传中…';
   try {
-    const res = await fetch('/upload?name=' + encodeURIComponent(file.name), {
+    // 发送端（浏览器，性能更强）先按 stem 把 .lrc 与音频配好对，把目标音频名
+    // 通过 pair 参数告诉手表，接收端直接查内存索引 O(1) 命中，不再扫目录。
+    const lrcStem = file.name.replace(/\.[^.]+$/, '').toLowerCase();
+    const paired = state.files.find(f =>
+      f.name.replace(/\.[^.]+$/, '').toLowerCase() === lrcStem);
+    const url = '/upload?name=' + encodeURIComponent(file.name)
+      + (paired ? '&pair=' + encodeURIComponent(paired.name) : '');
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: file

@@ -78,6 +78,43 @@ public final class LanTransferServer {
     /** 并行处理上传连接：以前 acceptLoop 单线程串行，歌词批量上传会排队到超时。 */
     private java.util.concurrent.ExecutorService requestExecutor;
     /** 同一音频文件的内嵌互斥锁（避免两个 .lrc 并发改同一个文件的标签）。 */
+    /** 音频 stem(小写) -> File：目录只扫一次，之后歌词匹配 O(1)。 */
+    private final java.util.concurrent.ConcurrentHashMap<String, File> audioIndex =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private volatile boolean audioIndexBuilt;
+    /** 未配对歌词：内存优先；磁盘 pending 目录仅作旧流程兼容。 */
+    private final java.util.concurrent.ConcurrentHashMap<String, byte[]> pendingLyrics =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 懒加载：首次需要匹配时递归扫一次 Music（最多 4 层），之后全走内存表。 */
+    private synchronized void ensureAudioIndex() {
+        if (audioIndexBuilt) {
+            return;
+        }
+        indexAudioRecursive(saveDir, 0);
+        audioIndexBuilt = true;
+    }
+
+    private void indexAudioRecursive(File dir, int depth) {
+        if (dir == null || !dir.isDirectory() || depth > 4) {
+            return;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File f : children) {
+            if (f.isFile() && isMusicFile(f.getName())) {
+                audioIndex.put(stripExt(f.getName()).toLowerCase(Locale.ROOT), f);
+            }
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                indexAudioRecursive(f, depth + 1);
+            }
+        }
+    }
+
     private final java.util.HashMap<String, Object> fileLocks = new java.util.HashMap<>();
     private synchronized Object lockFor(String path) {
         Object lock = fileLocks.get(path);
@@ -375,7 +412,7 @@ public final class LanTransferServer {
         // 2026-10-17：局域网传歌「歌词上传」—— .lrc 按文件名与音频匹配后合并，
         // 不落进音乐库 / 收件箱（它不是音频，也不是普通文件）。
         if (safeName != null && safeName.toLowerCase(Locale.ROOT).endsWith(".lrc")) {
-            handleLyricsUpload(out, safeName, in, contentLength);
+            handleLyricsUpload(out, safeName, in, contentLength, query);
             return;
         }
 
@@ -420,6 +457,8 @@ public final class LanTransferServer {
         // 仅音乐文件登记进本地音乐库缓存，让它立刻可被解析（不必等下一次扫描）；
         // 非音乐文件只落盘、不登记，避免污染「本机音乐」列表。
         if (isMusicFile(safeName)) {
+            // 新上传的音频立即进索引（不设 audioIndexBuilt，让首次匹配仍会扫一次已有库）
+            audioIndex.put(stripExt(safeName).toLowerCase(Locale.ROOT), target);
             try {
                 Song song = new Song(LocalTracks.idForPath(target.getAbsolutePath()),
                         safeName, "", "");
@@ -471,7 +510,7 @@ public final class LanTransferServer {
      * </ol>
      */
     private void handleLyricsUpload(OutputStream out, String safeName, InputStream in,
-                                    int contentLength) throws Exception {
+                                    int contentLength, String query) throws Exception {
         if (contentLength <= 0 || contentLength > 4 * 1024 * 1024) {
             byte[] body = "{\"ok\":false,\"error\":\"歌词文件过大或为空\"}".getBytes("UTF-8");
             writeResponse(out, 400, "Bad Request", "application/json; charset=utf-8", body);
@@ -495,7 +534,17 @@ public final class LanTransferServer {
             stem = "lyrics";
         }
 
-        File audio = findAudioByStem(saveDir, stem);
+        // 需求方 2026-11-15：匹配改在发送端做（配对参数 pair），接收端用一次建好的索引
+        // O(1) 命中；不再每次 .lrc 都递归扫 4 层 Music 目录（几十首歌时是 O(N²) I/O）。
+        ensureAudioIndex();
+        String stemKey = stem.toLowerCase(Locale.ROOT);
+        File audio = audioIndex.get(stemKey);
+        if (audio == null) {
+            String pair = queryValue(query, "pair");   // 发送端显式指定的配对音频名
+            if (pair != null && !pair.isEmpty()) {
+                audio = audioIndex.get(stripExt(pair).toLowerCase(Locale.ROOT));
+            }
+        }
         boolean matched = false;
         String audioName = "";
         if (audio != null) {
@@ -514,7 +563,8 @@ public final class LanTransferServer {
                 dir.mkdirs();
             }
             writeBytes(new File(dir, stem + ".lrc"), data);
-            Log.i(TAG, "歌词暂存（等音频上传）: " + safeName + " -> " + dir.getAbsolutePath());
+            pendingLyrics.put(stemKey, data);
+            Log.i(TAG, "歌词暂存（内存+磁盘，等音频上传）: " + safeName);
         }
 
         // 响应立即返回：内嵌是后台任务，别让上传端/接收端 UI 卡住
@@ -585,18 +635,24 @@ public final class LanTransferServer {
                 return;
             }
             String stem = stripExt(audio.getName());
+            byte[] data = pendingLyrics.remove(stem.toLowerCase(Locale.ROOT));
             File lrc = new File(pendingDir, stem + ".lrc");
-            if (!lrc.isFile()) {
-                return;
+            if (data == null || data.length == 0) {
+                // 兼容旧流程：磁盘上一次读（不扫描目录）
+                if (!lrc.isFile()) {
+                    return;
+                }
+                data = readFileBytes(lrc);
             }
-            byte[] data = readFileBytes(lrc);
             if (data == null || data.length == 0) {
                 return;
             }
             File sidecar = new File(audio.getParentFile(), stem + ".lrc");
             writeBytes(sidecar, data);
             embedInBackground(audio, new String(data, "UTF-8"));
-            lrc.delete();
+            if (lrc.isFile()) {
+                lrc.delete();
+            }
             Log.i(TAG, "音频上传后自动配对歌词: " + audio.getAbsolutePath());
         } catch (Exception e) {
             Log.w(TAG, "自动配对歌词失败: " + e);
