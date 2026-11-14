@@ -234,6 +234,13 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
     }
 
     private void startServer() {
+        // 需求方 2026-11-15：只在 WiFi 下开端口，禁止走移动数据
+        if (!com.qinghe.music163pro.util.LanNetwork.isWifiConnected(this)) {
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "请连接 WiFi 后再开启局域网传歌（不使用移动数据）");
+            tvStatus.setText("未连接 WiFi，已禁止开启端口");
+            return;
+        }
         Intent intent = new Intent(this, LanTransferService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);

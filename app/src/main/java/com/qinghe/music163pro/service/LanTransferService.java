@@ -27,6 +27,9 @@ import java.io.InputStream;
  */
 public class LanTransferService extends Service {
 
+    private android.content.BroadcastReceiver wifiWatcher;
+    private boolean wifiWatcherRegistered;
+
     private static final String CHANNEL_ID = "lan_transfer";
     private static final int NOTIFY_ID = 2051;
 
@@ -47,6 +50,14 @@ public class LanTransferService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         LocalLibraryCache.init(this);
+        // 需求方 2026-11-15：服务也可能被外部 intent 直接拉起，这里再拦一道
+        if (!com.qinghe.music163pro.util.LanNetwork.isWifiConnected(this)) {
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "未连接 WiFi，局域网传歌已停止（不使用移动数据）");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        registerWifiWatcher();
         if (server == null) {
             server = new LanTransferServer();
             // 注入美化后的上传页（参考 UI.html 的 LAN Drop 设计）；读不到就用内置回退页
@@ -59,8 +70,37 @@ public class LanTransferService extends Service {
         return START_STICKY;
     }
 
+    /** WiFi 断开时立刻关端口并停服，避免回落到移动数据继续监听。 */
+    private void registerWifiWatcher() {
+        if (wifiWatcherRegistered) {
+            return;
+        }
+        wifiWatcher = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(android.content.Context ctx, android.content.Intent intent) {
+                if (!android.net.ConnectivityManager.CONNECTIVITY_ACTION.equals(intent.getAction())) {
+                    return;
+                }
+                if (!com.qinghe.music163pro.util.LanNetwork.isWifiConnected(ctx)) {
+                    if (server != null) {
+                        server.stop();
+                    }
+                    stopSelf();
+                }
+            }
+        };
+        registerReceiver(wifiWatcher,
+                new android.content.IntentFilter(
+                        android.net.ConnectivityManager.CONNECTIVITY_ACTION));
+        wifiWatcherRegistered = true;
+    }
+
     @Override
     public void onDestroy() {
+        if (wifiWatcherRegistered) {
+            unregisterReceiver(wifiWatcher);
+            wifiWatcherRegistered = false;
+        }
         if (server != null) {
             server.stop();
         }

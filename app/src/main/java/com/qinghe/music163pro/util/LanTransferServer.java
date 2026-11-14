@@ -69,6 +69,12 @@ public final class LanTransferServer {
     private volatile int uploadedCount;
     private volatile String lastFileName;
     private final File saveDir;
+    /**
+     * 歌词内嵌后台线程（需求方 2026-11-15）：embedLyricsInto 要读整段音频、写标签、
+     * 备份 .bak，是重 I/O；以前在 HTTP 请求线程里同步做，接收端会长时间无响应。
+     * 用单线程串行后台执行——既不让请求线程阻塞，也避免并发写同一个音频文件。
+     */
+    private java.util.concurrent.ExecutorService embedExecutor;
 
     /** 美化后的上传页（从 assets 读取注入；为空时回退到内置精简页）。 */
     private String indexHtml;
@@ -171,6 +177,14 @@ public final class LanTransferServer {
         if (running) {
             return true;
         }
+        if (embedExecutor == null || embedExecutor.isShutdown()) {
+            embedExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
+                    r -> {
+                        Thread t = new Thread(r, "LanTransfer-embed");
+                        t.setDaemon(true);
+                        return t;
+                    });
+        }
         for (int candidate = DEFAULT_PORT;
              candidate < DEFAULT_PORT + PORT_SEARCH_LIMIT;
              candidate++) {
@@ -204,6 +218,10 @@ public final class LanTransferServer {
         if (acceptThread != null) {
             acceptThread.interrupt();
             acceptThread = null;
+        }
+        if (embedExecutor != null) {
+            embedExecutor.shutdownNow();
+            embedExecutor = null;
         }
     }
 
@@ -444,11 +462,13 @@ public final class LanTransferServer {
         if (audio != null) {
             File sidecar = new File(audio.getParentFile(), stripExt(audio.getName()) + ".lrc");
             writeBytes(sidecar, data);
-            int embedded = AudioTagEmbedder.embedLyricsInto(audio, text);
+            final File audioToEmbed = audio;
+            final String lyricText = text;
+            embedInBackground(audioToEmbed, lyricText);
             matched = true;
             audioName = audio.getName();
             Log.i(TAG, "歌词已匹配: " + safeName + " -> " + audio.getAbsolutePath()
-                    + " (sidecar=" + sidecar.getName() + ", embed=" + embedded + ")");
+                    + " (sidecar=" + sidecar.getName() + ", embed=后台进行中)");
         } else {
             File dir = lyricsPendingDir();
             if (!dir.exists()) {
@@ -458,9 +478,10 @@ public final class LanTransferServer {
             Log.i(TAG, "歌词暂存（等音频上传）: " + safeName + " -> " + dir.getAbsolutePath());
         }
 
+        // 响应立即返回：内嵌是后台任务，别让上传端/接收端 UI 卡住
         String json = "{\"ok\":true,\"type\":\"lrc\",\"matched\":" + matched
-                + ",\"audio\":\"" + jsonEscape(audioName) + "\",\"name\":\""
-                + jsonEscape(safeName) + "\"}";
+                + ",\"embed\":\"pending\",\"audio\":\"" + jsonEscape(audioName)
+                + "\",\"name\":\"" + jsonEscape(safeName) + "\"}";
         writeResponse(out, 200, "OK", "application/json; charset=utf-8", json.getBytes("UTF-8"));
     }
 
@@ -497,6 +518,23 @@ public final class LanTransferServer {
         return null;
     }
 
+    /** 把歌词内嵌丢到后台线程；HTTP 请求线程只负责落盘与应答。 */
+    private void embedInBackground(File audio, String lyricText) {
+        java.util.concurrent.ExecutorService executor = embedExecutor;
+        if (executor == null || executor.isShutdown()) {
+            executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+            embedExecutor = executor;
+        }
+        executor.execute(() -> {
+            try {
+                int embedded = AudioTagEmbedder.embedLyricsInto(audio, lyricText);
+                Log.i(TAG, "歌词内嵌(后台)完成: " + audio.getName() + " embed=" + embedded);
+            } catch (Exception e) {
+                Log.w(TAG, "歌词内嵌(后台)失败: " + audio.getName() + " -> " + e);
+            }
+        });
+    }
+
     /** 音频落盘后，看看 Music/__lyrics__/ 里有没有同名歌词，有就配对合并。 */
     private void matchPendingLyric(File audio) {
         try {
@@ -515,7 +553,7 @@ public final class LanTransferServer {
             }
             File sidecar = new File(audio.getParentFile(), stem + ".lrc");
             writeBytes(sidecar, data);
-            AudioTagEmbedder.embedLyricsInto(audio, new String(data, "UTF-8"));
+            embedInBackground(audio, new String(data, "UTF-8"));
             lrc.delete();
             Log.i(TAG, "音频上传后自动配对歌词: " + audio.getAbsolutePath());
         } catch (Exception e) {
