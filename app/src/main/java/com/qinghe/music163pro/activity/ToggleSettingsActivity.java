@@ -350,6 +350,29 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             });
         });
 
+        // 主界面播放页歌名显示（需求方 2026-11-15）：去曲师 / 去括号内容
+        final TextView artistSuffixValue = buildValueRow(container, "播放页歌名·去曲师",
+                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, false)
+                        ? "开" : "关");
+        ((LinearLayout) artistSuffixValue.getParent()).setOnClickListener(v -> {
+            boolean on = !prefs.getBoolean(
+                    com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, false);
+            prefs.edit().putBoolean(
+                    com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, on).apply();
+            artistSuffixValue.setText(on ? "开" : "关");
+        });
+
+        final TextView bracketValue = buildValueRow(container, "播放页歌名·去括号内容",
+                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, false)
+                        ? "开" : "关");
+        ((LinearLayout) bracketValue.getParent()).setOnClickListener(v -> {
+            boolean on = !prefs.getBoolean(
+                    com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, false);
+            prefs.edit().putBoolean(
+                    com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, on).apply();
+            bracketValue.setText(on ? "开" : "关");
+        });
+
         // 歌词字号：音 / 词 / 译 各一个
         final TextView originalValue = buildStepperRow(container, "歌词字号·原文",
                 "", () -> stepFont(0, -1), () -> stepFont(0, 1));

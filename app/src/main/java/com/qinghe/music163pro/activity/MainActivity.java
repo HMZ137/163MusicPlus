@@ -806,6 +806,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         playerManager.setCallback(this);
         // OLED 防烧屏：重新读开关（设置页改完回来立即生效）
         applyOledBurnProtection();
+        // 播放页歌名开关改完回来立即生效（不动其它 UI 状态）
+        if (tvSongName != null) {
+            com.qinghe.music163pro.model.Song cur = playerManager.getCurrentSong();
+            if (cur != null) {
+                tvSongName.setText(
+                        com.qinghe.music163pro.util.SongDisplay.mainTitle(this, cur));
+            }
+        }
+
         // Reload settings in case they changed
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         playerManager.setCookie(prefs.getString("cookie", ""));
@@ -5527,7 +5536,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void updateUI() {
         Song song = playerManager.getCurrentSong();
         if (song != null) {
-            tvSongName.setText(song.getDisplayName());
+            // 需求方 2026-11-15：播放页歌名按开关去曲师/去括号，别名单独保留
+            tvSongName.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song));
             tvArtist.setText(song.getArtist());
             ensureChorusLoaded(song);
         } else {
