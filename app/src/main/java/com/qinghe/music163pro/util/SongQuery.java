@@ -9,7 +9,7 @@ import java.util.Locale;
 /**
  * 歌曲关键词匹配 —— 本地音乐页、本地歌单详情、在线歌单详情共用一份口径。
  *
- * <p>匹配字段：曲名 / 曲师 / 专辑 / 文件路径（本地曲目）。忽略大小写。</p>
+ * <p>匹配字段：曲名 / **别名（网易云 tns 译名）** / 曲师 / 专辑 / 文件路径（本地曲目）。忽略大小写。</p>
  *
  * <p>还会再做一次**假名与西里尔的拉丁转写**比对（{@link ScriptTranslit}）：
  * 输入 {@code k} 能命中「かがやき」，{@code miku} 能命中「初音ミク」，
@@ -43,6 +43,7 @@ public final class SongQuery {
         if (contains(song.getName(), needle)
                 || contains(song.getArtist(), needle)
                 || contains(song.getAlbum(), needle)
+                || contains(song.getTransName(), needle)
                 || contains(song.getUrl(), needle)) {
             return true;
         }
@@ -52,6 +53,7 @@ public final class SongQuery {
         }
         // 逐个字段比对「全部拉丁候选写法」（含促音符的两种写法）
         return matchAny(ScriptTranslit.toLatinVariants(song.getName()), needleLatin)
+                || matchAny(ScriptTranslit.toLatinVariants(song.getTransName()), needleLatin)
                 || matchAny(ScriptTranslit.toLatinVariants(song.getArtist()), needleLatin)
                 || matchAny(ScriptTranslit.toLatinVariants(song.getAlbum()), needleLatin);
     }
