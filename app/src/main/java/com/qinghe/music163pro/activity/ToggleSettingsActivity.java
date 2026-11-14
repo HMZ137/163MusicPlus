@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.InputType;

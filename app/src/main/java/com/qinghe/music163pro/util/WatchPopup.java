@@ -355,7 +355,7 @@ public final class WatchPopup {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(2), 0, dp(4));
 
-        checkbox = new CheckBox(activity);
+        checkbox = new com.google.android.material.checkbox.MaterialCheckBox(activity);
         checkbox.setText(checkboxText);
         checkbox.setChecked(checkboxChecked);
         checkbox.setTextColor(0xB3FFFFFF);
