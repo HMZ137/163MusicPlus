@@ -100,6 +100,11 @@ public final class NetworkImageLoader {
      * 小于卡片）。改用 clipToOutline：View 级裁剪与 Bitmap 尺寸无关，显示圆角恒定。</p>
      */
     private static void applyRoundedOutline(ImageView imageView) {
+        // convertView 复用时已设置过：直接跳过，避免每次 getView 都触发
+        // setBackgroundResource 的 drawable 创建 + requestLayout（列表滚动会明显变慢）
+        if (imageView.getClipToOutline() && imageView.getBackground() != null) {
+            return;
+        }
         imageView.setClipToOutline(true);
         if (imageView.getBackground() == null) {
             imageView.setBackgroundResource(com.qinghe.music163pro.R.drawable.bg_cover_rounded);

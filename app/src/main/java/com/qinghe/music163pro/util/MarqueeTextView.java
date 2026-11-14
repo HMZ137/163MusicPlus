@@ -29,6 +29,25 @@ public class MarqueeTextView extends AppCompatTextView {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        setSelected(true);
+        // 宽度未知，等一次布局后再判断
+        post(this::updateMarquee);
+    }
+
+    @Override
+    protected void onTextChanged(CharSequence text, int start, int before, int count) {
+        super.onTextChanged(text, start, before, count);
+        post(this::updateMarquee);
+    }
+
+    /** 只有文字确实超宽才开启滚动；短标题保持静止（marquee 选中态会持续重绘）。 */
+    private void updateMarquee() {
+        int avail = getWidth() - getPaddingLeft() - getPaddingRight();
+        if (avail <= 0) {
+            return;
+        }
+        boolean overflow = getPaint().measureText(getText().toString()) > avail;
+        if (isSelected() != overflow) {
+            setSelected(overflow);
+        }
     }
 }
