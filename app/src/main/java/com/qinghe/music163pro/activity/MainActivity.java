@@ -769,7 +769,18 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         UpdateChecker.checkVersionInfo(this, new UpdateChecker.VersionCheckCallback() {
             @Override
             public void onResult(UpdateChecker.VersionInfo versionInfo) {
-                if (!versionInfo.isLatest()) {
+                // 需求方 2026-11-15：版本号已对齐 20261115，防止每次打开都提示更新。
+                // 服务端按 versionCode 判 is_latest 可能仍偏旧；远端版本名与本地一致时
+                // 视为同一版本，不再弹提示（手动检查不受影响）。
+                String remoteName = versionInfo.getVersionName();
+                String localName = "";
+                try {
+                    localName = getPackageManager()
+                            .getPackageInfo(getPackageName(), 0).versionName;
+                } catch (Exception ignored) {
+                }
+                boolean sameVersion = localName != null && localName.equals(remoteName);
+                if (!versionInfo.isLatest() && !sameVersion) {
                     // 只提示，不再自动跳到更新页、更不下载安装 ——
                     // 装官方新版会覆盖掉本修改版累积的所有改动。
                     Toast.makeText(MainActivity.this,
