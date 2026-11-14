@@ -637,17 +637,27 @@ function uploadOne(item) {
   });
 }
 
+/* 并发池：同时跑 n 个上传，避免手表端连接堆积/浏览器超时 */
+async function runPool(items, n, worker) {
+  let i = 0;
+  async function consume() {
+    while (i < items.length) {
+      const item = items[i++];
+      await worker(item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, consume));
+}
+
 async function startTransfer() {
   const queue = state.files.filter(f => f.status === 'pending' || f.status === 'fail');
   if (!queue.length) return;
   state.sending = true;
   updateSendBar();
 
-  // 串行上传：手表端一次只处理一个文件，串行更稳，进度也好读
+  // 并行上传（3 路）：手表端已改线程池并行处理连接，不再排队
   let ok = 0;
-  for (const f of queue) {
-    if (await uploadOne(f)) ok++;
-  }
+  await runPool(queue, 3, async (f) => { if (await uploadOne(f)) ok++; });
 
   state.sending = false;
   updateSendBar();
@@ -747,6 +757,7 @@ async function uploadLrcFile(file, row) {
 
 function addLrcFiles(files) {
   const list = $('#lrcList');
+  const jobs = [];
   [...files].forEach(f => {
     const li = document.createElement('li');
     li.className = 'file-item';
@@ -761,8 +772,10 @@ function addLrcFiles(files) {
         <div class="fi-bottom"><span class="fi-state">等待上传</span></div>
       </div>`;
     list.appendChild(li);
-    uploadLrcFile(f, li);
+    jobs.push([f, li]);
   });
+  // 并发池：歌词批量上传尤其要限流，否则几十个请求同时压到手表会超时报「网络错误」
+  runPool(jobs, 3, ([f, li]) => uploadLrcFile(f, li));
 }
 
 /* =========================================================

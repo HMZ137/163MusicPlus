@@ -75,12 +75,25 @@ public final class LanTransferServer {
      * 用单线程串行后台执行——既不让请求线程阻塞，也避免并发写同一个音频文件。
      */
     private java.util.concurrent.ExecutorService embedExecutor;
+    /** 并行处理上传连接：以前 acceptLoop 单线程串行，歌词批量上传会排队到超时。 */
+    private java.util.concurrent.ExecutorService requestExecutor;
+    /** 同一音频文件的内嵌互斥锁（避免两个 .lrc 并发改同一个文件的标签）。 */
+    private final java.util.HashMap<String, Object> fileLocks = new java.util.HashMap<>();
+    private synchronized Object lockFor(String path) {
+        Object lock = fileLocks.get(path);
+        if (lock == null) {
+            lock = new Object();
+            fileLocks.put(path, lock);
+        }
+        return lock;
+    }
 
     /** 美化后的上传页（从 assets 读取注入；为空时回退到内置精简页）。 */
     private String indexHtml;
     /** 已接收文件列表，供「收件箱」面板展示与回下载。单线程处理连接，synchronized 仅作保险。 */
     private final List<ReceivedFile> received = Collections.synchronizedList(new ArrayList<>());
-    private long rxSeq = 0;
+    private final java.util.concurrent.atomic.AtomicInteger rxSeq =
+            new java.util.concurrent.atomic.AtomicInteger(0);
 
     /** 已接收到的文件（用于「收件箱」面板展示与回下载）。 */
     private static final class ReceivedFile {
@@ -178,9 +191,18 @@ public final class LanTransferServer {
             return true;
         }
         if (embedExecutor == null || embedExecutor.isShutdown()) {
-            embedExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
+            // 歌词内嵌并行（I/O 密集，手表不宜开太多；同文件用 lockFor 互斥）
+            embedExecutor = java.util.concurrent.Executors.newFixedThreadPool(2,
                     r -> {
                         Thread t = new Thread(r, "LanTransfer-embed");
+                        t.setDaemon(true);
+                        return t;
+                    });
+        }
+        if (requestExecutor == null || requestExecutor.isShutdown()) {
+            requestExecutor = java.util.concurrent.Executors.newFixedThreadPool(4,
+                    r -> {
+                        Thread t = new Thread(r, "LanTransfer-request");
                         t.setDaemon(true);
                         return t;
                     });
@@ -223,22 +245,39 @@ public final class LanTransferServer {
             embedExecutor.shutdownNow();
             embedExecutor = null;
         }
+        if (requestExecutor != null) {
+            requestExecutor.shutdownNow();
+            requestExecutor = null;
+        }
     }
 
     // ==================== 请求处理 ====================
 
     private void acceptLoop() {
         while (running) {
-            Socket socket = null;
             try {
-                socket = serverSocket.accept();
-                handle(socket);
+                final Socket socket = serverSocket.accept();
+                java.util.concurrent.ExecutorService executor = requestExecutor;
+                if (executor == null || executor.isShutdown()) {
+                    closeQuietly(socket);
+                    continue;
+                }
+                // 并行处理每个上传：歌词批量上传不再排队到浏览器超时
+                executor.execute(() -> {
+                    try {
+                        handle(socket);
+                    } catch (Exception e) {
+                        if (running) {
+                            Log.w(TAG, "处理连接时出错", e);
+                        }
+                    } finally {
+                        closeQuietly(socket);
+                    }
+                });
             } catch (Exception e) {
                 if (running) {
-                    Log.w(TAG, "处理连接时出错", e);
+                    Log.w(TAG, "接受连接时出错", e);
                 }
-            } finally {
-                closeQuietly(socket);
             }
         }
     }
@@ -402,7 +441,7 @@ public final class LanTransferServer {
         // 登记进「收件箱」，前端可在网页上看到、回下载、删除
         String from = (socket.getInetAddress() != null)
                 ? socket.getInetAddress().getHostAddress() : "未知设备";
-        String rxId = "rx" + (++rxSeq);
+        String rxId = "rx" + rxSeq.incrementAndGet();
         received.add(new ReceivedFile(rxId, safeName, written, System.currentTimeMillis(), from,
                 target.getAbsolutePath()));
 
@@ -522,15 +561,18 @@ public final class LanTransferServer {
     private void embedInBackground(File audio, String lyricText) {
         java.util.concurrent.ExecutorService executor = embedExecutor;
         if (executor == null || executor.isShutdown()) {
-            executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+            executor = java.util.concurrent.Executors.newFixedThreadPool(2);
             embedExecutor = executor;
         }
+        final Object fileLock = lockFor(audio.getAbsolutePath());
         executor.execute(() -> {
-            try {
-                int embedded = AudioTagEmbedder.embedLyricsInto(audio, lyricText);
-                Log.i(TAG, "歌词内嵌(后台)完成: " + audio.getName() + " embed=" + embedded);
-            } catch (Exception e) {
-                Log.w(TAG, "歌词内嵌(后台)失败: " + audio.getName() + " -> " + e);
+            synchronized (fileLock) {
+                try {
+                    int embedded = AudioTagEmbedder.embedLyricsInto(audio, lyricText);
+                    Log.i(TAG, "歌词内嵌(后台)完成: " + audio.getName() + " embed=" + embedded);
+                } catch (Exception e) {
+                    Log.w(TAG, "歌词内嵌(后台)失败: " + audio.getName() + " -> " + e);
+                }
             }
         });
     }
@@ -726,7 +768,7 @@ public final class LanTransferServer {
     }
 
     /** 同名文件不覆盖：加 (1) (2) …… */
-    private static File uniqueFile(File dir, String name) {
+    private static synchronized File uniqueFile(File dir, String name) {
         File f = new File(dir, name);
         if (!f.exists()) {
             return f;

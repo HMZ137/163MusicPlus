@@ -27,8 +27,9 @@ import java.io.InputStream;
  */
 public class LanTransferService extends Service {
 
-    private android.content.BroadcastReceiver wifiWatcher;
-    private boolean wifiWatcherRegistered;
+    // 不再用 CONNECTIVITY_ACTION 广播自动停服：系统在网络状态抖动时会频繁发广播，
+    // isWifiConnected 瞬间返回 false 就会把端口关掉，上传页还开着却全部报「网络错误」。
+    // 「仅 WiFi 开端口」由 onStartCommand 的启动拦截保证（Service 被系统重建时也会再查一次）。
 
     private static final String CHANNEL_ID = "lan_transfer";
     private static final int NOTIFY_ID = 2051;
@@ -57,7 +58,6 @@ public class LanTransferService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        registerWifiWatcher();
         if (server == null) {
             server = new LanTransferServer();
             // 注入美化后的上传页（参考 UI.html 的 LAN Drop 设计）；读不到就用内置回退页
@@ -70,37 +70,8 @@ public class LanTransferService extends Service {
         return START_STICKY;
     }
 
-    /** WiFi 断开时立刻关端口并停服，避免回落到移动数据继续监听。 */
-    private void registerWifiWatcher() {
-        if (wifiWatcherRegistered) {
-            return;
-        }
-        wifiWatcher = new android.content.BroadcastReceiver() {
-            @Override
-            public void onReceive(android.content.Context ctx, android.content.Intent intent) {
-                if (!android.net.ConnectivityManager.CONNECTIVITY_ACTION.equals(intent.getAction())) {
-                    return;
-                }
-                if (!com.qinghe.music163pro.util.LanNetwork.isWifiConnected(ctx)) {
-                    if (server != null) {
-                        server.stop();
-                    }
-                    stopSelf();
-                }
-            }
-        };
-        registerReceiver(wifiWatcher,
-                new android.content.IntentFilter(
-                        android.net.ConnectivityManager.CONNECTIVITY_ACTION));
-        wifiWatcherRegistered = true;
-    }
-
     @Override
     public void onDestroy() {
-        if (wifiWatcherRegistered) {
-            unregisterReceiver(wifiWatcher);
-            wifiWatcherRegistered = false;
-        }
         if (server != null) {
             server.stop();
         }
