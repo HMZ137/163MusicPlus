@@ -210,9 +210,10 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
     /**
      * 本地歌曲去重（需求方 2026-10-17 深夜）。
      *
-     * <p><b>规则</b>：只把「文件大小 + MD5 完全相同」的副本移入
+     * <p><b>规则（2026-11-15 放宽）</b>：三级宽容匹配（精确 / 音频指纹 / 归一化曲名），
+     * 不要求 100% 不误收，但保证同名不同码率/来源的重复能被清掉；只把副本移入
      * {@code 163Music/DuplicatesTrash/<时间戳>/}（每组保留一份、保留目录结构、写 report.txt，
-     * 可随时找回）。因此 {@code A专辑歌曲(1)/(2)/(3)} 这种**内容不同**的歌不会被误删。</p>
+     * 可随时找回）。同名不同版本（现场版/伴奏）可能被归为一组，故保留最优一份并写报告。</p>
      */
     private void promptDedupe(final TextView tvValue) {
         if (dedupeRunning) {
@@ -222,9 +223,10 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
         final com.qinghe.music163pro.util.WatchPopup popup =
                 com.qinghe.music163pro.util.WatchPopup.create(this)
                         .title("本地歌曲去重")
-                        .description("只清理「文件大小 + MD5 完全相同」的副本（每组保留一份），"
-                                + "移到 163Music/DuplicatesTrash 可找回；"
-                                + "A专辑歌曲(1)(2)(3) 这类内容不同的歌不会动。")
+                        .description("三级宽容匹配：精确副本、同一音频不同标签、同名不同码率/来源"
+                                + "都会归为一组，每组保留音质最好的一份；"
+                                + "其余移到 163Music/DuplicatesTrash 可找回。"
+                                + "同名不同版本（现场版/伴奏）可能被误收，报告里会写明判定理由。")
                         .cancelButton();
         popup.primaryButton("扫描", text -> scanDedupe(tvValue));
         popup.show();
@@ -252,7 +254,7 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
                         tvValue.setText("没有发现重复歌曲");
                     }
                     Toast.makeText(LocalMusicSettingsActivity.this,
-                            "没有发现内容完全相同的重复歌曲（已扫描 " + plan.scannedFiles + " 个文件）",
+                            "没有发现重复歌曲（已扫描 " + plan.scannedFiles + " 个文件）",
                             Toast.LENGTH_LONG).show();
                     return;
                 }
