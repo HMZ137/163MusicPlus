@@ -101,10 +101,10 @@ public class SettingsPageActivity extends BaseWatchActivity {
                     });
         });
 
-        // 需求 2026-11-21：自定义字体（导入 ttf 后全局生效）
-        addRow("自定义字体",
-                com.qinghe.music163pro.util.CustomFont.has(this) ? "已启用" : "系统默认",
-                () -> startActivity(new Intent(this, FontSettingsActivity.class)));
+        // 自定义字体（需求 2026-11-21）：入口暂时隐藏（功能代码保留，恢复时取消下面两行注释即可）
+        // addRow("自定义字体",
+        //         com.qinghe.music163pro.util.CustomFont.has(this) ? "已启用" : "系统默认",
+        //         () -> startActivity(new Intent(this, FontSettingsActivity.class)));
 
         addSection("屏幕");
         addRow("屏幕常亮", "保持屏幕不熄灭", () -> openToggle("appearance"));

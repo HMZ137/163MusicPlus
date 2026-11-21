@@ -391,6 +391,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         setTheme(com.qinghe.music163pro.util.ThemeManager.styleRes(this));
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        // 2026-11-21：首次使用提示（左右滑动切换播放页 / 歌词页），只弹一次
+        showPagerHintOnce();
         mainPlayerContentView = findViewById(R.id.main_player_layout);
         // 背景画到「可移位的背景层」上（防烧屏要连背景一起动），见 installBackgroundLayer
         installBackgroundLayer();
@@ -1831,6 +1833,29 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             volumeSafeConfirmed = false;
         }
         applyVolumeToSystem(target);
+    }
+
+    /**
+     * 2026-11-21：首次使用提示 —— 主界面是 ViewPager2，左右滑动可切换播放页 / 歌词页。
+     * 只在第一次启动时弹一次，标志存在 music163_settings.pager_hint_shown。
+     */
+    private void showPagerHintOnce() {
+        try {
+            android.content.SharedPreferences sp =
+                    getSharedPreferences("music163_settings", MODE_PRIVATE);
+            if (sp.getBoolean("pager_hint_shown", false)) {
+                return;
+            }
+            sp.edit().putBoolean("pager_hint_shown", true).apply();
+            // 等首帧稳定后再弹，避免和入场动画打架
+            getWindow().getDecorView().postDelayed(() ->
+                    com.qinghe.music163pro.util.WatchPopup.confirm(this,
+                            "左右滑动切换页面",
+                            "主界面支持左右滑动，可在播放页与歌词页之间切换。",
+                            "知道了", false, () -> {
+                            }), 1200);
+        } catch (Throwable ignored) {
+        }
     }
 
     /** 把音量写进系统，并把浮层刷新到最新值。 */
