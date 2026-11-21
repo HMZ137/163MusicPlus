@@ -1836,8 +1836,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * 2026-11-21：首次使用提示 —— 主界面是 ViewPager2，左右滑动可切换播放页 / 歌词页。
-     * 只在第一次启动时弹一次，标志存在 music163_settings.pager_hint_shown。
+     * 2026-11-21：首次使用提示 —— 主界面是 ViewPager2，左右滑动在「播放页」与「歌词页」间切换。
+     * 只弹一次；弹窗带 5 秒倒计时，期间不可关闭（无按钮、禁止返回键与点外部）。
      */
     private void showPagerHintOnce() {
         try {
@@ -1847,15 +1847,103 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 return;
             }
             sp.edit().putBoolean("pager_hint_shown", true).apply();
-            // 等首帧稳定后再弹，避免和入场动画打架
-            getWindow().getDecorView().postDelayed(() ->
-                    com.qinghe.music163pro.util.WatchPopup.confirm(this,
-                            "左右滑动切换页面",
-                            "主界面支持左右滑动，可在播放页与歌词页之间切换。",
-                            "知道了", false, () -> {
-                            }), 1200);
+            getWindow().getDecorView().postDelayed(this::showPagerHintDialog, 1200);
         } catch (Throwable ignored) {
         }
+    }
+
+    /** 首次使用提示弹窗：5 秒倒计时结束后才出现「知道了」并允许关闭。 */
+    private void showPagerHintDialog() {
+        if (isFinishing()) {
+            return;
+        }
+        final android.app.Dialog dialog = new android.app.Dialog(this,
+                android.R.style.Theme_Translucent_NoTitleBar);
+        final android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setBackground(com.qinghe.music163pro.util.UiKit.dialogCard(this));
+        int pad = dp(16);
+        card.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("左右滑动切换");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(16);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        card.addView(title);
+
+        TextView body = new TextView(this);
+        body.setText("多数页面支持左右滑动切换分类标签，主界面则切换播放页与歌词页。此提示仅出现一次。");
+        body.setTextColor(0xFFAAAAAA);
+        body.setTextSize(13);
+        android.widget.LinearLayout.LayoutParams bodyLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        bodyLp.topMargin = dp(8);
+        card.addView(body, bodyLp);
+
+        final TextView countdown = new TextView(this);
+        countdown.setText("5 秒后可关闭");
+        countdown.setTextColor(0xFF888888);
+        countdown.setTextSize(12);
+        countdown.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams cLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        cLp.topMargin = dp(10);
+        card.addView(countdown, cLp);
+
+        final TextView ok = new TextView(this);
+        ok.setText("知道了");
+        ok.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
+        ok.setTextSize(14);
+        ok.setGravity(android.view.Gravity.CENTER);
+        ok.setPadding(0, dp(10), 0, dp(10));
+        ok.setVisibility(android.view.View.GONE);
+        android.widget.LinearLayout.LayoutParams okLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        okLp.topMargin = dp(8);
+        card.addView(ok, okLp);
+        ok.setOnClickListener(v -> dialog.dismiss());
+
+        android.widget.FrameLayout wrapper = new android.widget.FrameLayout(this);
+        // 2026-11-21：宽度按屏幕比例算，不用固定 dp —— 手表 320px 屏在 density 2.0 下
+        // dp(280) 会变成 560px，整张卡片直接溢出屏幕，文字被裁掉。
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int cardWidth = Math.min((int) (screenWidth * 0.9f), screenWidth - dp(12));
+        android.widget.FrameLayout.LayoutParams cardLp = new android.widget.FrameLayout.LayoutParams(
+                cardWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardLp.gravity = android.view.Gravity.CENTER;
+        wrapper.addView(card, cardLp);
+        dialog.setContentView(wrapper);
+        // 5 秒内：无按钮、返回键无效、点外部无效
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+
+        final android.os.Handler handler = new android.os.Handler(
+                android.os.Looper.getMainLooper());
+        final int[] remain = {5};
+        final Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                remain[0]--;
+                if (remain[0] > 0) {
+                    countdown.setText(remain[0] + " 秒后可关闭");
+                    handler.postDelayed(this, 1000L);
+                } else {
+                    countdown.setVisibility(android.view.View.GONE);
+                    ok.setVisibility(android.view.View.VISIBLE);
+                    dialog.setCancelable(true);
+                    dialog.setCanceledOnTouchOutside(true);
+                }
+            }
+        };
+        handler.postDelayed(tick, 1000L);
     }
 
     /** 把音量写进系统，并把浮层刷新到最新值。 */

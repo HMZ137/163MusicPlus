@@ -92,9 +92,9 @@ public class UpdateActivity extends BaseWatchActivity {
         tvVersionInfo = makeText("最新版本：获取中...", 0xFFAAAAAA, px(13), false, Gravity.CENTER);
         root.addView(tvVersionInfo);
 
-        // 明确告知：这是修改版，只提示、不下载安装，避免被官方新版覆盖
-        root.addView(makeText("当前为修改版，仅提示新版本，不提供下载安装",
-                0xFFCF6679, px(12), false, Gravity.CENTER));
+        // 2026-11-21：更新源已改为自有仓库，恢复下载安装能力
+        root.addView(makeText("选择下载源后可直接下载并安装更新",
+                0xFF888888, px(12), false, Gravity.CENTER));
 
         root.addView(makeSpacer(px(10)));
 
@@ -109,7 +109,7 @@ public class UpdateActivity extends BaseWatchActivity {
         root.addView(makeSpacer(px(10)));
 
         // Hint
-        tvSourceHint = makeText("本版本不提供下载，列表仅作版本信息参考",
+        tvSourceHint = makeText("选择下载源开始下载",
                 0xFF888888, px(12), false, Gravity.CENTER);
         tvSourceHint.setVisibility(android.view.View.GONE);
         root.addView(tvSourceHint);
@@ -332,17 +332,19 @@ public class UpdateActivity extends BaseWatchActivity {
      * 不再申请存储权限、也不再下载 APK。</p>
      */
     private void requestPermissionAndDownload() {
-        showDownloadDisabledNotice();
-    }
-
-    /** 统一的「不提供下载」提示，同时更新页面上的进度文字。 */
-    private void showDownloadDisabledNotice() {
-        String message = "当前为修改版，不提供下载安装，以免覆盖已有改动";
-        com.qinghe.music163pro.util.UiKit.toastLong(this, message);
-        if (tvProgress != null) {
-            tvProgress.setVisibility(android.view.View.VISIBLE);
-            tvProgress.setText(message);
+        // 2026-11-21：更新源已改为自有仓库，恢复下载安装
+        if (selectedUrl == null || selectedUrl.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先选择下载源");
+            return;
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    STORAGE_PERMISSION_REQUEST);
+            return;
+        }
+        startDownload();
     }
 
     @Override
@@ -358,8 +360,46 @@ public class UpdateActivity extends BaseWatchActivity {
     }
 
     private void startDownload() {
-        // 双保险：即便还有别的路径（例如权限回调）走到这里，也不发起下载
-        showDownloadDisabledNotice();
+        if (downloading || selectedUrl == null || selectedUrl.isEmpty()) {
+            return;
+        }
+        downloading = true;
+        final File target = new File(getExternalFilesDir(null), "163MusicPlus_update.apk");
+        if (tvProgress != null) {
+            tvProgress.setVisibility(android.view.View.VISIBLE);
+            tvProgress.setText("开始下载…");
+        }
+        // 复用通用下载器（内部已处理超时、进度回调切主线程）
+        com.qinghe.music163pro.util.UpdateChecker.downloadUpdate(
+                selectedUrl, target.getAbsolutePath(),
+                new com.qinghe.music163pro.util.UpdateChecker.DownloadCallback() {
+                    @Override
+                    public void onProgress(int percent) {
+                        if (tvProgress != null) {
+                            tvProgress.setText("正在下载… " + percent + "%");
+                        }
+                    }
+
+                    @Override
+                    public void onComplete(String filePath) {
+                        downloading = false;
+                        if (tvProgress != null) {
+                            tvProgress.setText("下载完成，正在打开安装界面…");
+                        }
+                        installApk(filePath);
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        downloading = false;
+                        resetDownloadState();
+                        if (tvProgress != null) {
+                            tvProgress.setText("下载失败：" + error);
+                        }
+                        com.qinghe.music163pro.util.UiKit.toastLong(
+                                UpdateActivity.this, "下载失败：" + error);
+                    }
+                });
     }
 
     private void resetDownloadState() {
