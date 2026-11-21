@@ -126,7 +126,10 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
                         view.setTag(new View[]{tvName, tvArtist, ivCover});
                     }
                     if (tvName != null) {
-                        tvName.setText(song.getDisplayName());
+                        String name = song.getDisplayName();
+                        if (!name.contentEquals(tvName.getText())) {
+                            tvName.setText(name);
+                        }
                     }
                     if (tvArtist != null) {
                         tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());

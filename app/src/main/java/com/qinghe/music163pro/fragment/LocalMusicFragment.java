@@ -171,11 +171,18 @@ public class LocalMusicFragment extends Fragment {
                         row.setTag(new View[]{tvName, tvArtist, ivCover});
                     }
                     if (tvName != null) {
-                        tvName.setText(song.getDisplayName());
+                        // 2026-11-21：内容没变就不 setText —— 避免 notifyDataSetChanged 之后
+                        // 跑马灯从头开始（TextView 重新 setText 会重置 marquee）
+                        String name = song.getDisplayName();
+                        if (!name.contentEquals(tvName.getText())) {
+                            tvName.setText(name);
+                        }
                     }
                     if (tvArtist != null) {
-                        // 元信息里可能根本没有歌手 —— 兜底会给出空串，这里再防一次 null
-                        tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());
+                        String artist = song.getArtist() == null ? "" : song.getArtist();
+                        if (!artist.contentEquals(tvArtist.getText())) {
+                            tvArtist.setText(artist);
+                        }
                     }
                     if (ivCover != null) {
                         // 本地封面走 file:// ，NetworkImageLoader 已经支持这条分支
@@ -305,9 +312,10 @@ public class LocalMusicFragment extends Fragment {
             return;
         }
         // 需求 2026-11-21 任务 2：进页只读缓存立即渲染，非刷新不重新读取歌曲信息。
-        // 「手动刷新」（refreshLocalCache）会先 invalidate 清缓存，此时缓存为空才会走完整扫描。
-        LocalMusicCache.Snapshot snap = LocalMusicCache.read(requireContext());
-        if (!snap.songs.isEmpty()) {
+        // 回滚（2026-11-21 晚）：实测缓存路径反而拖慢进页，恢复「每次进页都扫描」；
+        // 缓存读取这段保留但不再启用，方便日后重新评估。
+        LocalMusicCache.Snapshot snap = null;
+        if (snap != null && !snap.songs.isEmpty()) {
             // 补齐封面（2026-11-21）：JSON 缓存可能在封面抽取完成前就落盘了，
             // 空 coverUrl 的歌就近查一次索引，有封面就补上，避免整列表都显示默认图。
             for (Song s : snap.songs) {
@@ -421,9 +429,8 @@ public class LocalMusicFragment extends Fragment {
                         if (isStale(generation)) {
                             return;
                         }
-                        if (adapter != null) {
-                            adapter.notifyDataSetChanged();
-                        }
+                        // 2026-11-21：这里原来每读一首就 notifyDataSetChanged()，等于把整个列表
+                        // 反复重建 —— 列表项的跑马灯因此一直从头开始。进度只影响状态行，不要刷列表。
                         if (total > 0 && readingFromDisk) {
                             scanStatus = "读取歌曲信息中… " + processed + "/" + total;
                             refreshStatus();

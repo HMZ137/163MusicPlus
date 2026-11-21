@@ -1,0 +1,8 @@
+{
+  "versionCode": 43,
+  "versionName": "20261121",
+  "apkUrl": "https://github.com/HMZ137/163MusicPlus/releases/download/v20261121/163MusicPlus-20261121.apk",
+  "mirrors": [],
+  "notes": "1. 设置页按外观/播放/交互/数据/关于五类重构\n2. 本地音乐加载与排序优化\n3. 修复收藏页不显示、音量浮层圆角、安全音量确认后仍可拖动等问题\n4. 监控面板新增内存 / CPU 占用",
+  "force": false
+}

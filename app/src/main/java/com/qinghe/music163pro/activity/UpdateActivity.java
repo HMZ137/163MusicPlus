@@ -203,31 +203,14 @@ public class UpdateActivity extends BaseWatchActivity {
     }
 
     private void loadUpdateLog() {
-        ImoowApiHelper.fetchAboutContent(new ImoowApiHelper.AboutCallback() {
-            @Override
-            public void onResult(ImoowApiHelper.AboutContent aboutContent) {
-                ImoowApiHelper.UpdateLogItem matchedLog = null;
-                List<ImoowApiHelper.UpdateLogItem> items = aboutContent.getUpdateContent();
-                if (items != null) {
-                    for (ImoowApiHelper.UpdateLogItem item : items) {
-                        if (item != null && targetVersionName.equals(item.getVersion())) {
-                            matchedLog = item;
-                            break;
-                        }
-                    }
-                }
-                if (matchedLog == null) {
-                    tvUpdateLog.setText("获取失败");
-                    return;
-                }
-                tvUpdateLog.setText(formatUpdateLog(matchedLog.getContent()));
-            }
-
-            @Override
-            public void onError(String error) {
-                tvUpdateLog.setText("获取失败");
-            }
-        });
+        // 2026-11-21：更新说明改从自己的 update.json 的 notes 字段读取（不再依赖第三方 API）
+        new Thread(() -> {
+            final org.json.JSONObject obj = UpdateChecker.fetchManifest();
+            runOnUiThread(() -> {
+                String notes = obj == null ? "" : obj.optString("notes", "").trim();
+                tvUpdateLog.setText(notes.isEmpty() ? "暂无更新说明" : notes);
+            });
+        }, "update-notes").start();
     }
 
     private String formatUpdateLog(List<String> items) {

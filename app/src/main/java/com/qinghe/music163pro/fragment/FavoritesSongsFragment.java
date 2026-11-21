@@ -141,7 +141,10 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
             row.setTag(new View[]{tvName, tvArtist, ivCover});
         }
         if (tvName != null) {
-            tvName.setText(song.getDisplayName());
+            String name = song.getDisplayName();
+            if (!name.contentEquals(tvName.getText())) {
+                tvName.setText(name);
+            }
         }
         // 本地收藏带「本地」标签：它的 id 是路径派生的负数，
         // 不属于网易云曲目体系（没有云端音质/评论/歌单可用）。

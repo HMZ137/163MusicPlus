@@ -4,162 +4,265 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.qinghe.music163pro.api.ImoowApiHelper;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import java.io.BufferedInputStream;
-import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Utility for checking app updates and downloading the latest APK.
+ * 更新检查（2026-11-21）：数据源从第三方 API 换成本仓库根目录的 {@code update.json}。
+ *
+ * <p>清单地址按顺序尝试：jsDelivr（国内一般可达，带 CDN 缓存）→ raw.githubusercontent（备用）。
+ * 清单格式见仓库根目录的 update.json：versionCode / versionName / apkUrl / notes / mirrors。</p>
+ *
+ * <p>所有回调都切回主线程，调用方可以直接刷新 UI。</p>
  */
-public class UpdateChecker {
+public final class UpdateChecker {
 
-    private static final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** 清单地址（按顺序尝试，先成功者生效）。 */
+    private static final String[] MANIFEST_URLS = {
+            "https://cdn.jsdelivr.net/gh/HMZ137/163MusicPlus@main/update.json",
+            "https://raw.githubusercontent.com/HMZ137/163MusicPlus/main/update.json"
+    };
 
-    public interface CheckCallback {
-        void onResult(boolean isLatest);
-        void onError(String error);
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    private UpdateChecker() {
     }
 
-    public interface VersionCheckCallback {
-        void onResult(VersionInfo versionInfo);
-        void onError(String error);
-    }
-
+    /** 版本信息（保留原类的形状，避免上层改动）。 */
     public static class VersionInfo {
-        private final boolean latest;
         private final String versionName;
+        private final int versionCode;
+        private final String notes;
+        private final int localVersionCode;
 
-        public VersionInfo(boolean latest, String versionName) {
-            this.latest = latest;
+        public VersionInfo(String versionName, int versionCode, String notes, int localVersionCode) {
             this.versionName = versionName;
-        }
-
-        public boolean isLatest() {
-            return latest;
+            this.versionCode = versionCode;
+            this.notes = notes;
+            this.localVersionCode = localVersionCode;
         }
 
         public String getVersionName() {
             return versionName;
         }
+
+        public int getVersionCode() {
+            return versionCode;
+        }
+
+        public String getNotes() {
+            return notes;
+        }
+
+        /**
+         * 当前安装版本是否已是最新。
+         *
+         * <p>优先按 versionCode 比较；清单没填版本码时保守判定为「最新」，
+         * 避免把「检查不出结果」误报成有新版本。</p>
+         */
+        public boolean isLatest() {
+            if (versionCode > 0 && localVersionCode > 0) {
+                return localVersionCode >= versionCode;
+            }
+            return true;
+        }
+    }
+
+    public interface VersionCheckCallback {
+        void onResult(VersionInfo info);
+
+        void onError(String error);
     }
 
     public interface SourcesCallback {
         void onResult(List<String> urls);
+
         void onError(String error);
     }
 
+    /** 下载回调（进度/完成/失败均切主线程）。 */
     public interface DownloadCallback {
         void onProgress(int percent);
+
         void onComplete(String filePath);
+
         void onError(String error);
     }
 
     /**
-     * GET /source — returns list of download URLs.
-     * Response: {code:200, data:[url1,url2,...]}
-     * Calls callback on main thread.
+     * 下载文件到指定路径。
+     *
+     * <p>保留这个通用下载接口：小天才模块等页面在用它下模块包，与本项目的 APK 下载共用同一套实现。</p>
      */
-    public static void fetchSources(SourcesCallback callback) {
-        ImoowApiHelper.fetchSources(new ImoowApiHelper.SourcesCallback() {
-            @Override
-            public void onResult(List<String> urls) {
-                callback.onResult(new ArrayList<>(urls));
-            }
-
-            @Override
-            public void onError(String error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    /**
-     * POST /check with the app's versionCode.
-     * Calls callback on main thread.
-     */
-    public static void checkVersion(Context context, CheckCallback callback) {
-        checkVersionInfo(context, new VersionCheckCallback() {
-            @Override
-            public void onResult(VersionInfo versionInfo) {
-                callback.onResult(versionInfo.isLatest());
-            }
-
-            @Override
-            public void onError(String error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    public static void checkVersionInfo(Context context, VersionCheckCallback callback) {
-        ImoowApiHelper.checkVersionInfo(context, new ImoowApiHelper.VersionCheckCallback() {
-            @Override
-            public void onResult(ImoowApiHelper.CheckResult result) {
-                callback.onResult(new VersionInfo(result.isLatest(), result.getVersionName()));
-            }
-
-            @Override
-            public void onError(String error) {
-                callback.onError(error);
-            }
-        });
-    }
-
-    /**
-     * Downloads an APK from the given downloadUrl to savePath.
-     * Progress and completion callbacks are posted to the main thread.
-     */
-    public static void downloadUpdate(String downloadUrl, String savePath, DownloadCallback callback) {
+    public static void downloadUpdate(String url, String savePath, DownloadCallback callback) {
         new Thread(() -> {
             HttpURLConnection conn = null;
+            InputStream in = null;
+            java.io.OutputStream out = null;
             try {
-                URL url = new URL(downloadUrl);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(30000);
-                conn.setReadTimeout(60000);
+                conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(30000);
+                conn.setRequestProperty("User-Agent", "163MusicPlus");
                 conn.connect();
-
-                int totalLength = conn.getContentLength();
-                InputStream is = new BufferedInputStream(conn.getInputStream());
-                OutputStream os = new FileOutputStream(savePath);
-
-                try {
-                    byte[] buf = new byte[4096];
-                    int bytesRead;
-                    long totalRead = 0;
-                    int lastPercent = -1;
-                    while ((bytesRead = is.read(buf)) != -1) {
-                        os.write(buf, 0, bytesRead);
-                        totalRead += bytesRead;
-                        if (totalLength > 0) {
-                            int percent = (int) (totalRead * 100L / totalLength);
-                            if (percent != lastPercent) {
-                                lastPercent = percent;
-                                final int p = percent;
-                                mainHandler.post(() -> callback.onProgress(p));
-                            }
+                if (conn.getResponseCode() != 200) {
+                    throw new java.io.IOException("HTTP " + conn.getResponseCode());
+                }
+                long total = conn.getContentLength();
+                java.io.File target = new java.io.File(savePath);
+                java.io.File parent = target.getParentFile();
+                if (parent != null && !parent.exists()) {
+                    parent.mkdirs();
+                }
+                in = conn.getInputStream();
+                out = new java.io.FileOutputStream(target);
+                byte[] buf = new byte[8192];
+                long done = 0;
+                int n;
+                int lastPercent = -1;
+                while ((n = in.read(buf)) != -1) {
+                    out.write(buf, 0, n);
+                    done += n;
+                    if (total > 0) {
+                        int percent = (int) (done * 100 / total);
+                        if (percent != lastPercent) {
+                            lastPercent = percent;
+                            final int p = percent;
+                            MAIN.post(() -> callback.onProgress(p));
                         }
                     }
-                } finally {
-                    os.close();
-                    is.close();
                 }
-                final String path = savePath;
-                mainHandler.post(() -> callback.onComplete(path));
-            } catch (Exception e) {
-                final String msg = e.getMessage();
-                mainHandler.post(() -> callback.onError(msg != null ? msg : "下载失败"));
+                out.flush();
+                MAIN.post(() -> callback.onComplete(savePath));
+            } catch (Throwable t) {
+                final String msg = t.getMessage() == null ? "下载失败" : t.getMessage();
+                MAIN.post(() -> callback.onError(msg));
             } finally {
+                try {
+                    if (out != null) out.close();
+                } catch (Throwable ignored) {
+                }
+                try {
+                    if (in != null) in.close();
+                } catch (Throwable ignored) {
+                }
                 if (conn != null) conn.disconnect();
             }
-        }).start();
+        }, "update-download").start();
+    }
+
+    /** 拉取清单；全部源都失败返回 null。 */
+    public static JSONObject fetchManifest() {
+        for (String url : MANIFEST_URLS) {
+            JSONObject obj = fetchJson(url);
+            if (obj != null) {
+                return obj;
+            }
+        }
+        return null;
+    }
+
+    private static JSONObject fetchJson(String urlStr) {
+        HttpURLConnection conn = null;
+        InputStream in = null;
+        try {
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            conn.setRequestProperty("User-Agent", "163MusicPlus");
+            conn.setRequestProperty("Cache-Control", "no-cache");
+            conn.connect();
+            if (conn.getResponseCode() != 200) {
+                return null;
+            }
+            in = conn.getInputStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                bos.write(buf, 0, n);
+            }
+            return new JSONObject(new String(bos.toByteArray(), "UTF-8"));
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try {
+                if (in != null) in.close();
+            } catch (Throwable ignored) {
+            }
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    /** 版本信息（后台线程拉清单，回调切主线程）。 */
+    public static void checkVersionInfo(Context context, VersionCheckCallback callback) {
+        new Thread(() -> {
+            final JSONObject obj = fetchManifest();
+            MAIN.post(() -> {
+                if (obj == null) {
+                    callback.onError("无法连接更新服务器");
+                    return;
+                }
+                String name = obj.optString("versionName", "").trim();
+                if (name.isEmpty()) {
+                    callback.onError("清单缺少 versionName");
+                    return;
+                }
+                int localCode = 0;
+                try {
+                    localCode = context.getPackageManager()
+                            .getPackageInfo(context.getPackageName(), 0).versionCode;
+                } catch (Throwable ignored) {
+                }
+                callback.onResult(new VersionInfo(name,
+                        obj.optInt("versionCode", 0),
+                        obj.optString("notes", ""),
+                        localCode));
+            });
+        }, "update-check").start();
+    }
+
+    /** 下载源：清单里的 apkUrl + mirrors。 */
+    public static void fetchSources(SourcesCallback callback) {
+        new Thread(() -> {
+            final JSONObject obj = fetchManifest();
+            final List<String> urls = new ArrayList<>();
+            String error = null;
+            if (obj == null) {
+                error = "无法连接更新服务器";
+            } else {
+                String apk = obj.optString("apkUrl", "").trim();
+                if (!apk.isEmpty()) {
+                    urls.add(apk);
+                }
+                JSONArray mirrors = obj.optJSONArray("mirrors");
+                if (mirrors != null) {
+                    for (int i = 0; i < mirrors.length(); i++) {
+                        String m = mirrors.optString(i, "").trim();
+                        if (!m.isEmpty() && !urls.contains(m)) {
+                            urls.add(m);
+                        }
+                    }
+                }
+                if (urls.isEmpty()) {
+                    error = "清单未配置下载地址";
+                }
+            }
+            final String finalError = error;
+            MAIN.post(() -> {
+                if (finalError != null) {
+                    callback.onError(finalError);
+                } else {
+                    callback.onResult(urls);
+                }
+            });
+        }, "update-sources").start();
     }
 }
