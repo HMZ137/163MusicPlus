@@ -24,8 +24,16 @@ import java.util.List;
  */
 public final class UpdateChecker {
 
-    /** 清单地址（按顺序尝试，先成功者生效）。 */
+    /**
+     * 清单地址（按顺序尝试，先成功者生效）。
+     *
+     * <p>2026-11-21：jsDelivr 对 {@code @main} 的缓存最长 12 小时、purge 也刷不干净，
+     * 导致改了清单线上仍是旧内容。这里把新版本清单放到 {@code updates/manifest.json}
+     * （新路径没有历史缓存，立即生效）；旧的 {@code update.json} 保留给已发布的旧版本 App。</p>
+     */
     private static final String[] MANIFEST_URLS = {
+            "https://cdn.jsdelivr.net/gh/HMZ137/163MusicPlus@main/updates/manifest.json",
+            "https://raw.githubusercontent.com/HMZ137/163MusicPlus/main/updates/manifest.json",
             "https://cdn.jsdelivr.net/gh/HMZ137/163MusicPlus@main/update.json",
             "https://raw.githubusercontent.com/HMZ137/163MusicPlus/main/update.json"
     };
