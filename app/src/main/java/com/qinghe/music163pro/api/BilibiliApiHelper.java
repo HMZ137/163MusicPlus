@@ -447,31 +447,86 @@ public class BilibiliApiHelper {
         });
     }
 
-    public static void searchVideos(String keyword, String cookie, SearchVideosCallback callback) {
+    // ==================== 搜索（需求 2026-11-21 重做） ====================
+    // 旧实现用的是 /x/web-interface/search/type，没有 WBI 签名也没有分页，
+    // 在 B 站现行风控下会 412 或返回空。这里换成 wbi 版本：
+    //   · WBI 签名（密钥缓存 30 分钟）
+    //   · seid 按关键词缓存，保证翻页结果连续（不再用静态字段串词）
+    //   · 支持 page 分页
+
+    private static final java.util.Map<String, String> SEID_CACHE =
+            java.util.Collections.synchronizedMap(new java.util.HashMap<>());
+    private static volatile String wbiImgKey = "";
+    private static volatile String wbiSubKey = "";
+    private static volatile long wbiKeyFetchedAt = 0L;
+
+    /** 拉取 WBI 密钥（缓存 30 分钟）。未登录也能拿到。 */
+    private static String[] ensureWbiKeys(String cookie) {
+        long now = System.currentTimeMillis();
+        if (!wbiImgKey.isEmpty() && now - wbiKeyFetchedAt < 30 * 60 * 1000L) {
+            return new String[]{wbiImgKey, wbiSubKey};
+        }
+        try {
+            String resp = httpGet("https://api.bilibili.com/x/web-interface/nav", cookie);
+            JSONObject json = new JSONObject(resp);
+            JSONObject data = json.optJSONObject("data");
+            JSONObject wbi = data != null ? data.optJSONObject("wbi_img") : null;
+            if (wbi != null) {
+                wbiImgKey = BiliWbi.keyFromUrl(wbi.optString("img_url", ""));
+                wbiSubKey = BiliWbi.keyFromUrl(wbi.optString("sub_url", ""));
+                wbiKeyFetchedAt = now;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "ensureWbiKeys failed: " + t.getMessage());
+        }
+        return new String[]{wbiImgKey, wbiSubKey};
+    }
+
+    /** 搜索视频（带分页，page 从 1 开始）。 */
+    public static void searchVideos(String keyword, int page, String cookie,
+                                    SearchVideosCallback callback) {
         executor.execute(() -> {
             try {
-                String normalizedKeyword = keyword != null ? keyword.trim() : "";
-                if (normalizedKeyword.isEmpty()) {
+                String kw = keyword != null ? keyword.trim() : "";
+                if (kw.isEmpty()) {
                     postError(callback, "搜索关键词不能为空");
                     return;
                 }
                 String requestCookie = ensureSearchCookie(cookie);
-                String url = "https://api.bilibili.com/x/web-interface/search/type?search_type=video"
-                        + "&keyword=" + URLEncoder.encode(normalizedKeyword, "UTF-8");
+                String[] keys = ensureWbiKeys(requestCookie);
+                java.util.Map<String, String> params = new java.util.HashMap<>();
+                params.put("search_type", "video");
+                params.put("keyword", kw);
+                params.put("page", String.valueOf(Math.max(1, page)));
+                params.put("page_size", "20");
+                String seid = SEID_CACHE.get(kw);
+                if (seid != null && !seid.isEmpty()) {
+                    params.put("seid", seid);
+                }
+                String query = BiliWbi.signQuery(params, keys[0], keys[1]);
+                String url = "https://api.bilibili.com/x/web-interface/wbi/search/type?" + query;
                 String response = httpGet(url, requestCookie);
                 JSONObject json = new JSONObject(response);
                 int code = json.optInt("code", -1);
                 if (code != 0) {
-                    postError(callback, json.optString("message", "搜索失败"));
+                    postError(callback, json.optString("message", "搜索失败(" + code + ")"));
                     return;
                 }
-
                 JSONObject data = json.optJSONObject("data");
+                if (data != null) {
+                    String newSeid = data.optString("seid", "");
+                    if (!newSeid.isEmpty()) {
+                        SEID_CACHE.put(kw, newSeid);
+                    }
+                }
                 JSONArray resultArray = data != null ? data.optJSONArray("result") : null;
                 List<BilibiliSearchVideo> videos = new ArrayList<>();
                 if (resultArray != null) {
                     for (int i = 0; i < resultArray.length(); i++) {
-                        JSONObject item = resultArray.getJSONObject(i);
+                        JSONObject item = resultArray.optJSONObject(i);
+                        if (item == null) {
+                            continue;
+                        }
                         videos.add(new BilibiliSearchVideo(
                                 item.optLong("aid", 0),
                                 item.optString("bvid", ""),
@@ -486,6 +541,50 @@ public class BilibiliApiHelper {
             } catch (Exception e) {
                 Log.e(TAG, "searchVideos error", e);
                 postError(callback, e.getMessage());
+            }
+        });
+    }
+
+    /** 兼容旧调用（无分页语义，等价第一页）。 */
+    public static void searchVideos(String keyword, String cookie, SearchVideosCallback callback) {
+        searchVideos(keyword, 1, cookie, callback);
+    }
+
+    /** 搜索联想词。 */
+    public interface SuggestionsCallback {
+        void onResult(List<String> suggestions);
+
+        void onError(String message);
+    }
+
+    public static void searchSuggestions(String keyword, SuggestionsCallback callback) {
+        executor.execute(() -> {
+            try {
+                String kw = keyword == null ? "" : keyword.trim();
+                if (kw.isEmpty()) {
+                    mainHandler.post(() -> callback.onResult(new ArrayList<>()));
+                    return;
+                }
+                String url = "https://s.search.bilibili.com/main/suggest?main_ver=v1&term="
+                        + URLEncoder.encode(kw, "UTF-8");
+                String response = httpGet(url, "");
+                JSONObject json = new JSONObject(response);
+                JSONArray tags = json.optJSONArray("tag");
+                List<String> list = new ArrayList<>();
+                if (tags != null) {
+                    for (int i = 0; i < tags.length(); i++) {
+                        JSONObject t = tags.optJSONObject(i);
+                        String value = t != null ? t.optString("value", "") : "";
+                        if (!value.isEmpty()) {
+                            list.add(value);
+                        }
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(list));
+            } catch (Exception e) {
+                Log.e(TAG, "searchSuggestions error", e);
+                final String msg = e.getMessage() == null ? "联想词获取失败" : e.getMessage();
+                mainHandler.post(() -> callback.onError(msg));
             }
         });
     }

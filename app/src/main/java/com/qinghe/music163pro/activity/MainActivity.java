@@ -1624,7 +1624,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     /** F1：两次事件间隔超过它 ⇒ 视为一次新的「旋转手势」，立刻响应一步。 */
     private static final long CROWN_GESTURE_GAP_MS = 250L;
     /** F1：持续旋转时每一步的节拍（16 格音量下约 5.4s 从 0 到 100%，需求方 2026-10-17 指定）。 */
-    private static final long CROWN_STEP_INTERVAL_MS = 340L;
+    private static final long CROWN_STEP_INTERVAL_MS = 120L;
 
     /**
      * 表冠连转的步进节拍，随「灵敏度」档位变化（需求 2026-11-21）：
@@ -1632,12 +1632,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      */
     private long crownStepInterval() {
         int sens = com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this);
-        if (sens <= 1) return CROWN_STEP_INTERVAL_MS * 2;
-        if (sens >= 3) return CROWN_STEP_INTERVAL_MS * 2 / 3;
+        // 2026-11-21：节拍整体收紧（基准 120ms），配合 UI 即时跟手；
+        // 低灵敏仍保留明显减速，高灵敏更快。
+        if (sens <= 1) return 200L;
+        if (sens >= 3) return 60L;
         return CROWN_STEP_INTERVAL_MS;
     }
     /** F1：方向判定所需的最小累计位移（防抖；避免正负抖动来回跳音量）。 */
-    private static final float CROWN_DIR_THRESHOLD = 3f;
+    private static final float CROWN_DIR_THRESHOLD = 1.5f;
 
     /** 上一次事件时刻（判断手势是否中断）。 */
     private long crownLastEventMs;
@@ -1728,6 +1730,90 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         return true;   // 表冠事件自己消费，避免被父类/其它控件再当滚轮处理
     }
 
+    // ==================== 右侧滚轮音量细条（2026-11-21 重做） ====================
+
+    private android.widget.FrameLayout crownVolumeOverlay;
+    private com.qinghe.music163pro.widget.VolumeBarView crownVolumeBar;
+    private final android.os.Handler crownVolumeHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    /** 系统音量写入的合并队列（连滚时只写最后一格，UI 仍然每格即时更新）。 */
+    private final android.os.Handler volumeWriteHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable pendingVolumeRunnable;
+    private Runnable crownVolumeHideRunnable;
+    private android.animation.ValueAnimator crownBarAnimator;
+
+    /**
+     * 显示右侧音量细条：首次创建后淡入（DecelerateInterpolator(2f)、300ms），
+     * 每次调用重置 2 秒隐藏计时；停手 2 秒后淡出（AccelerateInterpolator、300ms）。
+     */
+    private void showCrownVolumeBar(int percent) {
+        if (crownVolumeOverlay == null) {
+            android.widget.FrameLayout overlay = new android.widget.FrameLayout(this);
+            overlay.setClipChildren(false);
+            com.qinghe.music163pro.widget.VolumeBarView bar =
+                    new com.qinghe.music163pro.widget.VolumeBarView(this);
+            android.widget.FrameLayout.LayoutParams barLp = new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, dp(120));
+            barLp.gravity = android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL;
+            barLp.rightMargin = dp(6);
+            overlay.addView(bar, barLp);
+            overlay.setAlpha(0f);
+            overlay.setVisibility(android.view.View.GONE);
+            android.view.ViewGroup content =
+                    findViewById(android.R.id.content);
+            if (!(content instanceof android.view.ViewGroup)) {
+                return;
+            }
+            ((android.view.ViewGroup) content).addView(overlay,
+                    new android.widget.FrameLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            crownVolumeOverlay = overlay;
+            crownVolumeBar = bar;
+        }
+        if (crownVolumeOverlay.getVisibility() != android.view.View.VISIBLE) {
+            crownVolumeOverlay.setVisibility(android.view.View.VISIBLE);
+            crownVolumeOverlay.animate().alpha(1f).setDuration(300L)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
+        }
+        animateCrownBarTo(percent);
+        if (crownVolumeHideRunnable != null) {
+            crownVolumeHandler.removeCallbacks(crownVolumeHideRunnable);
+        }
+        crownVolumeHideRunnable = () -> {
+            if (crownVolumeOverlay == null) {
+                return;
+            }
+            crownVolumeOverlay.animate().alpha(0f).setDuration(300L)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .withEndAction(() -> {
+                        if (crownVolumeOverlay != null) {
+                            crownVolumeOverlay.setVisibility(android.view.View.GONE);
+                        }
+                    }).start();
+        };
+        crownVolumeHandler.postDelayed(crownVolumeHideRunnable, 2000L);
+    }
+
+    /**
+     * 把细条推到目标百分比。
+     *
+     * <p>2026-11-21：改成控件内部缓动逼近（{@code setProgressSmooth}）——
+     * 每帧朝目标走 35%，滚轮连续转时目标一直在变，视觉上是连续滑动；
+     * 既不会像定长补间那样「永远追不上」，也不会一格一格硬跳。</p>
+     */
+    private void animateCrownBarTo(float targetPercent) {
+        if (crownVolumeBar == null) {
+            return;
+        }
+        if (crownBarAnimator != null) {
+            crownBarAnimator.cancel();
+            crownBarAnimator = null;
+        }
+        crownVolumeBar.setProgressSmooth(targetPercent);
+    }
+
     /** F1：表冠调音量本体（一步一格；return true = 已消费）。 */
     private boolean handleCrownScroll(int dir) {
         // P1-11（需求 2026-11-21）：表冠调音量的总开关 / 上限，全部收敛在这里
@@ -1746,8 +1832,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int maxPercent = com.qinghe.music163pro.util.CrownVolumePrefs.getMaxPercent(this);
         int crownCap = Math.round(max * maxPercent / 100f);
         if (dir > 0 && cur >= crownCap) {
-            MusicLog.i("Crown", "已到表冠音量上限 " + maxPercent + "%（" + crownCap + "），不再加大");
-            return false;
+            // 2026-11-21：到上限时不再「完全不响应」——仍然把细条显示到上限位置，
+            // 给用户明确的视觉反馈，只是不真的上调音量。
+            int capPercent = max > 0 ? Math.round(crownCap * 100f / max) : maxPercent;
+            showCrownVolumeBar(capPercent);
+            MusicLog.i("Crown", "已到表冠音量上限 " + maxPercent + "%（" + crownCap
+                    + "），显示细条但不调音量");
+            return true;
         }
         if (dir > 0 && target > crownCap) {
             target = crownCap;
@@ -1755,14 +1846,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // ⚠️ 顺序很重要：先把浮层建出来并显示**旧值**，再更新系统音量走动画；
         // 若像上一版那样先改音量再 showVolumeIndicator()，浮层首次出现时已经被设成新值，
         // 看不到过渡（这就是需求方反馈「平滑过渡没出现」的直接原因之一）。
-        showVolumeIndicator();
+        // 2026-11-21：表冠改用右侧竖直细条（参考零度音乐 ZeroVerticalProgressBar），
+        // 不再弹横向浮层；细条淡入 300ms、逐帧跟手、停手 2 秒后淡出。
+        int percent = max > 0 ? Math.round(target * 100f / max) : 0;
+        showCrownVolumeBar(percent);
         if (target != cur) {
-            animateVolumeUpdate = true;     // 表冠：音量条走平滑过渡
-            applyUserVolume(target, max);   // 复用 M1：含耳机安全音量确认
+            // 2026-11-21：UI 已经即时跟手，系统音量写入做 70ms 合并 ——
+            // 节拍收紧到 120ms 后连续转会产生较密的 setStreamVolume 调用，合并后只写最后一格。
+            final int pendingTarget = target;
+            final int pendingMax = max;
+            if (pendingVolumeRunnable != null) {
+                volumeWriteHandler.removeCallbacks(pendingVolumeRunnable);
+            }
+            pendingVolumeRunnable = () -> applyUserVolume(pendingTarget, pendingMax);
+            volumeWriteHandler.postDelayed(pendingVolumeRunnable, 70L);
         }
-        scheduleVolumeDismiss();
-        MusicLog.i("Crown", "表冠调音量: dir=" + dir + " 音量 " + cur + " -> " + target
-                + " (max=" + max + ")");
+        // 2026-11-21：去掉每次滚轮都写文件的日志（连续调节时是实打实的 IO 开销）
         return true;
     }
 
@@ -1829,9 +1928,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     WatchConfirmDialog.Options.defaultOptions());
             return;
         }
-        if (percent < SAFE_VOLUME_PERCENT) {
-            volumeSafeConfirmed = false;
-        }
+        // 2026-11-21：不再「降到阈值以下就复位」——那样每次下调后再升上去都会重新弹框。
+        // 口径改为「一次启动只确认一次」：进度内确认过就不再提醒，重启 App 才会再问。
         applyVolumeToSystem(target);
     }
 
@@ -1958,7 +2056,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int percent = max > 0 ? Math.round(target * 100f / max) : 0;
         boolean animate = animateVolumeUpdate;
         animateVolumeUpdate = false;
-        updateVolumeIndicator(max > 0, target, max, percent, animate);
+        // 2026-11-21：横条不可见时（表冠走竖条）跳过它的更新，省掉每格一次的无谓视图刷新
+        if (volumeIndicator != null && volumeIndicator.isShown()) {
+            updateVolumeIndicator(max > 0, target, max, percent, animate);
+        }
         scheduleVolumeDismiss();
     }
 

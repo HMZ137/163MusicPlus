@@ -238,10 +238,8 @@ public final class UpdateChecker {
             if (obj == null) {
                 error = "无法连接更新服务器";
             } else {
-                String apk = obj.optString("apkUrl", "").trim();
-                if (!apk.isEmpty()) {
-                    urls.add(apk);
-                }
+                // 2026-11-21：国内加速源优先（GitHub 直链多数网络环境裸连不通），
+                // 直链放最后兜底。
                 JSONArray mirrors = obj.optJSONArray("mirrors");
                 if (mirrors != null) {
                     for (int i = 0; i < mirrors.length(); i++) {
@@ -250,6 +248,10 @@ public final class UpdateChecker {
                             urls.add(m);
                         }
                     }
+                }
+                String apk = obj.optString("apkUrl", "").trim();
+                if (!apk.isEmpty() && !urls.contains(apk)) {
+                    urls.add(apk);
                 }
                 if (urls.isEmpty()) {
                     error = "清单未配置下载地址";
