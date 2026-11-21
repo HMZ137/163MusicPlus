@@ -1,942 +1,697 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-page-node-id="0YpasnBOgfWgIkKcX5VZMP">
-<head data-page-node-id="c0domdQVuYUFd8iadPYkaS">
-<meta charset="utf-8" data-page-node-id="Sb2np1btJy7rTPS02Fvk2a">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" data-page-node-id="ZXeieP5dbF147bhDVjA1yA">
-<meta name="color-scheme" content="dark" data-page-node-id="8yOZNv7UcBPdpRmsAyJsWd">
-<title>局域网快传 · 传到手表</title>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d1212">
+<title>163音乐Pro · 传歌到手表</title>
 <style>
-*,*::before,*::after{box-sizing:border-box;}
-html,body{height:100%;}
-
-/* ============ 主题变量：默认深色（App 配色），html.theme-light 覆盖为浅色 ============ */
+/* ============================================================
+   主题变量：#39c5bb（初音绿）占位，后续由主题系统覆盖。
+   页面所有颜色都走这里，换主题只改变量。
+   ============================================================ */
 :root{
-  --bg:#121212; --glow1:rgba(187,134,252,.16); --glow2:rgba(3,218,198,.10);
-  --text:#FFFFFF; --muted:#A0A0A0; --muted-2:#8A8A8A;
-  --card:#1E1E1E; --card-2:#252525; --dz-bg:rgba(255,255,255,.015);
-  --border:rgba(255,255,255,.06); --border-strong:rgba(255,255,255,.15);
-  --topbar-bg:rgba(18,18,18,.72); --bar-solid:rgba(18,18,18,.99); --bar-mid:rgba(18,18,18,.88);
-  --toast-bg:rgba(37,37,37,.97); --btn-bg:rgba(255,255,255,.07);
-  --track:rgba(255,255,255,.08);
-  --accent:#BB86FC; --accent-soft:#C7A6FF; --accent-12:rgba(187,134,252,.12);
-}
-html.theme-light{
-  --bg:#F4F1FB; --glow1:rgba(124,77,255,.10); --glow2:rgba(3,150,136,.08);
-  --text:#1D1D1F; --muted:#6E6E73; --muted-2:#8A8A8A;
-  --card:#FFFFFF; --card-2:#F2EFF9; --dz-bg:rgba(124,77,255,.04);
-  --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.16);
-  --topbar-bg:rgba(248,246,253,.85); --bar-solid:rgba(248,246,253,.99); --bar-mid:rgba(248,246,253,.90);
-  --toast-bg:rgba(255,255,255,.98); --btn-bg:rgba(0,0,0,.05);
-  --track:rgba(0,0,0,.08);
-  --accent:#7C4DFF; --accent-soft:#6A3DB8; --accent-12:rgba(124,77,255,.12);
+  --accent:#39c5bb;
+  --accent-bright:#5fe3d8;
+  --accent-dim:rgba(57,197,187,.12);
+  --accent-edge:rgba(57,197,187,.34);
+
+  --bg:#0b1111;
+  --panel:#131b1b;
+  --panel-2:#192323;
+  --stroke:#223030;
+
+  --fg:#e9f4f2;
+  --fg-dim:#8ba09e;
+  --bad:#ff7b72;
+  --good:#39c5bb;
+
+  --r-xl:18px;
+  --r-lg:14px;
+  --r-md:10px;
 }
 
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
 body{
-  margin:0;
+  margin:0;color:var(--fg);
   background:
-    radial-gradient(900px 500px at 8% -8%, var(--glow1), transparent 60%),
-    radial-gradient(700px 420px at 100% 4%, var(--glow2), transparent 55%),
+    radial-gradient(900px 500px at 78% -14%, rgba(57,197,187,.10), transparent 62%),
+    radial-gradient(700px 380px at -8% 108%, rgba(57,197,187,.06), transparent 64%),
     var(--bg);
-  color:var(--text);
-  font:14px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
-  -webkit-font-smoothing:antialiased;
-  overscroll-behavior-y:none;
-  -webkit-tap-highlight-color:transparent;
+  font:14px/1.55 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+  display:flex;justify-content:center;
+  padding:16px;
 }
-[hidden]{display:none !important;}
-button,input{font-family:inherit;}
+.app{width:100%;max-width:760px;display:flex;flex-direction:column;min-height:100%}
 
-/* ============ 布局 ============ */
-.app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding-bottom:calc(106px + env(safe-area-inset-bottom));}
-
-/* ============ 顶栏 ============ */
-.topbar{
-  position:sticky;top:0;z-index:30;
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
-  background:var(--topbar-bg);
-  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  border-bottom:1px solid var(--border);
-  overflow:hidden;
+/* ---------- 顶部工具栏 ---------- */
+.bar{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 12px;margin-bottom:12px;
+  background:var(--panel);border:1px solid var(--stroke);border-radius:var(--r-xl);
 }
-.brand{display:flex;align-items:center;gap:10px;min-width:0;}
-.logo{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;color:#fff;
-  background:linear-gradient(135deg,#BB86FC,#03DAC6);box-shadow:0 6px 16px rgba(187,134,252,.35);}
-.brand h1{margin:0;font-size:15px;font-weight:700;letter-spacing:.2px;}
-.brand p{margin:0;font-size:11px;color:var(--muted);}
-.status-pill{display:flex;align-items:center;gap:6px;flex:none;font-size:11px;color:#7ee2b8;
-  background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);padding:5px 10px;border-radius:99px;}
-.pulse{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 1.8s infinite;}
-@keyframes pulse{
-  0%{box-shadow:0 0 0 0 rgba(34,197,94,.55);}
-  70%{box-shadow:0 0 0 7px rgba(34,197,94,0);}
-  100%{box-shadow:0 0 0 0 rgba(34,197,94,0);}
+.mark{
+  width:36px;height:36px;border-radius:11px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(150deg,var(--accent),var(--accent-bright));
+  color:#04211f;font-weight:800;font-size:16px;
+  box-shadow:0 5px 16px rgba(57,197,187,.26);
+}
+.who{min-width:0;flex:1}
+.who b{display:block;font-size:15px;font-weight:700;letter-spacing:.2px}
+.who span{display:block;color:var(--fg-dim);font-size:12px;margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.dot{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--accent)}
+.dot i{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:beat 2s infinite}
+.dot.off{color:var(--bad)}
+.dot.off i{background:var(--bad);animation:none}
+@keyframes beat{
+  0%{box-shadow:0 0 0 0 rgba(57,197,187,.5)}
+  70%{box-shadow:0 0 0 8px rgba(57,197,187,0)}
+  100%{box-shadow:0 0 0 0 rgba(57,197,187,0)}
 }
 
-/* ============ 接收端卡片 ============ */
-.peer-card{display:flex;align-items:center;gap:12px;margin:16px 16px 0;padding:14px;border-radius:16px;
-  background:linear-gradient(135deg, rgba(187,134,252,.13), rgba(3,218,198,.05));
-  border:1px solid rgba(187,134,252,.24);}
-.peer-avatar{width:44px;height:44px;border-radius:13px;flex:none;display:grid;place-items:center;color:#fff;
-  font-size:13px;font-weight:800;letter-spacing:.3px;background:linear-gradient(135deg,#BB86FC,#9A6DE8);
-  box-shadow:0 6px 16px rgba(187,134,252,.3);}
-.peer-info{flex:1;min-width:0;}
-.peer-label{font-size:10.5px;color:var(--accent-soft);letter-spacing:.4px;font-weight:600;}
-.peer-name{font-size:14.5px;font-weight:700;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.peer-meta{font-size:11.5px;color:var(--muted);margin-top:1px;word-break:break-all;}
-.peer-status{display:flex;align-items:center;gap:5px;flex:none;font-size:11px;color:#7ee2b8;
-  background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.22);padding:4px 9px;border-radius:99px;}
+.icon-btn{
+  width:36px;height:36px;flex:none;border-radius:11px;cursor:pointer;
+  background:var(--accent-dim);border:1px solid var(--accent-edge);
+  color:var(--accent);display:grid;place-items:center;
+  transition:background .15s,transform .1s;
+}
+.icon-btn:hover{background:rgba(57,197,187,.2)}
+.icon-btn:active{transform:scale(.95)}
+.icon-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
 
-/* ============ 卡片 ============ */
-.card{margin:14px 16px 0;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;}
-.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;}
-.card-head h2{margin:0;font-size:13.5px;font-weight:600;}
-.head-actions{display:flex;align-items:center;gap:14px;}
-.link-btn{display:flex;align-items:center;gap:5px;background:transparent;border:0;color:var(--accent);
-  font-size:12.5px;font-weight:600;padding:4px 2px;cursor:pointer;transition:.18s;}
-.link-btn:active{opacity:.6;}
-.link-btn.active{color:#22a85c;}
-.link-btn:disabled{opacity:.35;cursor:not-allowed;}
+/* ---------- 拖放主区 ---------- */
+.stage{
+  flex:1;display:flex;flex-direction:column;gap:12px;min-height:0;
+}
+.dropzone{
+  position:relative;flex:1;min-height:180px;
+  display:grid;place-items:center;text-align:center;
+  border:1.6px dashed var(--accent-edge);border-radius:var(--r-xl);
+  background:
+    radial-gradient(520px 220px at 50% 0%, var(--accent-dim), transparent 72%),
+    var(--panel);
+  cursor:pointer;padding:26px 18px;
+  transition:border-color .16s,background .16s,transform .12s;
+}
+.dropzone:hover{border-color:var(--accent)}
+.dropzone.over{border-color:var(--accent-bright);background:rgba(57,197,187,.14);transform:scale(.995)}
+.dropzone .glyph{
+  width:56px;height:56px;margin:0 auto 12px;border-radius:16px;
+  display:grid;place-items:center;
+  background:var(--accent-dim);border:1px solid var(--accent-edge);color:var(--accent);
+}
+.dropzone .glyph svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.dropzone h3{margin:0 0 5px;font-size:15.5px;font-weight:650}
+.dropzone p{margin:0;color:var(--fg-dim);font-size:12.5px}
+.dropzone .cta{
+  display:inline-block;margin-top:13px;padding:7px 16px;border-radius:999px;
+  background:var(--accent);color:#04211f;font-size:12.5px;font-weight:750;
+}
+.hidden-file{display:none}
 
-/* ============ 拖拽区 ============ */
-.dropzone{margin-top:10px;border:1.5px dashed var(--border-strong);border-radius:14px;padding:22px 16px;
-  text-align:center;cursor:pointer;transition:.2s;background:var(--dz-bg);}
-.dropzone.over,.dropzone:active{border-color:#BB86FC;background:rgba(187,134,252,.09);}
-.dz-icon{width:42px;height:42px;margin:0 auto 8px;border-radius:12px;display:grid;place-items:center;
-  background:var(--accent-12);color:var(--accent);}
-.dz-title{margin:0;font-size:13.5px;font-weight:600;}
-.dz-sub{margin:3px 0 0;font-size:11.5px;color:var(--muted);}
+/* ---------- 队列 ---------- */
+.queue{
+  background:var(--panel);border:1px solid var(--stroke);border-radius:var(--r-xl);
+  padding:12px;max-height:42vh;display:flex;flex-direction:column;min-height:0;
+}
+.qhead{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.qhead b{font-size:13px;font-weight:650}
+.qhead .n{color:var(--fg-dim);font-size:11.5px}
+.qhead .gap{flex:1}
+.qlist{list-style:none;margin:0;padding:0;overflow:auto;display:flex;flex-direction:column;gap:7px}
+.qlist::-webkit-scrollbar{width:6px}
+.qlist::-webkit-scrollbar-thumb{background:var(--stroke);border-radius:99px}
 
-/* ============ 文件列表 ============ */
-.file-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
-.file-list:empty{display:none;}
-.file-item{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:13px;background:var(--card-2);
-  animation:slideIn .22s ease;transition:background .18s;}
-@keyframes slideIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
+.row{
+  display:grid;grid-template-columns:30px 1fr 42px;gap:9px;align-items:center;
+  padding:8px 10px;border-radius:var(--r-md);
+  background:var(--panel-2);border:1px solid var(--stroke);
+}
+.row .tag{
+  width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+  background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:750;
+}
+.row .txt{min-width:0}
+.row .nm{font-size:12.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .meta{display:flex;gap:7px;font-size:11px;color:var(--fg-dim);margin-top:2px;
+  white-space:nowrap;overflow:hidden}
+.row .meta .ok{color:var(--good)}
+.row .meta .err{color:var(--bad)}
+.row .num{font-size:11.5px;color:var(--fg-dim);text-align:right;font-variant-numeric:tabular-nums}
+.row .track{grid-column:1 / -1;height:3px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
+.row .track > i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-bright));transition:width .18s}
+.row.ok{border-color:var(--accent-edge)}
+.row.bad{border-color:rgba(255,123,114,.42)}
 
-.fi-check{width:20px;height:20px;flex:none;border-radius:50%;border:1.5px solid var(--border-strong);
-  display:none;place-items:center;font-size:11px;color:#fff;line-height:1;transition:.18s;}
-.file-list.multi-mode .fi-check{display:grid;}
-.file-list.multi-mode .file-item{cursor:pointer;}
-.file-list.multi-mode .fi-remove{display:none;}
-.file-item.sel{background:var(--accent-12);}
-.file-item.sel .fi-check{background:var(--accent);border-color:var(--accent);}
-.file-item.sel .fi-check::after{content:'✓';}
+/* ---------- 监控面板（底部滑出） ---------- */
+.sheet-mask{
+  position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;
+  transition:opacity .2s;z-index:40;
+  backdrop-filter:blur(2px);
+}
+.sheet-mask.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:41;
+  max-width:760px;margin:0 auto;
+  background:var(--panel);border-top:1px solid var(--accent-edge);
+  border-radius:20px 20px 0 0;
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom));
+  transform:translateY(102%);transition:transform .26s cubic-bezier(.32,.72,0,1);
+  max-height:84vh;overflow:auto;
+  box-shadow:0 -18px 40px rgba(0,0,0,.5);
+}
+.sheet.on{transform:translateY(0)}
+.sheet .grab{width:38px;height:4px;border-radius:99px;background:var(--stroke);margin:0 auto 12px}
+.sheet h3{margin:0 0 12px;font-size:14.5px;font-weight:650;display:flex;align-items:center;gap:8px}
+.sheet h3 .close{
+  margin-left:auto;width:28px;height:28px;border-radius:8px;cursor:pointer;
+  background:var(--panel-2);border:1px solid var(--stroke);color:var(--fg-dim);
+  display:grid;place-items:center;font-size:15px;line-height:1;
+}
+.sheet h3 .close:hover{color:var(--fg)}
 
-.fi-icon{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
-  font-size:9.5px;font-weight:800;color:#fff;background:var(--c,#64748b);letter-spacing:.2px;}
-.fi-main{flex:1;min-width:0;}
-.fi-top{display:flex;align-items:baseline;gap:8px;}
-.fi-name{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.fi-size{font-size:11px;color:var(--muted);flex:none;}
-.fi-progress{height:4px;border-radius:99px;background:var(--track);margin:7px 0 5px;overflow:hidden;}
-.fi-progress i{display:block;height:100%;width:0;border-radius:99px;
-  background:linear-gradient(90deg,#BB86FC,#03DAC6);transition:width .12s linear;}
-.fi-bottom{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
-.file-item.done .fi-progress i{background:linear-gradient(90deg,#22c55e,#4ade80);}
-.file-item.done .fi-state{color:#4ade80;}
-.file-item.fail .fi-state{color:#ff8a8a;}
-.fi-remove{width:24px;height:24px;flex:none;border:0;border-radius:50%;background:var(--btn-bg);
-  color:var(--muted);font-size:15px;line-height:1;cursor:pointer;transition:.18s;}
-.fi-remove:hover{background:rgba(240,80,80,.18);color:#f07070;}
+.now{
+  display:grid;grid-template-columns:44px 1fr;gap:11px;align-items:center;
+  padding:11px;border-radius:var(--r-lg);
+  background:var(--panel-2);border:1px solid var(--stroke);margin-bottom:10px;
+}
+.now .cover{
+  width:44px;height:44px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(145deg,var(--accent-dim),transparent);
+  border:1px solid var(--accent-edge);color:var(--accent);font-size:19px;
+}
+.now .t1{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now .t2{font-size:11.5px;color:var(--fg-dim);margin-top:2px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.now .pb{height:4px;border-radius:99px;background:rgba(255,255,255,.07);margin-top:7px;overflow:hidden}
+.now .pb > i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-bright));transition:width .5s linear}
+.now .times{display:flex;justify-content:space-between;font-size:10.5px;
+  color:var(--fg-dim);margin-top:3px;font-variant-numeric:tabular-nums}
 
-/* ============ 收件箱 ============ */
-.inbox-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:var(--card-2);margin-top:8px;}
-.inbox-item .fi-name{font-size:12.5px;}
-.ib-actions{display:flex;gap:8px;flex:none;}
-.icon-btn{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;text-decoration:none;
-  background:var(--btn-bg);color:var(--text);font-size:13px;transition:.18s;}
-.icon-btn:active{transform:scale(.94);}
-.icon-btn.danger:hover{background:rgba(240,80,80,.18);color:#ff8a8a;}
-.empty-tip{margin:10px 0 0;font-size:12px;color:var(--muted-2);text-align:center;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.tile{
+  padding:10px 11px;border-radius:var(--r-md);
+  background:var(--panel-2);border:1px solid var(--stroke);
+}
+.tile .k{font-size:11px;color:var(--fg-dim);display:flex;align-items:center;gap:5px}
+.tile .v{font-size:14px;font-weight:650;margin-top:3px;font-variant-numeric:tabular-nums}
+.tile .sub{font-size:10.5px;color:var(--fg-dim);margin-top:1px}
+.tile.wide{grid-column:1 / -1}
+.tile .meter{height:4px;border-radius:99px;background:rgba(255,255,255,.07);
+  margin-top:7px;overflow:hidden}
+.tile .meter > i{display:block;height:100%;border-radius:99px;
+  background:var(--accent);transition:width .4s}
 
-.drawer-mask{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);
-  opacity:0;pointer-events:none;transition:opacity .22s;}
-.drawer-mask.open{opacity:1;pointer-events:auto;}
-.drawer{position:fixed;top:0;right:0;bottom:0;z-index:60;width:min(88%,420px);
-  background:var(--bg);border-left:1px solid var(--border);
-  transform:translateX(102%);transition:transform .26s cubic-bezier(.22,.9,.3,1);
-  display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);}
-.drawer.open{transform:none;}
-.drawer-head{display:flex;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;
-  border-bottom:1px solid var(--border);background:var(--topbar-bg);
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);}
-.drawer-head h2{flex:1;margin:0;font-size:14.5px;font-weight:700;}
-.drawer-body{flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch;}
-.drawer-body .inbox-item:last-child{margin-bottom:14px;}
+.sheet .hint{margin:11px 0 0;text-align:center;color:var(--fg-dim);font-size:11px}
 
-/* ============ 底部操作栏 ============ */
-.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:40;
-  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
-  background:linear-gradient(to top, var(--bar-solid) 55%, var(--bar-mid) 78%, transparent);}
-.actionbar-inner{max-width:560px;margin:0 auto;}
-.btn-primary{width:100%;border:0;border-radius:8px;padding:15px;font-size:15px;font-weight:700;color:#fff;
-  cursor:pointer;background:var(--accent);box-shadow:0 8px 22px rgba(187,134,252,.22);
-  transition:transform .15s, box-shadow .2s, opacity .2s;}
-html.theme-light .btn-primary{color:#fff;}
-.btn-primary:active{transform:scale(.985);}
-.btn-primary:disabled{opacity:.42;box-shadow:none;cursor:not-allowed;}
-
-.multi-bar{display:flex;align-items:center;gap:10px;}
-.multi-count{flex:1;min-width:0;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.multi-count b{color:var(--text);font-size:15px;font-weight:700;margin:0 2px;}
-.btn-mini{flex:none;border-radius:12px;padding:12px 16px;font-size:13.5px;font-weight:600;cursor:pointer;
-  background:var(--btn-bg);color:var(--text);border:1px solid var(--border-strong);
-  transition:transform .15s, background .18s, opacity .18s;}
-.btn-mini:active{transform:scale(.97);}
-.btn-mini.danger{background:rgba(240,80,80,.15);color:#ff8a8a;border-color:rgba(240,80,80,.3);}
-.btn-mini:disabled{opacity:.38;cursor:not-allowed;transform:none;}
-
-/* ============ Toast ============ */
-.toast{position:fixed;left:50%;bottom:110px;z-index:99;transform:translate(-50%,10px);
-  background:var(--toast-bg);border:1px solid var(--border);color:var(--text);
-  padding:10px 18px;border-radius:99px;font-size:13px;white-space:nowrap;opacity:0;pointer-events:none;
-  transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.45);}
-.toast.show{opacity:1;transform:translate(-50%,0);}
-
-.hint{margin:12px 16px 0;font-size:11.5px;color:var(--muted-2);line-height:1.6;}
-
-/* ============ 桌面 hero 标题区（移动端隐藏） ============ */
-.hero{display:none;}
-
-/* ============ 随机一句话（借鉴 ZeroMusic） ============ */
-.quote{margin:12px 16px 0;text-align:center;font-size:11.5px;color:var(--muted);
-  letter-spacing:.4px;display:flex;align-items:center;gap:10px;}
-.quote::before,.quote::after{content:'';flex:1;height:1px;background:var(--border);}
-
-@media (max-width:419px){ .brand p{display:none;} }
-
-/* ============ 顶栏按钮：主题切换 / 已传输文件 ============ */
-.btn-topbar{flex:none;border:1px solid var(--border-strong);background:var(--btn-bg);color:var(--muted);
-  font-size:11px;padding:6px 10px;border-radius:99px;cursor:pointer;transition:.18s;white-space:nowrap;
-  display:inline-flex;align-items:center;gap:5px;font-family:inherit;}
-.btn-topbar:active{color:var(--accent);border-color:var(--accent);}
-.inbox-btn{color:var(--text);}
-.entry-count{min-width:20px;text-align:center;font-size:10.5px;font-weight:700;color:#fff;
-  background:var(--accent);border-radius:99px;padding:2px 6px;line-height:1.4;}
-.entry-count.zero{background:var(--btn-bg);color:var(--muted);}
-
-/* ============ 页脚 ============ */
-.footer{margin:18px 16px calc(4px + env(safe-area-inset-bottom));text-align:center;
-  font-size:10.5px;color:var(--muted-2);letter-spacing:.3px;}
-
-/* ============ PC 端适配（≥1024px）：内容左移，抽屉变常驻右侧面板 ============ */
-@media (min-width:1024px){
-  body{font-size:15px;}
-  .app{max-width:640px;margin-left:max(40px, calc((100vw - 1140px) / 2));
-    padding-bottom:calc(120px + env(safe-area-inset-bottom));}
-  .actionbar-inner{max-width:640px;margin-left:max(40px, calc((100vw - 1140px) / 2));}
-  .card,.peer-card{margin-left:0;margin-right:0;}
-  .hint,.quote,.footer{margin-left:0;margin-right:0;}
-  .card{padding:20px;border-radius:18px;}
-  .peer-card{padding:18px;border-radius:18px;}
-  .dropzone{padding:44px 24px;}
-  .dz-icon{width:52px;height:52px;}
-  .dz-title{font-size:15px;}
-  .fi-name{font-size:14px;}
-  .btn-primary{padding:17px;font-size:16px;}
-
-  /* 桌面 hero 标题区（移动端隐藏） */
-  .hero{display:block;margin:18px 0 2px;}
-  .hero h1{margin:0;font-size:30px;font-weight:800;letter-spacing:.5px;}
-  .hero p{margin:6px 0 0;font-size:13.5px;color:var(--muted);}
-
-  /* 抽屉 → 常驻右侧面板 */
-  .drawer{top:24px;right:40px;bottom:24px;left:auto;width:420px;transform:none;
-    border:1px solid var(--border);border-radius:18px;background:var(--card);
-    box-shadow:0 18px 50px rgba(0,0,0,.35);padding-bottom:0;}
-  html.theme-light .drawer{box-shadow:0 18px 50px rgba(60,40,110,.12);}
-  .drawer.open{transform:none;}
-  .drawer-head{padding:16px 18px;}
-  .drawer-body{padding:16px 18px;}
-  .drawer-mask,#btnInbox,#btnCloseDrawer{display:none !important;}
+@media (max-width:520px){
+  body{padding:11px}
+  .bar{padding:9px 10px;border-radius:var(--r-lg)}
+  .dropzone{min-height:150px;border-radius:var(--r-lg)}
+  .queue{border-radius:var(--r-lg);max-height:38vh}
+  .grid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
-<body data-page-node-id="nFBbobsECt5hPrecqgOPIR">
+<body>
+<div class="app">
 
-<div class="app" data-page-node-id="Qz3yVNEX7FicJcMgq7eqKG">
-
-  <!-- ========== 顶栏 ========== -->
-  <header class="topbar" data-page-node-id="ZrUah2KiVAKzbDrr2MLr52">
-    <div class="brand" data-page-node-id="ZAfyHpwlkpKZ21hKDtwxD4">
-      <div class="logo" data-page-node-id="tQ6wiwxGEZI4SvFBXriPiC">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-             stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="BmbvRs1YGLVj03MQRoFzvN">
-          <path d="M7 10l-4 4 4 4" data-page-node-id="YjZK1kz3cnU5yj2yYrizUc"/><path d="M3 14h13a4 4 0 004-4V8" data-page-node-id="2yENvauEHNu7gx3kgGvRKK"/>
-          <path d="M17 14l4-4-4-4" data-page-node-id="AxTimNftx0F6lcWLAw0qvt"/><path d="M21 10H8a4 4 0 00-4 4v2" data-page-node-id="wzfimcEbXpcFtZgewc2TAj"/>
-        </svg>
-      </div>
-      <div data-page-node-id="ZPsN0CFSIcNP5ZXB8FhkAp">
-        <h1 data-page-node-id="qXtvkFWIzNUDGF83wUeGoD">局域网快传</h1>
-        <p data-page-node-id="xZ6GaXfhR7fdDXbkKwZmPo">同一 Wi-Fi · 传到手表</p>
-      </div>
+  <!-- 顶部工具栏 -->
+  <div class="bar">
+    <div class="mark">♪</div>
+    <div class="who">
+      <b>传歌到手表</b>
+      <span id="subtitle">音乐进 Music · 歌词自动配对</span>
     </div>
-    <!-- 顶栏右侧：已传输文件（抽屉入口）+ 主题切换；连接状态在下方接收端卡片上有"在线"徽章 -->
-    <button class="btn-topbar inbox-btn" id="btnInbox" title="已传输文件" data-page-node-id="IbxBtn0000000000000000001">
-      已传输<span class="entry-count zero" id="inboxCount" data-page-node-id="IbxN000000000000000000001">0</span>
+    <div class="dot" id="conn"><i></i><span id="connText">在线</span></div>
+    <button class="icon-btn" id="btnMonitor" title="状态监控" aria-label="状态监控">
+      <svg viewBox="0 0 24 24">
+        <path d="M3 13h3l2.5-6 3.5 12 3-8 2 2h4"/>
+      </svg>
     </button>
-    <button class="btn-topbar" id="btnTheme" title="切换主题（深色/浅色/自动）" data-page-node-id="ThBtn0000000000000001">深色</button>
-  </header>
-
-  <!-- ========== 接收端（手表）========== -->
-  <div class="peer-card" data-page-node-id="XzfVqBJzAtDAbMuKUA5ZFt">
-    <div class="peer-avatar" data-page-node-id="s2KMsWmJatxfgI652bEdmT">表</div>
-    <div class="peer-info" data-page-node-id="Y6gdqa6DGojhgEsOhjbLtX">
-      <div class="peer-label" data-page-node-id="JajeYsEFiKwWt6v3V516EB">接收端</div>
-      <div class="peer-name" data-page-node-id="MwF7XHwRg7aanOigRuzbwH">163音乐Pro · 手表</div>
-      <div class="peer-meta" id="peerMeta" data-page-node-id="RqJPXOZLPsYQjQuf2cYgis">—</div>
-    </div>
-    <div class="peer-status" data-page-node-id="Fs22aIgZAYsQ67kJeqwEjB"><span class="pulse" data-page-node-id="rlRDU9fd4OddaBp2pCuTzi"></span>在线</div>
   </div>
 
-  <!-- ========== 桌面端 hero 标题区（借鉴 pico hgroup；移动端隐藏） ========== -->
-  <div class="hero" data-page-node-id="Hero0000000000000000000001">
-    <h1 data-page-node-id="HeroH100000000000000000001">传歌到手表</h1>
-    <p data-page-node-id="HeroSub00000000000000000001">局域网快传 · 选好文件一键上传，音乐自动进音乐库</p>
-  </div>
-
-  <!-- ========== 随机一句话（每次刷新轮换，借鉴 ZeroMusic 的彩蛋） ========== -->
-  <p class="quote" id="quote" data-page-node-id="QteLn0000000000000000001"></p>
-
-  <!-- ========== 待发送文件 ========== -->
-  <div class="card" data-page-node-id="N71nGFA3jL7ONWh0rZO1pM">
-    <div class="card-head" data-page-node-id="96b0OFUB9xWamqKBd5WPi6">
-      <h2 data-page-node-id="6HuQ18QA7x48CEQbBmKxrM">待发送文件</h2>
-      <div class="head-actions" data-page-node-id="taYAj9l2WMiUqWMnVoCofr">
-        <button class="link-btn" id="btnMulti" hidden data-page-node-id="PwBfzwzzVQe6BNDjBZiga4">多选</button>
+  <div class="stage">
+    <!-- 拖放区 -->
+    <div class="dropzone" id="dropzone">
+      <div>
+        <div class="glyph">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 16V4"/><path d="M7 9l5-5 5 5"/>
+            <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+          </svg>
+        </div>
+        <h3>拖进来，或点一下选文件</h3>
+        <p>音频 + 同名 .lrc 一起选，会自动配对</p>
+        <div class="cta">选择文件</div>
       </div>
     </div>
+    <input class="hidden-file" type="file" id="picker" multiple>
 
-    <div class="dropzone" id="dropzone" data-page-node-id="uV87JbzI9MFCgXFkI80EOj">
-      <div class="dz-icon" data-page-node-id="zp5aV2lGFj9961X1cALH7N">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-page-node-id="h7O0SBJKypyOKZHxvGZGrv">
-          <path d="M12 16V4" data-page-node-id="rG4HHMMAIREK85N9ggIA5Y"/><path d="M7 9l5-5 5 5" data-page-node-id="6An6lEFIr0zqj9ywsWzTIR"/>
-          <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" data-page-node-id="wiq1uI5Zbra9P63SG8fdeI"/>
-        </svg>
+    <!-- 上传队列 -->
+    <div class="queue">
+      <div class="qhead">
+        <b>待传</b>
+        <span class="n" id="qcount">0 个</span>
+        <span class="gap"></span>
+        <button class="icon-btn" id="btnSend" title="开始上传" aria-label="开始上传" style="width:30px;height:30px;border-radius:9px">
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 12h13"/><path d="M12 5l7 7-7 7"/></svg>
+        </button>
+        <button class="icon-btn" id="btnClear" title="清空" aria-label="清空" style="width:30px;height:30px;border-radius:9px">
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 7h12"/><path d="M9 7V5h6v2"/><path d="M8 7l1 13h6l1-13"/></svg>
+        </button>
       </div>
-      <p class="dz-title" data-page-node-id="aMBaYKrl0TYGN0cZtdqnpV">点击选择文件</p>
-      <p class="dz-sub" data-page-node-id="ZF3YC5zqCEBT7DT2NRg0Ni">或拖拽文件到此处 · 支持多选</p>
-    </div>
-    <input type="file" id="fileInput" multiple hidden data-page-node-id="ZgmBBJBfMKRVU8qcJb4F8f">
-    <ul class="file-list" id="fileList" data-page-node-id="DDuNCB4MGLlZkTCiSh6YDu"></ul>
-  </div>
-
-  <!-- ========== 上传歌词（.lrc）：按文件名与音频匹配并合并 ========== -->
-  <div class="card" id="lrcCard">
-    <div class="card-head">
-      <h2>上传歌词（.lrc）</h2>
-    </div>
-    <div class="dropzone" id="lrcDropzone">
-      <div class="dz-icon" style="font-size:12px;font-weight:800;letter-spacing:.5px;">LRC</div>
-      <p class="dz-title">点击选择 .lrc 歌词</p>
-      <p class="dz-sub">按文件名与 Music 里的音频自动匹配并合并 · 支持多选</p>
-    </div>
-    <input type="file" id="lrcInput" accept=".lrc" multiple hidden>
-    <ul class="file-list" id="lrcList"></ul>
-    <p class="hint" style="text-align:left;margin-top:8px;">
-      匹配规则：歌词与音频「去掉扩展名的文件名」相同即配对，配对后会在音频旁生成同名 .lrc
-      （播放器优先读取）并写进音频标签；先传歌词也可以，音频上传后会自动配对。
-    </p>
-  </div>
-
-  <p class="hint" data-page-node-id="vC9TBlyMaNHxyB3LVGyVZA">音乐文件落到手表的 Music 目录（App 里扫得到），其它文件落到 TransFiles。
-                 传完记得回手表点「停止」。</p>
-
-  <footer class="footer" data-page-node-id="FtrLn0000000000000000001">163音乐Pro · 局域网快传 · 传完记得回手表停止服务</footer>
-</div>
-
-<!-- ========== 底部操作栏 ========== -->
-<div class="actionbar" data-page-node-id="l4oQZMn2YFaYeQBKdvs0q7">
-  <div class="actionbar-inner" data-page-node-id="X8uECyN9hErLqHrHS16YNo">
-    <button class="btn-primary" id="btnSend" disabled data-page-node-id="WBVI01J6GBUHpx5LIVClUb">请选择文件</button>
-    <div class="multi-bar" id="multiBar" hidden data-page-node-id="fKNtRcXuu570WZyBCSF0xb">
-      <span class="multi-count" id="multiCount" data-page-node-id="zQOTrFm0cSJXA5iRe0BCCT">已选 <b data-page-node-id="809U4yX9H7iLV2Hymwcw7F">0</b> / 0 项</span>
-      <button class="btn-mini" id="btnSelectAll" data-page-node-id="vhBacZzpqdrklXScakXX52">全选</button>
-      <button class="btn-mini danger" id="btnDeleteSel" disabled data-page-node-id="8kTS6CkoFYzir9EcAYdLIn">删除</button>
+      <ul class="qlist" id="qlist"></ul>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast" data-page-node-id="5IFfl29U9LZRJCTJUh0xg4"></div>
+<!-- 监控面板 -->
+<div class="sheet-mask" id="mask"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h3>
+    <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--accent);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round">
+      <path d="M3 13h3l2.5-6 3.5 12 3-8 2 2h4"/>
+    </svg>
+    手表状态
+    <div class="close" id="btnClose">×</div>
+  </h3>
 
-<!-- ========== 已传输文件抽屉（PC 端 ≥1024px 时变为常驻右栏） ========== -->
-<div class="drawer-mask" id="drawerMask" data-page-node-id="DwMask0000000000000000001"></div>
-<div class="drawer" id="drawer" data-page-node-id="Drawer000000000000000000001">
-  <div class="drawer-head" data-page-node-id="DwHead000000000000000000001">
-    <h2 data-page-node-id="DwT00000000000000000000001">已传输文件</h2>
-    <button class="link-btn" id="btnRefreshInbox" data-page-node-id="mebVlMBal0V8pRY8wfO9fp">刷新</button>
-    <button class="icon-btn" id="btnCloseDrawer" title="关闭" data-page-node-id="DwX0000000000000000000001">✕</button>
+  <div class="now">
+    <div class="cover" id="monCover">♪</div>
+    <div style="min-width:0">
+      <div class="t1" id="monSong">未在播放</div>
+      <div class="t2" id="monArtist">—</div>
+      <div class="pb"><i id="monBar"></i></div>
+      <div class="times"><span id="monPos">0:00</span><span id="monDur">0:00</span></div>
+    </div>
   </div>
-  <div class="drawer-body" id="inbox" data-page-node-id="vnbejWYYAH3iCYhYssMcaV"></div>
+
+  <div class="grid">
+    <div class="tile">
+      <div class="k">状态</div>
+      <div class="v" id="monState">—</div>
+      <div class="sub" id="monStateSub">播放 / 暂停</div>
+    </div>
+    <div class="tile">
+      <div class="k">音量</div>
+      <div class="v" id="monVol">—</div>
+      <div class="meter"><i id="monVolBar"></i></div>
+    </div>
+    <div class="tile">
+      <div class="k">电量</div>
+      <div class="v" id="monBat">—</div>
+      <div class="sub" id="monBatSub">—</div>
+    </div>
+    <div class="tile">
+      <div class="k">网络</div>
+      <div class="v" id="monNet">—</div>
+      <div class="sub" id="monNetSub">—</div>
+    </div>
+    <div class="tile">
+      <div class="k">内存</div>
+      <div class="v" id="monMem">—</div>
+      <div class="sub" id="monMemSub">—</div>
+    </div>
+    <div class="tile">
+      <div class="k">CPU</div>
+      <div class="v" id="monCpu">—</div>
+      <div class="sub" id="monCpuSub">进程占用</div>
+    </div>
+    <div class="tile">
+      <div class="k">定时</div>
+      <div class="v" id="monTimer">—</div>
+      <div class="sub" id="monTimerSub">—</div>
+    </div>
+    <div class="tile">
+      <div class="k">下载</div>
+      <div class="v" id="monDl">—</div>
+      <div class="sub" id="monDlSub">—</div>
+    </div>
+  </div>
+
+  <p class="hint" id="monHint">每 1 秒刷新</p>
 </div>
 
 <script>
-/* =========================================================
- *  工具
- * ========================================================= */
-const $ = (s, r = document) => r.querySelector(s);
-const uid = () => Math.random().toString(36).slice(2, 10);
+/* ============================================================
+   常量 / 元素
+   ============================================================ */
+const AUDIO_RE = /\.(mp3|flac|m4a|aac|wav|ogg|opus|wma)$/i;
+const LRC_RE = /\.lrc$/i;
 
-function fmtSize(b) {
-  if (!b && b !== 0) return '未知';
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
-  return (b / 1073741824).toFixed(2) + ' GB';
-}
-const fmtSpeed = bps => (bps / 1048576).toFixed(1) + ' MB/s';
-
-function ext(name) {
-  const m = String(name).match(/\.([a-z0-9]+)$/i);
-  return m ? m[1].toUpperCase().slice(0, 4) : 'FILE';
-}
-
-function fileColor(name) {
-  const e = ext(name).toLowerCase();
-  if (['jpg','jpeg','png','gif','webp','heic','bmp','svg'].includes(e)) return '#f97316';
-  if (['mp4','mov','avi','mkv','webm','flv'].includes(e)) return '#8b5cf6';
-  if (e === 'pdf') return '#ef4444';
-  if (['doc','docx','pages'].includes(e)) return '#2b579a';
-  if (['xls','xlsx','csv'].includes(e)) return '#1d6f42';
-  if (['ppt','pptx','key'].includes(e)) return '#d24726';
-  if (['zip','rar','7z','tar','gz'].includes(e)) return '#22c55e';
-  if (['mp3','wav','flac','aac','m4a','ogg','ape','opus'].includes(e)) return '#ec4899';
-  if (e === 'apk') return '#3ddc84';
-  return '#64748b';
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
-
-/* =========================================================
- *  状态
- * ========================================================= */
-const state = {
-  peer: { host: location.host },
-  files: [],        // 待发送队列
-  multi: false,
-  selected: new Set(),
-  sending: false,
+const $ = id => document.getElementById(id);
+const ui = {
+  dropzone: $('dropzone'), picker: $('picker'), qlist: $('qlist'),
+  qcount: $('qcount'), btnSend: $('btnSend'), btnClear: $('btnClear'),
+  conn: $('conn'), connText: $('connText'), subtitle: $('subtitle'),
+  btnMonitor: $('btnMonitor'), mask: $('mask'), sheet: $('sheet'), btnClose: $('btnClose'),
+  // 监控面板元素（之前漏登记，导致 applyStatus 取不到节点、面板永远显示「—」）
+  monCover: $('monCover'), monSong: $('monSong'), monArtist: $('monArtist'),
+  monBar: $('monBar'), monPos: $('monPos'), monDur: $('monDur'),
+  monState: $('monState'), monStateSub: $('monStateSub'),
+  monVol: $('monVol'), monVolBar: $('monVolBar'),
+  monBat: $('monBat'), monBatSub: $('monBatSub'),
+  monNet: $('monNet'), monNetSub: $('monNetSub'),
+  monMem: $('monMem'), monMemSub: $('monMemSub'),
+  monCpu: $('monCpu'), monCpuSub: $('monCpuSub'),
+  monTimer: $('monTimer'), monTimerSub: $('monTimerSub'),
+  monDl: $('monDl'), monDlSub: $('monDlSub'), monHint: $('monHint')
 };
 
-/* =========================================================
- *  Toast
- * ========================================================= */
-let toastTimer = null;
-function toast(msg) {
-  const el = $('#toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+const S = { items: [], seq: 0, busy: false, parallel: 3, sse: null, pollTimer: null };
+
+/* ============================================================
+   小工具
+   ============================================================ */
+function size(n){
+  if (n === undefined || n === null) return '—';
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+  return (n / 1073741824).toFixed(2) + ' GB';
+}
+function speed(bps){
+  return bps ? size(bps) + '/s' : '';
+}
+function clock(ms){
+  if (!ms || ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function stem(name){ return name.replace(/\.[^.]+$/, ''); }
+function kind(name){
+  if (LRC_RE.test(name)) return 'LRC';
+  if (AUDIO_RE.test(name)) return '音频';
+  return '文件';
 }
 
-function renderPeer() { $('#peerMeta').textContent = state.peer.host; }
-
-/* =========================================================
- *  待发送列表
- * ========================================================= */
-function addFiles(items) {
-  if (state.sending) { toast('正在传输中，请稍候'); return; }
-  if (!items || !items.length) return;
-  items.forEach(it => {
-    state.files.push({
-      id: uid(),
-      file: it.file || null,
-      name: it.name,
-      size: it.size || (it.file && it.file.size) || 0,
-      progress: 0,
-      status: 'pending',
-      speed: 0,
-      el: null,
-    });
+/* ============================================================
+   队列渲染
+   ============================================================ */
+function add(files){
+  Array.from(files || []).forEach(f => {
+    const it = {
+      file: f, name: f.name, size: f.size,
+      kind: kind(f.name), status: 'wait', progress: 0, bps: 0, note: '', err: ''
+    };
+    S.items.push(it);
+    it.el = row(it);
+    ui.qlist.appendChild(it.el);
+    paint(it);
   });
-  renderFiles();
+  count();
 }
 
-function renderFiles() {
-  const list = $('#fileList');
-  const keep = new Set();
-  state.files.forEach(f => {
-    if (!f.el) f.el = createFileRow(f);
-    keep.add(f.el);
-    list.appendChild(f.el);
-    updateFileRow(f);
-  });
-  [...list.children].forEach(c => { if (!keep.has(c)) c.remove(); });
-
-  $('#btnMulti').hidden = !state.multi && !state.files.length;
-  updateSendBar();
-}
-
-function createFileRow(f) {
+function row(it){
   const li = document.createElement('li');
-  li.className = 'file-item';
-  li.innerHTML = `
-    <span class="fi-check"></span>
-    <div class="fi-icon" style="--c:${fileColor(f.name)}">${ext(f.name)}</div>
-    <div class="fi-main">
-      <div class="fi-top">
-        <span class="fi-name">${escapeHtml(f.name)}</span>
-        <span class="fi-size">${fmtSize(f.size)}</span>
-      </div>
-      <div class="fi-progress"><i></i></div>
-      <div class="fi-bottom">
-        <span class="fi-state">等待发送</span>
-        <span class="fi-speed"></span>
-      </div>
-    </div>
-    <button class="fi-remove" aria-label="移除">×</button>`;
-
-  li.addEventListener('click', () => { if (state.multi) toggleSelect(f.id); });
-
-  li.querySelector('.fi-remove').addEventListener('click', e => {
-    e.stopPropagation();
-    if (f.status === 'sending') { toast('该文件正在传输中'); return; }
-    state.files = state.files.filter(x => x !== f);
-    state.selected.delete(f.id);
-    li.remove();
-    $('#btnMulti').hidden = !state.multi && !state.files.length;
-    updateSendBar();
-  });
-
+  li.className = 'row';
+  li.innerHTML =
+    '<div class="tag">' + (it.kind === 'LRC' ? 'LRC' : it.kind === '音频' ? '♪' : '·') + '</div>' +
+    '<div class="txt"><div class="nm"></div><div class="meta"><span class="st"></span><span class="ex"></span></div></div>' +
+    '<div class="num"></div>' +
+    '<div class="track"><i></i></div>';
+  li.querySelector('.nm').textContent = it.name;
+  li.querySelector('.nm').title = it.name;
   return li;
 }
 
-function updateFileRow(f) {
-  if (!f.el) return;
-  const pct = f.size ? Math.round(f.progress / f.size * 100) : 0;
-  f.el.querySelector('.fi-progress i').style.width = pct + '%';
-  const st = f.el.querySelector('.fi-state');
-  const sp = f.el.querySelector('.fi-speed');
+function paint(it){
+  if (!it.el) return;
+  const pct = it.size ? Math.round(it.progress / it.size * 100) : 0;
+  it.el.querySelector('.track > i').style.width = Math.min(100, pct) + '%';
+  it.el.querySelector('.num').textContent =
+    it.status === 'ok' ? '✓' : it.status === 'err' ? '×' : pct ? pct + '%' : '';
 
-  if (f.status === 'pending') { st.textContent = '等待发送'; sp.textContent = ''; }
-  else if (f.status === 'sending') { st.textContent = `传输中 ${pct}%`; sp.textContent = fmtSpeed(f.speed); }
-  else if (f.status === 'done') { f.el.classList.add('done'); st.textContent = '已完成'; sp.textContent = ''; }
-  else if (f.status === 'fail') { f.el.classList.add('fail'); st.textContent = '失败：' + (f.error || '未知'); sp.textContent = ''; }
-}
+  const st = it.el.querySelector('.st');
+  const ex = it.el.querySelector('.ex');
+  it.el.classList.remove('ok', 'err');
 
-/* =========================================================
- *  多选
- * ========================================================= */
-function setMulti(on) {
-  state.multi = on;
-  state.selected.clear();
-  $('#fileList').classList.toggle('multi-mode', on);
-  state.files.forEach(f => { if (f.el) f.el.classList.remove('sel'); });
-
-  const btn = $('#btnMulti');
-  btn.textContent = on ? '完成' : '多选';
-  btn.classList.toggle('active', on);
-  btn.hidden = !on && !state.files.length;
-  updateSendBar();
-}
-
-function toggleSelect(id) {
-  if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
-  const f = state.files.find(x => x.id === id);
-  if (f && f.el) f.el.classList.toggle('sel', state.selected.has(id));
-  updateSendBar();
-}
-
-function toggleSelectAll() {
-  const total = state.files.length;
-  if (!total) return;
-  if (state.selected.size === total) state.selected.clear();
-  else state.files.forEach(f => state.selected.add(f.id));
-  state.files.forEach(f => { if (f.el) f.el.classList.toggle('sel', state.selected.has(f.id)); });
-  updateSendBar();
-}
-
-/** 只从待发队列里移除（**不动手表上已收到的任何文件**） */
-function deleteSelected() {
-  const n = state.selected.size;
-  if (!n) return;
-  state.files = state.files.filter(f => !state.selected.has(f.id));
-  state.selected.clear();
-  renderFiles();
-  if (!state.files.length) setMulti(false);
-  toast(`已移除 ${n} 个文件`);
-}
-
-/* =========================================================
- *  底部按钮状态
- * ========================================================= */
-function updateSendBar() {
-  const btn = $('#btnSend');
-  const multiBar = $('#multiBar');
-  const total = state.files.length;
-
-  if (state.multi) {
-    btn.hidden = true; multiBar.hidden = false;
-    const sel = state.selected.size;
-    $('#multiCount').innerHTML = `已选 <b>${sel}</b> / ${total} 项`;
-    $('#btnSelectAll').textContent = (sel === total && total > 0) ? '取消全选' : '全选';
-    $('#btnSelectAll').disabled = total === 0;
-    $('#btnDeleteSel').disabled = sel === 0;
-    $('#btnDeleteSel').textContent = sel ? `删除 (${sel})` : '删除';
-    return;
+  if (it.status === 'wait'){ st.textContent = '等待'; st.className = 'st'; ex.textContent = size(it.size); }
+  else if (it.status === 'send'){ st.textContent = '上传中'; st.className = 'st'; ex.textContent = speed(it.bps) || size(it.progress); }
+  else if (it.status === 'ok'){
+    it.el.classList.add('ok');
+    st.textContent = it.note || '完成'; st.className = 'st ok';
+    ex.textContent = size(it.size);
+  } else {
+    it.el.classList.add('err');
+    st.textContent = '失败 · ' + (it.err || '未知'); st.className = 'st err';
+    ex.textContent = '';
   }
-
-  btn.hidden = false; multiBar.hidden = true;
-  const pending = state.files.filter(f => f.status === 'pending' || f.status === 'fail');
-  $('#btnMulti').disabled = state.sending;
-
-  if (state.sending) { btn.disabled = true; btn.textContent = '传输中…'; return; }
-  if (!pending.length) {
-    btn.disabled = true;
-    btn.textContent = state.files.length ? '全部已发送' : '请选择文件';
-    return;
-  }
-  const size = pending.reduce((s, f) => s + f.size, 0);
-  btn.disabled = false;
-  btn.textContent = `发送到手表 · ${pending.length} 个文件 · ${fmtSize(size)}`;
 }
 
-/* =========================================================
- *  上传：原始字节流 POST /upload?name=<编码文件名>
- * ========================================================= */
-function uploadOne(item) {
-  return new Promise(resolve => {
-    if (!item.file) { item.status = 'fail'; item.error = '拿不到文件内容'; updateFileRow(item); resolve(false); return; }
+function count(){
+  const pending = S.items.filter(i => i.status === 'wait' || i.status === 'err');
+  ui.qcount.textContent = pending.length
+    ? pending.length + ' 个待传 · ' + size(pending.reduce((s, i) => s + i.size, 0))
+    : (S.items.length ? '全部完成' : '0 个');
+  ui.btnSend.disabled = S.busy || !pending.length;
+  ui.btnClear.disabled = S.busy || !S.items.length;
+  ui.btnSend.style.opacity = ui.btnSend.disabled ? '.4' : '1';
+  ui.btnClear.style.opacity = ui.btnClear.disabled ? '.4' : '1';
+}
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/upload?name=' + encodeURIComponent(item.name));
+/* ============================================================
+   上传
+   ============================================================ */
+function pairOf(lrc){
+  const s = stem(lrc.name).toLowerCase();
+  const hit = S.items.find(i => i.kind === '音频' && stem(i.name).toLowerCase() === s);
+  return hit ? hit.name : '';
+}
 
-    let last = performance.now(), lastLoaded = 0;
-    xhr.upload.onprogress = e => {
+function send(it){
+  return new Promise(done => {
+    it.status = 'send'; it.progress = 0; it.bps = 0;
+    paint(it); count();
+
+    let url = '/upload?name=' + encodeURIComponent(it.name);
+    if (it.kind === 'LRC'){
+      const p = pairOf(it);
+      if (p) url += '&pair=' + encodeURIComponent(p);
+    }
+
+    const x = new XMLHttpRequest();
+    x.open('POST', url);
+    let t0 = performance.now(), b0 = 0;
+
+    x.upload.onprogress = e => {
       if (!e.lengthComputable) return;
-      const now = performance.now();
-      const dt = (now - last) / 1000;
-      if (dt > 0.2) {
-        item.speed = (e.loaded - lastLoaded) / dt;
-        last = now; lastLoaded = e.loaded;
-      }
-      item.progress = e.loaded;
-      updateFileRow(item);
+      const now = performance.now(), dt = (now - t0) / 1000;
+      if (dt > .25){ it.bps = (e.loaded - b0) / dt; t0 = now; b0 = e.loaded; }
+      it.progress = e.loaded;
+      paint(it);
     };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        item.status = 'done'; item.progress = item.size;
+    x.onload = () => {
+      if (x.status >= 200 && x.status < 300){
+        it.status = 'ok'; it.progress = it.size;
+        try {
+          const r = JSON.parse(x.responseText || '{}');
+          if (r.type === 'lrc'){
+            it.note = r.matched ? '歌词已匹配' : '歌词已暂存';
+          }
+        } catch(e){}
       } else {
-        item.status = 'fail'; item.error = 'HTTP ' + xhr.status;
+        it.status = 'err'; it.err = 'HTTP ' + x.status;
       }
-      updateFileRow(item);
-      resolve(item.status === 'done');
+      paint(it); count(); done();
     };
-    xhr.onerror = () => { item.status = 'fail'; item.error = '网络错误'; updateFileRow(item); resolve(false); };
-
-    item.status = 'sending';
-    updateFileRow(item);
-    xhr.send(item.file);
+    x.onerror = () => {
+      it.status = 'err'; it.err = '网络错误'; paint(it); count(); done();
+    };
+    x.send(it.file);
   });
 }
 
-/* 并发池：同时跑 n 个上传，避免手表端连接堆积/浏览器超时 */
-async function runPool(items, n, worker) {
+async function sendAll(){
+  if (S.busy) return;
+  const pending = S.items.filter(i => i.status === 'wait' || i.status === 'err');
+  if (!pending.length) return;
+
+  S.busy = true; count();
+  pending.sort((a, b) => (a.kind === '音频' ? 0 : 1) - (b.kind === '音频' ? 0 : 1));
+
   let i = 0;
-  async function consume() {
-    while (i < items.length) {
-      const item = items[i++];
-      await worker(item);
-    }
+  await Promise.all(Array.from({ length: Math.min(S.parallel, pending.length) }, async () => {
+    while (i < pending.length) await send(pending[i++]);
+  }));
+
+  S.busy = false; count();
+  const bad = S.items.filter(x => x.status === 'err').length;
+  ui.subtitle.textContent = bad ? bad + ' 个失败，可再点上传重试' : '全部上传完成';
+  setTimeout(() => { ui.subtitle.textContent = '音乐进 Music · 歌词自动配对'; }, 3200);
+}
+
+/* ============================================================
+   监控
+   ============================================================ */
+let sheetOpen = false;
+
+function openSheet(){
+  sheetOpen = true;
+  ui.sheet.classList.add('on');
+  ui.mask.classList.add('on');
+  startMonitor();
+}
+function closeSheet(){
+  sheetOpen = false;
+  ui.sheet.classList.remove('on');
+  ui.mask.classList.remove('on');
+  stopMonitor();
+}
+
+function setConn(ok){
+  ui.conn.classList.toggle('off', !ok);
+  ui.connText.textContent = ok ? '在线' : '未响应';
+}
+
+function applyStatus(d){
+  if (!d) return;
+  setConn(true);
+
+  ui.monSong.textContent = d.song || '未在播放';
+  ui.monArtist.textContent = d.artist ? d.artist : '—';
+  ui.monCover.textContent = d.playing ? '♪' : '⏸';
+
+  const pos = d.positionMs || 0, dur = d.durationMs || 0;
+  ui.monPos.textContent = clock(pos);
+  ui.monDur.textContent = clock(dur);
+  ui.monBar.style.width = dur > 0 ? Math.min(100, pos / dur * 100) + '%' : '0%';
+
+  ui.monState.textContent = d.playing ? '播放中' : '已暂停';
+  ui.monStateSub.textContent = d.playMode || '—';
+
+  const vol = typeof d.volume === 'number' ? d.volume : -1;
+  ui.monVol.textContent = vol >= 0 ? vol + '%' : '—';
+  ui.monVolBar.style.width = vol >= 0 ? vol + '%' : '0%';
+
+  ui.monBat.textContent = typeof d.battery === 'number' ? d.battery + '%' : '—';
+  ui.monBatSub.textContent = d.charging ? '充电中' : (d.battery >= 0 ? '未充电' : '—');
+
+  ui.monNet.textContent = d.network || '—';
+  ui.monNetSub.textContent = d.networkDetail || '';
+
+  // 2026-11-21：内存 / CPU（设备端 /proc 采样）
+  if (ui.monMem) {
+    ui.monMem.textContent = d.memUsedMb > 0 ? d.memUsedMb + ' MB' : '—';
+    ui.monMemSub.textContent = d.memTotalMb > 0
+      ? '堆 ' + d.memTotalMb + ' / 上限 ' + d.memMaxMb + ' MB' : '—';
   }
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, consume));
+  if (ui.monCpu) {
+    ui.monCpu.textContent = d.cpuPercent >= 0 ? d.cpuPercent + '%' : '—';
+  }
+
+  if (d.sleepTimerActive){
+    ui.monTimer.textContent = clock(d.sleepTimerRemainingMs || 0);
+    ui.monTimerSub.textContent = d.sleepTimerMode || '定时中';
+  } else {
+    ui.monTimer.textContent = '未设置';
+    ui.monTimerSub.textContent = '—';
+  }
+
+  if (d.downloading > 0){
+    ui.monDl.textContent = d.downloading + ' 项';
+    ui.monDlSub.textContent = d.downloadName
+      ? d.downloadName + (d.downloadPercent >= 0 ? ' · ' + d.downloadPercent + '%' : '')
+      : '下载中';
+  } else {
+    ui.monDl.textContent = '空闲';
+    ui.monDlSub.textContent = '—';
+  }
+
+  ui.monHint.textContent = d.ts ? ('更新于 ' + new Date(d.ts).toLocaleTimeString()) : '每 1 秒刷新';
 }
 
-async function startTransfer() {
-  const queue = state.files.filter(f => f.status === 'pending' || f.status === 'fail');
-  if (!queue.length) return;
-  state.sending = true;
-  updateSendBar();
-
-  // 并行上传（3 路）：手表端已改线程池并行处理连接，不再排队
-  let ok = 0;
-  await runPool(queue, 3, async (f) => { if (await uploadOne(f)) ok++; });
-
-  state.sending = false;
-  updateSendBar();
-  toast(`已发送 ${ok} / ${queue.length} 个文件`);
-  loadInbox();
-}
-
-/* =========================================================
- *  收件箱（手表已收到的文件）
- * ========================================================= */
-/* =========================================================
- *  已传输文件：抽屉（点入口滑出，点遮罩/✕ 收回）
- * ========================================================= */
-function setDrawer(open) {
-  document.getElementById('drawer').classList.toggle('open', open);
-  document.getElementById('drawerMask').classList.toggle('open', open);
-  if (open) loadInbox();
-}
-
-function setInboxCount(n) {
-  const el = document.getElementById('inboxCount');
-  if (!el) return;
-  el.textContent = n;
-  el.classList.toggle('zero', !n);
-}
-
-async function loadInbox() {
-  const box = document.getElementById('inbox');
-  if (!box) return;
+async function fetchStatus(){
   try {
-    const r = await fetch('/api/inbox', { cache: 'no-store' });
+    const r = await fetch('/api/status', { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    const list = data.files || data || [];
-    setInboxCount(list.length);
-
-    if (!list.length) { box.innerHTML = '<p class="empty-tip">还没有文件</p>'; return; }
-
-    box.innerHTML = list.map(f => `
-      <div class="inbox-item">
-        <div class="fi-icon" style="--c:${fileColor(f.name)}">${ext(f.name)}</div>
-        <div class="fi-main">
-          <div class="fi-top">
-            <span class="fi-name">${escapeHtml(f.name)}</span>
-            <span class="fi-size">${fmtSize(f.size)}</span>
-          </div>
-          <div class="fi-bottom">
-            <span class="fi-state">来自 ${escapeHtml(f.from || '未知设备')}</span>
-            <span class="fi-speed">${f.time ? new Date(f.time).toLocaleTimeString() : ''}</span>
-          </div>
-        </div>
-        <div class="ib-actions">
-          <a class="icon-btn" href="/api/download/${encodeURIComponent(f.id)}" title="下载">↓</a>
-          <button class="icon-btn danger" data-id="${escapeHtml(f.id)}" title="从列表移除">×</button>
-        </div>
-      </div>`).join('');
-
-    box.querySelectorAll('.icon-btn.danger').forEach(b => {
-      b.addEventListener('click', async () => {
-        const id = b.getAttribute('data-id');
-        await fetch('/api/inbox/' + encodeURIComponent(id), { method: 'DELETE' });
-        loadInbox();
-      });
-    });
-  } catch (e) {
-    box.innerHTML = '<p class="empty-tip">读取失败：' + escapeHtml(String(e.message || e)) + '</p>';
+    applyStatus(await r.json());
+  } catch(e){
+    setConn(false);
+    ui.monHint.textContent = '读不到手表状态：' + e.message;
   }
 }
 
-/* =========================================================
- *  歌词上传（.lrc）：按文件名与音频匹配并合并
- * ========================================================= */
-async function uploadLrcFile(file, row) {
-  const state = row.querySelector('.fi-state');
-  state.textContent = '上传中…';
-  try {
-    // 发送端（浏览器，性能更强）先按 stem 把 .lrc 与音频配好对，把目标音频名
-    // 通过 pair 参数告诉手表，接收端直接查内存索引 O(1) 命中，不再扫目录。
-    const lrcStem = file.name.replace(/\.[^.]+$/, '').toLowerCase();
-    const paired = state.files.find(f =>
-      f.name.replace(/\.[^.]+$/, '').toLowerCase() === lrcStem);
-    const url = '/upload?name=' + encodeURIComponent(file.name)
-      + (paired ? '&pair=' + encodeURIComponent(paired.name) : '');
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: file
-    });
-    const j = await res.json().catch(() => null);
-    if (j && j.ok) {
-      row.classList.add('done');
-      state.textContent = j.matched
-        ? ('已合并到：' + j.audio)
-        : '未找到同名音频，已暂存（音频上传后自动配对）';
-    } else {
-      row.classList.add('fail');
-      state.textContent = '失败：' + ((j && j.error) || ('HTTP ' + res.status));
+function startMonitor(){
+  fetchStatus();
+  // 优先 SSE；不支持就退回 1s 轮询
+  if (window.EventSource){
+    try {
+      stopMonitor();
+      S.sse = new EventSource('/api/events');
+      S.sse.onmessage = ev => {
+        try { applyStatus(JSON.parse(ev.data)); } catch(e){}
+      };
+      S.sse.onerror = () => {
+        // SSE 断了就降级轮询，不反复重连打扰用户
+        if (S.sse){ S.sse.close(); S.sse = null; }
+        if (!S.pollTimer) S.pollTimer = setInterval(fetchStatus, 1000);
+      };
+    } catch(e){
+      S.pollTimer = setInterval(fetchStatus, 1000);
     }
-  } catch (e) {
-    row.classList.add('fail');
-    state.textContent = '失败：网络错误';
+  } else {
+    S.pollTimer = setInterval(fetchStatus, 1000);
   }
 }
 
-function addLrcFiles(files) {
-  const list = $('#lrcList');
-  const jobs = [];
-  [...files].forEach(f => {
-    const li = document.createElement('li');
-    li.className = 'file-item';
-    li.innerHTML = `
-      <div class="fi-icon" style="--c:#22c55e">LRC</div>
-      <div class="fi-main">
-        <div class="fi-top">
-          <span class="fi-name">${escapeHtml(f.name)}</span>
-          <span class="fi-size">${fmtSize(f.size)}</span>
-        </div>
-        <div class="fi-progress"><i style="width:100%"></i></div>
-        <div class="fi-bottom"><span class="fi-state">等待上传</span></div>
-      </div>`;
-    list.appendChild(li);
-    jobs.push([f, li]);
-  });
-  // 并发池：歌词批量上传尤其要限流，否则几十个请求同时压到手表会超时报「网络错误」
-  runPool(jobs, 3, ([f, li]) => uploadLrcFile(f, li));
+function stopMonitor(){
+  if (S.sse){ S.sse.close(); S.sse = null; }
+  if (S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer = null; }
 }
 
-/* =========================================================
- *  事件
- * ========================================================= */
-function bindEvents() {
-  const dz = $('#dropzone');
-  const input = $('#fileInput');
+/* ============================================================
+   绑定
+   ============================================================ */
+ui.dropzone.addEventListener('click', () => ui.picker.click());
+ui.picker.addEventListener('change', e => { add(e.target.files); ui.picker.value = ''; });
 
-  dz.addEventListener('click', () => {
-    if (state.multi) { toast('多选模式下暂不可添加文件'); return; }
-    input.click();
-  });
-  input.addEventListener('change', e => {
-    addFiles([...e.target.files].map(f => ({ file: f, name: f.name, size: f.size })));
-    input.value = '';
-  });
+['dragenter','dragover'].forEach(ev => ui.dropzone.addEventListener(ev, e => {
+  e.preventDefault(); ui.dropzone.classList.add('over');
+}));
+['dragleave','drop'].forEach(ev => ui.dropzone.addEventListener(ev, e => {
+  e.preventDefault(); ui.dropzone.classList.remove('over');
+}));
+ui.dropzone.addEventListener('drop', e => {
+  if (e.dataTransfer && e.dataTransfer.files) add(e.dataTransfer.files);
+});
 
-  // 歌词上传：独立的选框 + 拖拽
-  const lrcDz = $('#lrcDropzone');
-  const lrcInput = $('#lrcInput');
-  if (lrcDz && lrcInput) {
-    lrcDz.addEventListener('click', () => lrcInput.click());
-    lrcInput.addEventListener('change', e => {
-      addLrcFiles(e.target.files);
-      lrcInput.value = '';
-    });
-    ['dragenter', 'dragover'].forEach(ev =>
-      lrcDz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); lrcDz.classList.add('over'); }));
-    ['dragleave', 'drop'].forEach(ev =>
-      lrcDz.addEventListener(ev, e => {
-        e.preventDefault(); e.stopPropagation();
-        if (ev === 'dragleave' && lrcDz.contains(e.relatedTarget)) return;
-        lrcDz.classList.remove('over');
-      }));
-    lrcDz.addEventListener('drop', e => {
-      if (e.dataTransfer && e.dataTransfer.files) addLrcFiles(e.dataTransfer.files);
-    });
+ui.btnSend.addEventListener('click', sendAll);
+ui.btnClear.addEventListener('click', () => {
+  if (S.busy) return;
+  S.items = []; ui.qlist.innerHTML = ''; count();
+});
+
+ui.btnMonitor.addEventListener('click', openSheet);
+ui.btnClose.addEventListener('click', closeSheet);
+ui.mask.addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => {
+  const tag = (e.target && e.target.tagName) || '';
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+  // M 键：快速打开 / 关闭监控面板（在输入框里打字时不拦截）
+  if (!typing && (e.key === 'm' || e.key === 'M')) {
+    e.preventDefault();
+    if (sheetOpen) closeSheet(); else openSheet();
+    return;
   }
+  if (e.key === 'Escape' && sheetOpen) closeSheet();
+});
 
-  ['dragenter', 'dragover'].forEach(ev =>
-    dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dz.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(ev =>
-    dz.addEventListener(ev, e => {
-      e.preventDefault(); e.stopPropagation();
-      if (ev === 'dragleave' && dz.contains(e.relatedTarget)) return;
-      dz.classList.remove('over');
-    }));
-  dz.addEventListener('drop', e => {
-    if (state.multi) { toast('多选模式下暂不可添加文件'); return; }
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (files && files.length) addFiles([...files].map(f => ({ file: f, name: f.name, size: f.size })));
-  });
-  ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
-
-  $('#btnMulti').addEventListener('click', () => {
-    if (!state.multi && state.sending) { toast('传输中无法多选'); return; }
-    setMulti(!state.multi);
-  });
-  $('#btnSelectAll').addEventListener('click', toggleSelectAll);
-  $('#btnDeleteSel').addEventListener('click', deleteSelected);
-  $('#btnSend').addEventListener('click', startTransfer);
-  $('#btnRefreshInbox').addEventListener('click', loadInbox);
-
-  // 已传输文件抽屉
-  document.getElementById('btnInbox').addEventListener('click', () => setDrawer(true));
-  document.getElementById('btnCloseDrawer').addEventListener('click', () => setDrawer(false));
-  document.getElementById('drawerMask').addEventListener('click', () => setDrawer(false));
-}
-
-/* =========================================================
- *  主题（借鉴 pico 的 theme switcher）：深 → 浅 → 自动 循环，localStorage 记忆
- * ========================================================= */
-const THEME_KEY = 'lanTheme';
-const THEME_ORDER = ['dark', 'light', 'auto'];
-const mqLight = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
-
-function applyTheme(mode) {
-  const light = mode === 'light' || (mode === 'auto' && mqLight && mqLight.matches);
-  document.documentElement.classList.toggle('theme-light', light);
-  const label = mode === 'dark' ? '深色' : (mode === 'light' ? '浅色' : '自动');
-  const btn = document.getElementById('btnTheme');
-  if (btn) btn.textContent = label;
-}
-
-function cycleTheme() {
-  const cur = localStorage.getItem(THEME_KEY) || 'dark';
-  const next = THEME_ORDER[(THEME_ORDER.indexOf(cur) + 1) % THEME_ORDER.length];
-  localStorage.setItem(THEME_KEY, next);
-  applyTheme(next);
-}
-
-function initTheme() {
-  // URL 参数优先（?theme=light / dark / auto，便于调试与分享固定主题），其次记忆，默认深色
-  const param = new URLSearchParams(location.search).get('theme');
-  const mode = (param && THEME_ORDER.includes(param)) ? param
-      : (localStorage.getItem(THEME_KEY) || 'dark');
-  applyTheme(mode);
-  if (mqLight) {
-    const onchg = () => {
-      const cur = new URLSearchParams(location.search).get('theme')
-          || localStorage.getItem(THEME_KEY) || 'dark';
-      if (cur === 'auto') applyTheme('auto');
-    };
-    mqLight.addEventListener ? mqLight.addEventListener('change', onchg) : mqLight.addListener(onchg);
-  }
-  const btn = document.getElementById('btnTheme');
-  if (btn) btn.addEventListener('click', cycleTheme);
-}
-
-/* =========================================================
- *  随机一句话（每次刷新轮换，localStorage 记索引避免连续重复）
- * ========================================================= */
-const QUOTES = [
-  '同一 Wi-Fi 下，传歌像风一样快',
-  '好歌不等人，传完就开唱',
-  '手表虽小，曲库俱全',
-  '今天也要听点新的',
-  '昨晚的歌单，今天的风',
-  '一首歌的时间，把专辑搬过来',
-  'Wi-Fi 万岁，数据线退休',
-  '歌在手表上，世界在耳边',
-  '传的是文件，放的是心情',
-  '别让等待成为遗憾',
-  '今天的 BGM 由你决定',
-  '戴上手表，音浪来袭',
-  '轻装出门，全曲库随行',
-  '慢慢传，歌不急，你也不急',
-];
-
-function showQuote() {
-  const el = document.getElementById('quote');
-  if (!el) return;
-  let idx = parseInt(localStorage.getItem('quoteIndex') || '-1', 10);
-  idx = (idx + 1) % QUOTES.length;
-  localStorage.setItem('quoteIndex', String(idx));
-  el.textContent = QUOTES[idx];
-}
-
-/* =========================================================
- *  初始化
- * ========================================================= */
-(function init() {
-  initTheme();
-  showQuote();
-  renderPeer();
-  bindEvents();
-  updateSendBar();
-  loadInbox();
-  // 调试参数：?drawer=1 直接展开「已传输文件」抽屉
-  if (new URLSearchParams(location.search).get('drawer') === '1') {
-    setDrawer(true);
-  }
-})();
+/* 打开页面先探一次连接 */
+fetch('/api/status', { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+  .then(() => setConn(true))
+  .catch(() => setConn(false));
 </script>
 </body>
 </html>

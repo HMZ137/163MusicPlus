@@ -168,7 +168,7 @@ public class LyricsActivity extends BaseWatchActivity {
             return;
         }
 
-        tvSongName.setText(song.getDisplayName() + " - " + song.getArtist());
+        tvSongName.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song) + " - " + song.getArtist());
 
         if (lyricScrollMode == LYRIC_MODE_BLOCK) {
             setupBlockingModeDetection();

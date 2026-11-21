@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  菜单格子底（带扩散涟漪版）。
+  - 常态：深色圆角；
+  - 按下：涟漪从触摸点扩散，颜色是主题半透明强调色，范围由圆角 mask 限定（四角不会露直角）。
+  与 bg_card_tile 的分工：那个是 selector（瞬间切换、无扩散），给 ListView 用（ripple 在
+  AbsListView 里裁剪不稳）；这个给普通 LinearLayout 行用（更多页 / 设置页），扩散动画正常。
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorAccentSoft">
+    <item android:id="@android:id/mask">
+        <inset
+            android:insetLeft="6dp"
+            android:insetTop="3dp"
+            android:insetRight="6dp"
+            android:insetBottom="3dp">
+            <shape android:shape="rectangle">
+                <solid android:color="#FFFFFFFF" />
+                <corners android:radius="14dp" />
+            </shape>
+        </inset>
+    </item>
+    <item>
+        <inset
+            android:insetLeft="6dp"
+            android:insetTop="3dp"
+            android:insetRight="6dp"
+            android:insetBottom="3dp">
+            <shape android:shape="rectangle">
+                <solid android:color="#1E1F24" />
+                <corners android:radius="14dp" />
+            </shape>
+        </inset>
+    </item>
+</ripple>

@@ -269,6 +269,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     // Headphone volume protection: confirmed once above the safe threshold,
     // reset when volume drops back below it.
     private boolean volumeSafeConfirmed = false;
+    /**
+     * 2026-11-21：安全音量确认框弹出后，手指还没松开时 SeekBar 仍会持续回调 onProgressChanged
+     * （触摸目标在 ACTION_DOWN 时就锁定了，弹窗盖上去不会转移它）——这就是「弹窗后继续滑动还能调音量」。
+     * 这里在确认框存活期间忽略后续回调；音量条下一次 ACTION_DOWN 时复位。
+     */
+    private boolean volumeConfirmPending = false;
 
     // Song id whose cover is currently being fetched for the background (-1 = none)
     private long coverFetchInFlightId = -1;
@@ -380,6 +386,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     protected void onCreate(Bundle savedInstanceState) {
+        // P1-10：主界面直接继承 AppCompatActivity（不走 BaseWatchActivity），这里单独应用主题
+        com.qinghe.music163pro.util.ThemeManager.applyTo(this);
+        setTheme(com.qinghe.music163pro.util.ThemeManager.styleRes(this));
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mainPlayerContentView = findViewById(R.id.main_player_layout);
@@ -387,8 +396,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         installBackgroundLayer();
         applyMainBackground();
 
-        // Initialize file logging
-        MusicLog.init(new File("/sdcard/163Music"));
+        // Initialize file logging（2026-11-21：挪到后台，/sdcard 建目录+开流在慢卡上是实打实的主线程 IO）
+        new Thread(() -> MusicLog.init(new File("/sdcard/163Music")), "log-init").start();
 
         // 让相册别再收下载下来的封面：在下载根目录放 .nomedia，
         // 并清掉**已经**被收录进相册的历史封面记录。放后台线程，不拖启动。
@@ -1101,6 +1110,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         row6.addView(createFuncItem(R.drawable.ic_info, "播放器信息",
                 v -> onFuncPlayerInfo()));
+        row6.addView(createFuncItem(R.drawable.ic_tune, "均衡器",
+                v -> startActivity(new Intent(MainActivity.this, EqualizerActivity.class))));
         contentLayout.addView(row6);
 
         // Row 7: 查看专辑
@@ -1612,6 +1623,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final long CROWN_GESTURE_GAP_MS = 250L;
     /** F1：持续旋转时每一步的节拍（16 格音量下约 5.4s 从 0 到 100%，需求方 2026-10-17 指定）。 */
     private static final long CROWN_STEP_INTERVAL_MS = 340L;
+
+    /**
+     * 表冠连转的步进节拍，随「灵敏度」档位变化（需求 2026-11-21）：
+     * 档位 1 = 2 倍间隔（慢，防误触），2 = 原速，3 = 2/3 间隔（快）。
+     */
+    private long crownStepInterval() {
+        int sens = com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this);
+        if (sens <= 1) return CROWN_STEP_INTERVAL_MS * 2;
+        if (sens >= 3) return CROWN_STEP_INTERVAL_MS * 2 / 3;
+        return CROWN_STEP_INTERVAL_MS;
+    }
     /** F1：方向判定所需的最小累计位移（防抖；避免正负抖动来回跳音量）。 */
     private static final float CROWN_DIR_THRESHOLD = 3f;
 
@@ -1679,7 +1701,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 crownDir = dir;
                 crownLastStepMs = now;
                 stepped = handleCrownScroll(dir);
-            } else if (now - crownLastStepMs >= CROWN_STEP_INTERVAL_MS) {
+            } else if (now - crownLastStepMs >= crownStepInterval()) {
                 // 持续旋转：按节拍一格一格走，不再随事件突发跳变
                 crownLastStepMs = now;
                 stepped = handleCrownScroll(dir);
@@ -1706,6 +1728,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     /** F1：表冠调音量本体（一步一格；return true = 已消费）。 */
     private boolean handleCrownScroll(int dir) {
+        // P1-11（需求 2026-11-21）：表冠调音量的总开关 / 上限，全部收敛在这里
+        if (!com.qinghe.music163pro.util.CrownVolumePrefs.isEnabled(this)) {
+            return false;   // 开关关闭：表冠不响应音量调整
+        }
         android.media.AudioManager am =
                 (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
         if (am == null) {
@@ -1714,6 +1740,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
         int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
         int target = Math.max(0, Math.min(max, cur + (dir > 0 ? 1 : -1)));
+        // 最大音量限制：表冠加音量到设定上限后不再响应（减小仍然放行）
+        int maxPercent = com.qinghe.music163pro.util.CrownVolumePrefs.getMaxPercent(this);
+        int crownCap = Math.round(max * maxPercent / 100f);
+        if (dir > 0 && cur >= crownCap) {
+            MusicLog.i("Crown", "已到表冠音量上限 " + maxPercent + "%（" + crownCap + "），不再加大");
+            return false;
+        }
+        if (dir > 0 && target > crownCap) {
+            target = crownCap;
+        }
         // ⚠️ 顺序很重要：先把浮层建出来并显示**旧值**，再更新系统音量走动画；
         // 若像上一版那样先改音量再 showVolumeIndicator()，浮层首次出现时已经被设成新值，
         // 看不到过渡（这就是需求方反馈「平滑过渡没出现」的直接原因之一）。
@@ -1771,15 +1807,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * 先把浮层回滚到当前系统值，再弹确认框；确认后才真正调大。</p>
      */
     private void applyUserVolume(int value, int max) {
+        // 2026-11-21：确认框未处理完时，忽略拖动带来的后续回调（手指没松会一直触发）
+        if (volumeConfirmPending) {
+            return;
+        }
         int target = Math.max(0, Math.min(value, Math.max(max, 1)));
         int percent = max > 0 ? Math.round(target * 100f / max) : 0;
         if (percent >= SAFE_VOLUME_PERCENT && isHeadphonesConnected() && !volumeSafeConfirmed) {
+            volumeConfirmPending = true;
             // 回滚显示，避免"条已经拉到那么大"的错觉
             applyVolumeToSystem(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC));
             WatchConfirmDialog.show(this, "音量保护",
                     "当前音量已达 " + percent + "%，继续调大可能损伤听力。确定继续调大吗？",
                     () -> {
                         volumeSafeConfirmed = true;
+                        volumeConfirmPending = false;
                         applyVolumeToSystem(target);
                     },
                     WatchConfirmDialog.Options.defaultOptions());
@@ -1843,6 +1885,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         progressBar.setPadding(dp(2), 0, dp(2), 0);
         progressBar.setMax(hasVolumeInfo ? Math.max(max, 1) : 1);
         progressBar.setProgress(hasVolumeInfo ? current : 0);
+        // 2026-11-21：新的一次按下视为新意图，解除「确认框期间冻结」
+        progressBar.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                volumeConfirmPending = false;
+            }
+            return false;
+        });
         progressBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
@@ -1867,12 +1916,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         TextView percentView = new TextView(this);
         LinearLayout.LayoutParams percentParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        percentParams.leftMargin = dp(10);
+        // 2026-11-21：6dp 是「不贴住圆头」的最小安全距离，其余空间全部让给音量条。
+        percentParams.leftMargin = dp(4);
         percentView.setLayoutParams(percentParams);
         percentView.setTextColor(hasVolumeInfo && percent >= SAFE_VOLUME_PERCENT
                 ? 0xFFFFA726 : 0xFFFFFFFF);
         percentView.setTextSize(20);
         percentView.setTypeface(percentView.getTypeface(), android.graphics.Typeface.BOLD);
+        // 2026-11-21：数字区固定 34dp（单行 + 强制最大宽度），字号自适应 12~20sp：
+        // 0/56 用大字号，100 自动缩到能塞下 —— 这样位数变化不再挤音量条，
+        // 同时把省下的宽度全部让给条（用户要求「尽全力保证条宽」）。
+        percentView.setSingleLine(true);
+        percentView.setMinWidth(dp(34));
+        percentView.setMaxWidth(dp(34));
+        androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                percentView, 12, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        percentView.setGravity(android.view.Gravity.CENTER);
         percentView.setText(hasVolumeInfo ? String.valueOf(percent) : "--");
 
         card.addView(progressBar);
@@ -2728,10 +2787,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
         if (tvLyricsTitle != null) {
-            tvLyricsTitle.setText(song.getDisplayName());
+            tvLyricsTitle.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song));
         }
         if (tvLyricsSongLabel != null) {
-            tvLyricsSongLabel.setText(song.getDisplayName() + " - " + song.getArtist());
+            tvLyricsSongLabel.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song) + " - " + song.getArtist());
         }
         String key = songKeyOf(song);
         if (!key.equals(loadedLyricsSongKey)) {
@@ -3398,7 +3457,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             if (romanizationEnabled && line.romanization != null && !line.romanization.isEmpty()) {
                 TextView tvRoma = new TextView(this);
                 tvRoma.setText(line.romanization);
-                tvRoma.setTextColor(0x99BB86FC);
+                tvRoma.setTextColor(com.qinghe.music163pro.util.UiKit.withAlpha(
+                        com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 0x99));
                 tvRoma.setTextSize(romanizationFontSize);
                 tvRoma.setGravity(Gravity.CENTER);
                 tvRoma.setPadding(0, dp(1), 0, 0);
@@ -3896,7 +3956,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         TextView tv = new TextView(this);
         tv.setText("心动续播中 · 已续 " + playerManager.getHeartbeatCount() + " 首");
-        tv.setTextColor(0xFFBB86FC);
+        tv.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tv.setTextSize(11);
         tv.setSingleLine(true);
         tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -3933,7 +3993,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private TextView makeOverlayAzButton() {
         TextView btn = new TextView(this);
         btn.setText("A-Z");
-        btn.setTextColor(0xFFBB86FC);
+        btn.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dp(16));
         btn.setPadding(dp(12), dp(6), dp(12), dp(6));
         btn.setMinWidth(dp(40));
@@ -4045,7 +4105,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             TextView tvName = new TextView(this);
             String prefix = (realIndex == curReal) ? "▶ " : (d + 1) + ". ";
             tvName.setText(prefix + song.getDisplayName());
-            tvName.setTextColor(realIndex == curReal ? 0xFFBB86FC : 0xFFFFFFFF);
+            tvName.setTextColor(realIndex == curReal ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0xFFFFFFFF);
             tvName.setTextSize(13);
             tvName.setSingleLine(true);
             tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -4087,7 +4147,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 badge.setPadding(dp(5), dp(2), dp(5), dp(2));
                 android.graphics.drawable.GradientDrawable badgeBg =
                         new android.graphics.drawable.GradientDrawable();
-                badgeBg.setColor(0xFFBB86FC);
+                badgeBg.setColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
                 badgeBg.setCornerRadius(UiKit.dp(this, 8));
                 badge.setBackground(badgeBg);
                 LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(
@@ -4149,7 +4209,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (playlistOverlaySortBtn != null) {
             playlistOverlaySortBtn.setText(playlistOverlaySorted ? "原序" : "排序");
             playlistOverlaySortBtn.setTextColor(
-                    playlistOverlaySorted ? 0xFFBB86FC : 0xFFFFFFFF);
+                    playlistOverlaySorted ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0xFFFFFFFF);
         }
     }
 
@@ -4337,7 +4397,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), Math.abs(currentSpeed - speed) < 0.01f ? 0xFFBB86FC : 0xFF2D2D2D));
+            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), Math.abs(currentSpeed - speed) < 0.01f ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0xFF2D2D2D));
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -4388,7 +4448,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnApply.setTextSize(14);
         btnApply.setGravity(Gravity.CENTER);
         btnApply.setPadding(dp(12), dp(8), dp(12), dp(8));
-        btnApply.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnApply.getContext(), 0xFFBB86FC));
+        btnApply.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnApply.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_ACCENT));
         btnApply.setClickable(true);
         btnApply.setFocusable(true);
         btnApply.setOnClickListener(v -> {
@@ -4551,7 +4611,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
-            row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), isSelected ? 0x33BB86FC : 0xFF2D2D2D));
+            row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), isSelected
+                    ? com.qinghe.music163pro.util.UiKit.withAlpha(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 0x33)
+                    : 0xFF2D2D2D));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             rowParams.bottomMargin = dp(4);
@@ -4566,7 +4628,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             TextView tvName = new TextView(this);
             tvName.setText(getQualityShortName(quality));
-            tvName.setTextColor(isSelected ? 0xFFBB86FC : 0xFFFFFFFF);
+            tvName.setTextColor(isSelected ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0xFFFFFFFF);
             tvName.setTextSize(14);
             leftCol.addView(tvName);
 
@@ -4659,7 +4721,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
-            int bgColor = disabledForSelection ? 0xFF222222 : (isSelected ? 0x33BB86FC : 0xFF2D2D2D);
+            int bgColor = disabledForSelection ? 0xFF222222 : (isSelected
+                    ? com.qinghe.music163pro.util.UiKit.withAlpha(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 0x33)
+                    : 0xFF2D2D2D);
             row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), bgColor));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -4678,7 +4742,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             TextView tvName = new TextView(this);
             tvName.setText(name);
-            int nameColor = disabledForSelection ? 0x60FFFFFF : (isSelected ? 0xFFBB86FC : 0xFFFFFFFF);
+            int nameColor = disabledForSelection ? 0x60FFFFFF : (isSelected ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0xFFFFFFFF);
             tvName.setTextColor(nameColor);
             tvName.setTextSize(14);
             leftCol.addView(tvName);
@@ -5001,7 +5065,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         });
 
         int grayButtonColor = ContextCompat.getColor(this, R.color.surface_elevated);
-        int primaryButtonColor = ContextCompat.getColor(this, R.color.colorPrimary);
+        int primaryButtonColor = com.qinghe.music163pro.util.ThemeManager.accentColor(this);
 
         LinearLayout topButtonRow = new LinearLayout(this);
         topButtonRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -5292,7 +5356,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             case 1:
                 return "播放净时长";
             case 2:
-                return "放完当前曲";
+                return "播放完毕";
+            case 3:
+                return "播完当前";
             default:
                 return "总时长";
         }
@@ -5304,7 +5370,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             case 1:
                 return "（只在播放时计时，暂停不计）";
             case 2:
-                return "（到点后等这首放完再停）";
+                return "（倒计时结束后，等这首放完再停）";
+            case 3:
+                return "（不设倒计时，本曲放完立即停）";
             default:
                 return "（到点立刻停）";
         }
@@ -5338,7 +5406,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // 以前只能在设置页改，菜单里看不到当前模式，很容易「以为选了放完当前曲、其实是总时长」。
         final SharedPreferences timerPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         final TextView modeBtn = new TextView(this);
-        modeBtn.setTextColor(0xFFBB86FC);
+        modeBtn.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         modeBtn.setTextSize(13);
         modeBtn.setGravity(Gravity.CENTER);
         modeBtn.setPadding(0, dp(10), 0, dp(10));
@@ -5353,7 +5421,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 timerPrefs.getInt("sleep_timer_mode", 0);
         modeBtn.setText("模式：" + sleepTimerModeLabel(modeSupplier.getAsInt()) + "（点按切换）");
         modeBtn.setOnClickListener(v -> {
-            int next = (modeSupplier.getAsInt() + 1) % 3;
+            int next = (modeSupplier.getAsInt() + 1) % 4;
             timerPrefs.edit().putInt("sleep_timer_mode", next).apply();
             modeBtn.setText("模式：" + sleepTimerModeLabel(next) + "（点按切换）");
             com.qinghe.music163pro.util.UiKit.toastLong(this, "定时模式：" + sleepTimerModeLabel(next)
@@ -5379,8 +5447,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setFocusable(true);
             int finalMin = min;
             btn.setOnClickListener(v -> {
+                int timerMode = timerPrefs.getInt("sleep_timer_mode", 0);
                 playerManager.startSleepTimer(finalMin);
-                com.qinghe.music163pro.util.UiKit.toast(this, finalMin + "分钟后自动停止播放");
+                com.qinghe.music163pro.util.UiKit.toast(this,
+                        timerMode == com.qinghe.music163pro.player.MusicPlayerManager.SLEEP_TIMER_MODE_STOP_AFTER_CURRENT
+                                ? "本曲放完即停" : finalMin + "分钟后自动停止播放");
                 dismissOverlay();
             });
             contentLayout.addView(btn);
@@ -5422,7 +5493,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCustom.setTextSize(14);
         btnCustom.setGravity(Gravity.CENTER);
         btnCustom.setPadding(dp(12), dp(8), dp(12), dp(8));
-        btnCustom.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnCustom.getContext(), 0xFFBB86FC));
+        btnCustom.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnCustom.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_ACCENT));
         btnCustom.setClickable(true);
         btnCustom.setFocusable(true);
         btnCustom.setOnClickListener(v -> {
@@ -5504,7 +5575,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             public void run() {
                 if (overlayContainer == null) return;
                 long remainMs = playerManager.getSleepTimerRemainingMs();
-                if (remainMs > 0) {
+                if (playerManager.isSleepTimerStopAfterCurrentPending() && remainMs <= 0) {
+                    // 「播完当前」没有倒计时，只是等本曲结束；「播放完毕」到点后也是这个状态
+                    tvRemaining.setText("等待本曲结束");
+                    timerDisplayHandler.postDelayed(this, 1000);
+                } else if (remainMs > 0) {
                     int totalSec = (int) (remainMs / 1000);
                     int min = totalSec / 60;
                     int sec = totalSec % 60;
@@ -5524,7 +5599,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCancel.setTextSize(14);
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setPadding(0, dp(10), 0, dp(10));
-        btnCancel.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnCancel.getContext(), 0xFFBB86FC));
+        btnCancel.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btnCancel.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_ACCENT));
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         btnCancel.setLayoutParams(cancelParams);
@@ -5687,7 +5762,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     @Override
     public void onSongChanged(Song song) {
-        tvSongName.setText(song.getDisplayName());
+        tvSongName.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song));
         tvArtist.setText(song.getArtist());
         // B 站曲目开播也记一次历史：从收藏 / 历史 直接点播时不经过 BilibiliPlaylistActivity，
         // 只在那里记会漏掉这些路径。BV 号去重，重复打开只会刷新时间与标题。
@@ -5703,7 +5778,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         HistoryManager.getInstance().addToHistory(song);
         // M2：歌词页顶栏歌名随歌曲切换更新；标记「歌词需要重拉」
         if (tvLyricsTitle != null) {
-            tvLyricsTitle.setText(song.getDisplayName());
+            tvLyricsTitle.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song));
         }
         loadedLyricsSongKey = null;
         // 正在显示歌词页时：重拉新歌的歌词
@@ -5718,7 +5793,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             currentHighlightIndex = -1;
             // Update song name label
             if (tvLyricsSongLabel != null) {
-                tvLyricsSongLabel.setText(song.getDisplayName() + " - " + song.getArtist());
+                tvLyricsSongLabel.setText(com.qinghe.music163pro.util.SongDisplay.mainTitle(this, song) + " - " + song.getArtist());
             }
             // Hide translation button until we know if new song has translation
             if (btnTranslationToggle != null) {
@@ -5954,6 +6029,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private final Runnable seekBarUpdateRunnable = new Runnable() {
+        private int lastDuration = -1;
+
         @Override
         public void run() {
             if (!isUserSeeking && playerManager.isPlaying()) {
@@ -5963,14 +6040,19 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                     seekBar.setMax(1000);
                     seekBar.setProgress((int) (1000L * current / duration));
                     tvCurrentTime.setText(formatTime(current));
-                    tvTotalTime.setText(formatTime(duration));
-                    syncTimeLabelWidth(duration);   // M4d：按曲目时长决定标签宽度（播放中不重排）
-                    updateChorusMarker(duration);
+                    // 2026-11-21：时长没变就不重排标签宽度、不重建副歌标记（原来每 500ms 都做一遍）
+                    if (duration != lastDuration) {
+                        lastDuration = duration;
+                        tvTotalTime.setText(formatTime(duration));
+                        syncTimeLabelWidth(duration);   // M4d：按曲目时长决定标签宽度（播放中不重排）
+                        updateChorusMarker(duration);
+                    }
                     // 播放满 30 秒给服务端打卡（每曲一次），让听歌记录/排行与账号同步
                     playerManager.reportPlayIfNeeded();
                 }
             }
-            seekHandler.postDelayed(this, 500);
+            // 2026-11-21：500ms → 800ms，进度条视觉上无差别，前台 CPU 少一截
+            seekHandler.postDelayed(this, 800);
         }
     };
 

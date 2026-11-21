@@ -62,7 +62,7 @@ public class MusicCloudActivity extends BaseWatchActivity {
                     TextView name = view.findViewById(R.id.tv_cloud_name);
                     TextView detail = view.findViewById(R.id.tv_cloud_detail);
                     icon.setImageResource(item.isMusic() ? R.drawable.ic_music_note : R.drawable.ic_insert_drive_file);
-                    icon.setColorFilter(item.isMusic() ? 0xFFBB86FC : 0x80FFFFFF);
+                    icon.setColorFilter(item.isMusic() ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0x80FFFFFF);
                     name.setText(item.getDisplayName());
                     detail.setText(item.getSubtitle());
                 }

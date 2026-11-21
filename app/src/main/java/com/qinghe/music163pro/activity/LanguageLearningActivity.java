@@ -134,7 +134,7 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         LinearLayout statsRow = cardRow();
         LinearLayout statsText = textColumn();
         statsText.addView(label("缓存与用量"));
-        statsText.addView(hint("同一首歌只分析一次；缓存放在 /sdcard/163MusicPro/ai_lyrics"));
+        statsText.addView(hint("同一首歌只分析一次；缓存放在 /sdcard/163MusicPlus/ai_lyrics"));
         statsRow.addView(statsText);
         tvStatsValue = valueText("");
         statsRow.addView(tvStatsValue);
@@ -205,7 +205,7 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
     private TextView valueText(String text) {
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextColor(getResources().getColor(R.color.colorPrimary));
+        tv.setTextColor(com.qinghe.music163pro.util.ThemeManager.accentColor(this));
         tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
         tv.setGravity(Gravity.END);
         tv.setMaxLines(2);
@@ -338,7 +338,7 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
                 new String[]{"清空 AI 歌词缓存", "重置用量统计"}, which -> {
                     if (which == 0) {
                         com.qinghe.music163pro.util.WatchConfirmDialog.show(this, "清空缓存",
-                                "将删除 /sdcard/163MusicPro/ai_lyrics 下的全部分析结果，下次打开需要重新消耗 token。",
+                                "将删除 /sdcard/163MusicPlus/ai_lyrics 下的全部分析结果，下次打开需要重新消耗 token。",
                                 () -> {
                                     AiLyricCache.clearAll();
                                     refreshValues();

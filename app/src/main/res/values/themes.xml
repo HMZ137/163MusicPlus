@@ -36,6 +36,8 @@
              按下反馈改由各 item 自己的圆角 shape 提供。 -->
         <item name="android:listSelector">@null</item>
         <item name="android:colorControlHighlight">#33BB86FC</item>
+        <!-- P1-10：半透明强调色（按下态 / 选中态底），各主题覆盖 -->
+        <item name="colorAccentSoft">#33BB86FC</item>
     </style>
 
     <!-- MainActivity theme: disables system swipe-to-dismiss -->
@@ -58,5 +60,78 @@
     <!-- Text-only button -->
     <style name="Widget.App.Button.Text" parent="Widget.Material3.Button.TextButton">
         <item name="android:textAllCaps">false</item>
+    </style>
+
+    <!-- ============================================================
+         P1-10：主题换肤（只换强调色，不做深浅色切换）
+         AppTheme 本身是「经典紫」，下面每套只覆盖强调色相关角色。
+         ============================================================ -->
+    <style name="Theme.App.Green" parent="AppTheme">
+        <item name="colorPrimary">#39C5BB</item>
+        <item name="colorPrimaryDark">#1F6E67</item>
+        <item name="colorAccent">#39C5BB</item>
+        <item name="colorPrimaryContainer">#39C5BB</item>
+        <item name="colorSecondary">#5FE3D8</item>
+        <item name="colorSecondaryContainer">#5FE3D8</item>
+        <item name="android:colorControlHighlight">#3339C5BB</item>
+        <item name="colorAccentSoft">#3339C5BB</item>
+    </style>
+
+    <style name="Theme.App.Blue" parent="AppTheme">
+        <item name="colorPrimary">#4A9EFF</item>
+        <item name="colorPrimaryDark">#1F5FA8</item>
+        <item name="colorAccent">#4A9EFF</item>
+        <item name="colorPrimaryContainer">#4A9EFF</item>
+        <item name="colorSecondary">#7FC0FF</item>
+        <item name="colorSecondaryContainer">#7FC0FF</item>
+        <item name="android:colorControlHighlight">#334A9EFF</item>
+        <item name="colorAccentSoft">#334A9EFF</item>
+    </style>
+
+    <style name="Theme.App.Orange" parent="AppTheme">
+        <item name="colorPrimary">#FF9F43</item>
+        <item name="colorPrimaryDark">#A85F16</item>
+        <item name="colorAccent">#FF9F43</item>
+        <item name="colorPrimaryContainer">#FF9F43</item>
+        <item name="colorSecondary">#FFC078</item>
+        <item name="colorSecondaryContainer">#FFC078</item>
+        <item name="android:colorControlHighlight">#33FF9F43</item>
+        <item name="colorAccentSoft">#33FF9F43</item>
+    </style>
+
+    <!-- B站粉：需求方 2026-11-21 指定 #FE65A6（原樱花粉） -->
+    <style name="Theme.App.Pink" parent="AppTheme">
+        <item name="colorPrimary">#FE65A6</item>
+        <item name="colorPrimaryDark">#A83E6B</item>
+        <item name="colorAccent">#FE65A6</item>
+        <item name="colorPrimaryContainer">#FE65A6</item>
+        <item name="colorSecondary">#FF9CC5</item>
+        <item name="colorSecondaryContainer">#FF9CC5</item>
+        <item name="android:colorControlHighlight">#33FE65A6</item>
+        <item name="colorAccentSoft">#33FE65A6</item>
+    </style>
+
+    <!-- 星蓝：需求方指定的 (86,134,254) = #5686FE -->
+    <style name="Theme.App.StarBlue" parent="AppTheme">
+        <item name="colorPrimary">#5686FE</item>
+        <item name="colorPrimaryDark">#2E4B9E</item>
+        <item name="colorAccent">#5686FE</item>
+        <item name="colorPrimaryContainer">#5686FE</item>
+        <item name="colorSecondary">#7FA6FF</item>
+        <item name="colorSecondaryContainer">#7FA6FF</item>
+        <item name="android:colorControlHighlight">#335686FE</item>
+        <item name="colorAccentSoft">#335686FE</item>
+    </style>
+
+    <!-- 必刷题绿：需求方 2026-11-21 指定 RGB(147,213,10) = #93D50A -->
+    <style name="Theme.App.ExamYellow" parent="AppTheme">
+        <item name="colorPrimary">#93D50A</item>
+        <item name="colorPrimaryDark">#5E8A06</item>
+        <item name="colorAccent">#93D50A</item>
+        <item name="colorPrimaryContainer">#93D50A</item>
+        <item name="colorSecondary">#B4E84E</item>
+        <item name="colorSecondaryContainer">#B4E84E</item>
+        <item name="android:colorControlHighlight">#3393D50A</item>
+        <item name="colorAccentSoft">#3393D50A</item>
     </style>
 </resources>

@@ -92,6 +92,7 @@
                 android:layout_height="40dp"
                 android:padding="6dp"
                 android:src="@drawable/ic_more_vert"
+                android:tint="?attr/colorPrimary"
                 android:alpha="0.87"
                 android:clickable="true"
                 android:focusable="true" />
@@ -236,8 +237,8 @@
                 android:paddingTop="0dp"
                 android:paddingBottom="0dp"
                 android:progress="0"
-                android:progressTint="@color/colorPrimary"
-                android:thumbTint="@color/colorPrimary" />
+                android:progressTint="?attr/colorPrimary"
+                android:thumbTint="?attr/colorPrimary" />
 
             <TextView
                 android:id="@+id/tv_total_time"
@@ -270,7 +271,7 @@
                 android:id="@+id/btn_prev"
                 android:layout_width="54dp"
                 android:layout_height="40dp"
-                android:layout_marginEnd="5dp"
+                android:layout_marginEnd="4dp"
                 android:padding="10dp"
                 android:src="@drawable/ic_skip_previous"
                 android:alpha="0.87"
@@ -281,8 +282,8 @@
                 android:id="@+id/btn_play"
                 android:layout_width="54dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="5dp"
-                android:layout_marginEnd="5dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
                 android:padding="8dp"
                 android:src="@drawable/ic_play_arrow"
                 android:alpha="1.0"
@@ -293,7 +294,7 @@
                 android:id="@+id/btn_next"
                 android:layout_width="54dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="5dp"
+                android:layout_marginStart="4dp"
                 android:padding="10dp"
                 android:src="@drawable/ic_skip_next"
                 android:alpha="0.87"

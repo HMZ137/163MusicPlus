@@ -97,8 +97,57 @@ public abstract class BaseWatchActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // P1-10：进入页面前应用当前主题（只换强调色，不做深浅切换）
+        com.qinghe.music163pro.util.ThemeManager.applyTo(this);
+        setTheme(com.qinghe.music163pro.util.ThemeManager.styleRes(this));
         super.onCreate(savedInstanceState);
         WatchUiUtils.applyKeepScreenOnPreference(this);
+    }
+
+    /**
+     * P1-10 扩展：二级页面背景。
+     *
+     * <p>放在 onPostCreate：此时子类的 setContentView 已经执行完，才有根 View 可铺。
+     * 受「二级页面背景」开关控制（默认关），模糊档位沿用 {@link BackgroundUtil} 的全局设置。</p>
+     */
+    @Override
+    protected void onPostCreate(@Nullable Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        try {
+            if (com.qinghe.music163pro.util.BackgroundUtil.isPageBackgroundEnabled(this)) {
+                View content = findViewById(android.R.id.content);
+                if (content instanceof ViewGroup && ((ViewGroup) content).getChildCount() > 0) {
+                    // 页面根布局自带 bg_dark 背景，会把铺在 content 上的背景图完全盖住 ——
+                    // 先清掉根布局的背景，背景图才能透出来（2026-11-21 需求方反馈「设置页背景不生效」的根因）
+                    View pageRoot = ((ViewGroup) content).getChildAt(0);
+                    pageRoot.setBackground(null);
+                    com.qinghe.music163pro.util.BackgroundUtil.applyBackground(this, content);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        // 2026-11-21：全局自定义字体（未设置时零开销）
+        try {
+            android.graphics.Typeface tf =
+                    com.qinghe.music163pro.util.CustomFont.get(this);
+            if (tf != null) {
+                applyTypeface(getWindow().getDecorView(), tf);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 递归给所有 TextView 挂字体（自定义字体功能用）。 */
+    private void applyTypeface(View v, android.graphics.Typeface tf) {
+        if (v instanceof android.widget.TextView) {
+            ((android.widget.TextView) v).setTypeface(tf);
+        }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                applyTypeface(g.getChildAt(i), tf);
+            }
+        }
     }
 
     // ── 浮动返回按钮 ────────────────────────────────────────────────────────

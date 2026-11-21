@@ -15,7 +15,7 @@ import android.app.Activity;
 public final class WatchConfirmDialog {
 
     private static final int DEFAULT_CANCEL_BUTTON_COLOR = 0xFF2D2D2D;
-    private static final int CONFIRM_COLOR = 0xFFBB86FC;
+    private static final int CONFIRM_COLOR = com.qinghe.music163pro.util.UiKit.COLOR_ACCENT;
     private static final int DESTRUCTIVE_COLOR = 0xFFCF6679;
     private static final String OVERLAY_TAG = "watch_confirm_dialog_overlay";
 
@@ -55,7 +55,7 @@ public final class WatchConfirmDialog {
         /** 统一的弹窗底色（P5 起由 UiKit.dialogCard 决定，此值仅保留兼容）。 */
         private static final int DIALOG_BACKGROUND = 0xFF1E1E1E;
         /** 普通确认按钮（主色）。 */
-        private static final int CONFIRM_COLOR = 0xFFBB86FC;
+        private static final int CONFIRM_COLOR = com.qinghe.music163pro.util.UiKit.COLOR_ACCENT;
         /** 破坏性确认按钮（删除、移除等）。 */
         private static final int DESTRUCTIVE_COLOR = 0xFFCF6679;
 

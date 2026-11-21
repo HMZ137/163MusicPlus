@@ -483,7 +483,7 @@ public final class AudioTagEmbedder {
         entries.add(("LYRICS=" + l).getBytes(StandardCharsets.UTF_8));
         entries.add(("UNSYNCEDLYRICS=" + l).getBytes(StandardCharsets.UTF_8));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] vendor = "163MusicPro".getBytes(StandardCharsets.UTF_8);
+        byte[] vendor = "163MusicPlus".getBytes(StandardCharsets.UTF_8);
         writeLe32(out, vendor.length);
         out.write(vendor, 0, vendor.length);
         writeLe32(out, entries.size());
@@ -685,7 +685,7 @@ public final class AudioTagEmbedder {
 
     private static byte[] buildVorbisComment(String lyrics) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] vendor = "163MusicPro".getBytes(StandardCharsets.UTF_8);
+        byte[] vendor = "163MusicPlus".getBytes(StandardCharsets.UTF_8);
         writeLe32(out, vendor.length);
         out.write(vendor, 0, vendor.length);
         List<byte[]> entries = new ArrayList<>();

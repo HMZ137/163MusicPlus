@@ -42,8 +42,9 @@ public final class LyricsCopyController {
     /** 长按进入复制状态的时长（需求方：1 秒）。 */
     public static final long LONG_PRESS_MS = 1000L;
 
-    private static final int SELECTED_FILL = 0x55BB86FC;
-    private static final int SELECTED_STROKE = 0xFFBB86FC;
+    /** 主题强调色（选中填充 / 描边）：非 final，由 ThemeManager 刷新（P1-10）。 */
+    static int SELECTED_FILL = 0x55BB86FC;
+    static int SELECTED_STROKE = 0xFFBB86FC;
     private static final int BAR_BG = 0xF01A1A1A;
     private static final int BTN_BG = 0xFF303030;
 

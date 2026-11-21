@@ -124,6 +124,11 @@ public final class NetworkImageLoader {
         imageView.setTag(imageUrl);
         imageView.setImageDrawable(null);
         if (imageUrl == null || imageUrl.trim().isEmpty()) {
+            // 需求 2026-11-21 任务 4：没有封面 URL 时直接用「默认封面」，否则这里 return 会永远是黑块
+            Bitmap dc = DefaultCover.load(imageView.getContext());
+            if (dc != null) {
+                imageView.setImageBitmap(dc);
+            }
             return;
         }
         Bitmap cached = MEMORY_CACHE.get(imageUrl);
@@ -165,6 +170,12 @@ public final class NetworkImageLoader {
                     target.post(() -> {
                         if (finalBitmap != null && imageUrl.equals(target.getTag())) {
                             target.setImageBitmap(finalBitmap);
+                        } else if (finalBitmap == null) {
+                            // 需求 2026-11-21 任务 4：无封面/加载失败时用「默认封面」兜底，不再黑块
+                            Bitmap dc = DefaultCover.load(target.getContext());
+                            if (dc != null && imageUrl.equals(target.getTag())) {
+                                target.setImageBitmap(dc);
+                            }
                         }
                     });
                 }

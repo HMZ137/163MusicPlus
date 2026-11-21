@@ -40,7 +40,7 @@
             android:focusable="true"
             android:padding="8dp"
             android:src="@drawable/ic_menu"
-            android:tint="@color/colorPrimary" />
+            android:tint="?attr/colorPrimary" />
     </RelativeLayout>
 
     <!-- P3：独立信息行「N 首」（与下载页 / 收藏页同一口径） -->

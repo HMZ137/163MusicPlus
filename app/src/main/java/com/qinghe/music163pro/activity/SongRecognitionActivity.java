@@ -119,7 +119,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
         addSpacer(root, px(10));
 
         tvMode = new TextView(this);
-        tvMode.setTextColor(0xFFBB86FC);
+        tvMode.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tvMode.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tvMode.setTypeface(tvMode.getTypeface(), Typeface.BOLD);
         tvMode.setGravity(Gravity.CENTER);
@@ -518,7 +518,7 @@ public class SongRecognitionActivity extends BaseWatchActivity {
     }
 
     private void updateIdleUi() {
-        setCircleButtonState(0xFFBB86FC, true, "开始录音");
+        setCircleButtonState(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, true, "开始录音");
         tvMode.setText(isAutoMode() ? "当前模式：自动识别" : "当前模式：手动暂停");
         if (isAutoMode()) {
             tvHint.setText("点一下开始持续监听\n每三秒自动识别一次");

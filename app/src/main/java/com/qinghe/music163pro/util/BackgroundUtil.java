@@ -537,8 +537,28 @@ public final class BackgroundUtil {
 
     // ==================== Apply ====================
 
-    public static void applyBackground(Context context, View root) {
-        if (root == null) return;
+    // ==================== P1-10：二级页面背景 ====================
+
+    private static final String KEY_PAGE_BG = "background_on_pages";
+
+    /**
+     * 是否给设置页 / 歌单页等二级页面也铺背景。
+     *
+     * <p><b>2026-11-21 暂时停用</b>：需求方反馈「改设置页背景要动大手术」（页面根布局/滚动容器
+     * 各有背景，清掉它们影响面大），已把设置页的入口按钮隐藏，这里强制返回 false，
+     * 铺背景逻辑保留但不再触发。恢复时把下面的 return 改回 SharedPreferences 读取即可。</p>
+     */
+    public static boolean isPageBackgroundEnabled(Context context) {
+        return false;   // 暂时停用（需求方 2026-11-21），入口按钮已隐藏
+    }
+
+    public static void setPageBackgroundEnabled(Context context, boolean enabled) {
+        if (context == null) return;
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_PAGE_BG, enabled).commit();
+    }
+
+    public static void applyBackground(Context context, View root) {        if (root == null) return;
         String mode = getMode(context);
         if (MODE_FLUID.equals(mode)) {
             // P9 补充（需求方 2026-10-17）：流体背景的色团从当前背景（封面 / 选定图片）取色。

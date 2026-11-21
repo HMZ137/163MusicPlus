@@ -42,6 +42,12 @@ public class AlbumDetailActivity extends BaseWatchActivity {
     private long albumId;
     private boolean albumSubscribed = false;
 
+    // P0-8：本地收藏需要的元信息（详情加载后补齐）
+    private String albumNameCache = "";
+    private String albumCoverCache = "";
+    private String albumArtistCache = "";
+    private int albumTrackCount = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,6 +60,8 @@ public class AlbumDetailActivity extends BaseWatchActivity {
         albumId = getIntent().getLongExtra("album_id", 0);
         String albumName = getIntent().getStringExtra("album_name");
         String albumCoverUrl = getIntent().getStringExtra("album_cover_url");
+        albumNameCache = albumName == null ? "" : albumName;
+        albumCoverCache = albumCoverUrl == null ? "" : albumCoverUrl;
 
         playerManager = MusicPlayerManager.getInstance();
 
@@ -205,60 +213,28 @@ public class AlbumDetailActivity extends BaseWatchActivity {
     }
 
     /**
-     * 回显收藏按钮的初始状态。
+     * 回显收藏按钮状态。
      *
-     * <p>走「收藏专辑列表」逐页找，不用 {@code /album/detail/dynamic} ——
-     * 后者在本机网络下会一直不返回（连续 15s 读超时，实测）。</p>
+     * <p>P0-8（2026-11-20）：专辑收藏已改为<b>本地收藏</b>，不再查云端、也不再要求登录，
+     * 所以这里直接读本地记录即可。</p>
      */
     private void loadAlbumSubState(long albumId) {
-        String cookie = playerManager.getCookie();
-        if (cookie == null || cookie.isEmpty()) {
-            // 未登录谈不上"已收藏/未收藏"，隐藏按钮比显示一个必然失败的按钮好
-            btnAlbumSub.setVisibility(View.GONE);
-            return;
-        }
-        MusicApiHelper.isAlbumSubscribed(albumId, cookie, new MusicApiHelper.AlbumSubStateCallback() {
-            @Override
-            public void onResult(boolean subscribed) {
-                albumSubscribed = subscribed;
-                applyAlbumSubStyle(subscribed);
-            }
-
-            @Override
-            public void onError(String message) {
-                // 查不到状态就保持"未收藏"，按钮仍可点（点了会真的去收藏）
-                btnAlbumSub.setVisibility(View.VISIBLE);
-            }
-        });
+        albumSubscribed = com.qinghe.music163pro.util.LocalAlbumFavorites.isFavorite(this, albumId);
+        btnAlbumSub.setVisibility(View.VISIBLE);
+        applyAlbumSubStyle(albumSubscribed);
     }
 
     private void toggleAlbumSub() {
         if (albumId <= 0) {
             return;
         }
-        String cookie = playerManager.getCookie();
-        if (cookie == null || cookie.isEmpty()) {
-            com.qinghe.music163pro.util.UiKit.toast(this, "请先登录");
-            return;
-        }
-        final boolean target = !albumSubscribed;
-        btnAlbumSub.setEnabled(false);
-        MusicApiHelper.subAlbum(albumId, target, cookie, new MusicApiHelper.AlbumSubCallback() {
-            @Override
-            public void onResult(boolean subscribed) {
-                btnAlbumSub.setEnabled(true);
-                albumSubscribed = subscribed;
-                applyAlbumSubStyle(subscribed);
-                com.qinghe.music163pro.util.UiKit.toast(AlbumDetailActivity.this, subscribed ? "已收藏专辑" : "已取消收藏");
-            }
-
-            @Override
-            public void onError(String message) {
-                btnAlbumSub.setEnabled(true);
-                Toast.makeText(AlbumDetailActivity.this, "操作失败：" + message,
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
+        // P0-8：只写本地，不调 /api/album/sub
+        boolean nowFavorite = com.qinghe.music163pro.util.LocalAlbumFavorites.toggle(
+                this, albumId, albumNameCache, albumArtistCache, albumCoverCache, albumTrackCount);
+        albumSubscribed = nowFavorite;
+        applyAlbumSubStyle(nowFavorite);
+        com.qinghe.music163pro.util.UiKit.toast(this,
+                nowFavorite ? "已收藏专辑" : "已取消收藏");
     }
 
     private void applyAlbumSubStyle(boolean on) {
@@ -280,9 +256,15 @@ public class AlbumDetailActivity extends BaseWatchActivity {
             public void onResult(String albumName, String coverUrl, List<Song> songs) {
                 if (!albumName.isEmpty()) {
                     tvAlbumName.setText(albumName);
+                    albumNameCache = albumName;
                 }
                 if (!coverUrl.isEmpty()) {
                     NetworkImageLoader.load(ivAlbumCover, coverUrl);
+                    albumCoverCache = coverUrl;
+                }
+                albumTrackCount = songs.size();
+                if (!songs.isEmpty() && songs.get(0).getArtist() != null) {
+                    albumArtistCache = songs.get(0).getArtist();
                 }
                 displayList.clear();
                 displayList.addAll(songs);

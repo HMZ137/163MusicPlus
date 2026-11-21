@@ -38,11 +38,15 @@ public class OpenSourceActivity extends BaseWatchActivity {
                 0xFFAAAAAA, px(15), false, Gravity.START));
         content.addView(makeSpacer(px(8)));
         content.addView(makeText(
-                "163MusicPro 代码部分可在 MIT 协议下使用、修改和分发；网易云音乐相关 API 与内容版权仍归网易公司所有。",
+                "163MusicPlus 代码部分可在 MIT 协议下使用、修改和分发；网易云音乐相关 API 与内容版权仍归网易公司所有。",
                 0xFFAAAAAA, px(15), false, Gravity.START));
         addProject(content,
-                "163MusicPro",
+                "163MusicPlus",
                 "开发者：Qinghe",
+                "https://github.com/HMZ137/163MusicPlus");
+        addProject(content,
+                "163MusicPro（上游项目）",
+                "开发者：9xhk-1",
                 "https://github.com/9xhk-1/163MusicPro");
         addProject(content,
                 "Material Components for Android",

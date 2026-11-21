@@ -86,10 +86,13 @@ public class MoreActivity extends BaseWatchActivity {
         btnLogin = findViewById(R.id.btn_menu_login);
         btnSettings = findViewById(R.id.btn_menu_settings);
 
-        // 本机音乐：本地播放模式下的主入口（云音乐模式下这个磁贴不显示）
+        // 本机音乐：本地播放模式下的主入口，直接落到「本地音乐管理」的本地页（左右滑可切下载）
         if (btnLocalMusic != null) {
-            btnLocalMusic.setOnClickListener(v ->
-                    startActivity(new Intent(this, LocalMusicActivity.class)));
+            btnLocalMusic.setOnClickListener(v -> {
+                Intent intent = new Intent(this, DownloadListActivity.class);
+                intent.putExtra(DownloadListActivity.EXTRA_INITIAL_TAB, 1);
+                startActivity(intent);
+            });
         }
 
         btnFavorites.setOnClickListener(v ->
@@ -141,7 +144,7 @@ public class MoreActivity extends BaseWatchActivity {
                 startActivity(new Intent(this, LoginActivity.class)));
 
         btnSettings.setOnClickListener(v ->
-                startActivity(new Intent(this, SettingsActivity.class)));
+                startActivity(new Intent(this, SettingsHomeActivity.class)));
 
         // Set up right-swipe to go back to player
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -187,15 +190,19 @@ public class MoreActivity extends BaseWatchActivity {
 
     private void updateMenuVisibility() {
         // 本机音乐磁贴的显隐完全由播放模式决定，不参与「编辑更多菜单」的勾选体系
+        boolean localOnlyMode = PlaybackMode.isLocalOnly(this);
         if (btnLocalMusic != null) {
-            btnLocalMusic.setVisibility(
-                    PlaybackMode.isLocalOnly(this) ? View.VISIBLE : View.GONE);
+            btnLocalMusic.setVisibility(localOnlyMode ? View.VISIBLE : View.GONE);
         }
-        applyVisibility(btnFavorites, MoreMenuPreferences.KEY_FAVORITES, false);
+        // 需求（2026-11-20）：仅本地模式隐藏「收藏」「历史记录」——两者都是在线的内容
+        if (localOnlyMode) {
+            if (btnFavorites != null) btnFavorites.setVisibility(View.GONE);
+        } else {
+            applyVisibility(btnFavorites, MoreMenuPreferences.KEY_FAVORITES, false);
+        }
         // 「我的歌单」：页内已分「在线歌单 / 本地歌单」两个二级界面。纯本地播放模式下这页退化为
         // 纯本地入口（只留本地那一栏），属于离线可用功能 —— 因此放行：既不按云端功能隐藏，
         // 也不要求登录。云音乐模式下仍沿用原来的「需登录」规则，行为与改动前完全一致。
-        boolean localOnlyMode = PlaybackMode.isLocalOnly(this);
         boolean myPlaylistsEnabled = MoreMenuPreferences.isEnabled(prefs, MoreMenuPreferences.KEY_MY_PLAYLISTS);
         boolean myPlaylistsVisible = localOnlyMode
                 ? myPlaylistsEnabled
@@ -211,7 +218,11 @@ public class MoreActivity extends BaseWatchActivity {
         applyVisibility(btnBilibili, MoreMenuPreferences.KEY_BILIBILI, false);
         applyVisibility(btnRingtones, MoreMenuPreferences.KEY_RINGTONES, false);
         applyVisibility(btnTopList, MoreMenuPreferences.KEY_TOPLIST, false);
-        applyVisibility(btnHistory, MoreMenuPreferences.KEY_HISTORY, false);
+        if (localOnlyMode) {
+            if (btnHistory != null) btnHistory.setVisibility(View.GONE);
+        } else {
+            applyVisibility(btnHistory, MoreMenuPreferences.KEY_HISTORY, false);
+        }
         applyVisibility(btnProfile, MoreMenuPreferences.KEY_PROFILE, true);
         applyVisibility(btnPersonalFM, MoreMenuPreferences.KEY_PERSONAL_FM, false);
         applyVisibility(btnLogin, MoreMenuPreferences.KEY_LOGIN, false);

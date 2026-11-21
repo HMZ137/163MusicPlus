@@ -320,6 +320,22 @@ public class LoginActivity extends BaseWatchActivity {
      * 才是真正生效的登录状态。输入框有未保存的改动时会额外提示。</p>
      */
     private void exportCookie() {
+        // 需求 2026-11-21：导出前弹安全确认（复用项目统一浮窗样式；不提供「不再提示」）
+        String saved0 = prefs.getString(CookieBackup.KEY_COOKIE, "");
+        String typed0 = etCookie.getText() == null ? "" : etCookie.getText().toString().trim();
+        if ((saved0 == null || saved0.trim().isEmpty()) && typed0.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this,
+                    "还没有 Cookie 可导出，请先扫码登录或粘贴后保存");
+            return;
+        }
+        com.qinghe.music163pro.util.WatchPopup.confirm(this, "安全提示",
+                "Cookie 等同于账号登录凭证，导出后请妥善保管，"
+                        + "请勿发送给他人或上传至公开位置，泄露可能导致账号被盗用。确认导出？",
+                "确认导出", false, this::doExportCookie);
+    }
+
+    /** 真正的导出动作（安全确认之后才执行）。 */
+    private void doExportCookie() {
         String saved = prefs.getString(CookieBackup.KEY_COOKIE, "");
         saved = saved == null ? "" : saved.trim();
         String typed = etCookie.getText() == null ? "" : etCookie.getText().toString().trim();

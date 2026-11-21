@@ -275,7 +275,7 @@ public class MusicPlaybackService extends Service {
     }
 
     private void initializeMediaSession() {
-        mediaSession = new MediaSession(this, "163MusicPro");
+        mediaSession = new MediaSession(this, "163MusicPlus");
         mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS
                 | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
         mediaSession.setCallback(new MediaSession.Callback() {

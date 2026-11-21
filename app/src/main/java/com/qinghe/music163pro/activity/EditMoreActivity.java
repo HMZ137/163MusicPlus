@@ -44,7 +44,7 @@ public class EditMoreActivity extends BaseWatchActivity {
         itemLabels.put(MoreMenuPreferences.KEY_MUSIC_CLOUD, "音乐云盘");
         itemLabels.put(MoreMenuPreferences.KEY_SEARCH, "搜索");
         itemLabels.put(MoreMenuPreferences.KEY_SONG_RECOGNITION, "听歌识曲");
-        itemLabels.put(MoreMenuPreferences.KEY_DOWNLOADS, "本地音乐管理");
+        itemLabels.put(MoreMenuPreferences.KEY_DOWNLOADS, "下载管理");
         itemLabels.put(MoreMenuPreferences.KEY_RINGTONES, "铃声管理");
         itemLabels.put(MoreMenuPreferences.KEY_TOPLIST, "排行榜");
         itemLabels.put(MoreMenuPreferences.KEY_HISTORY, "历史记录");
@@ -95,7 +95,7 @@ public class EditMoreActivity extends BaseWatchActivity {
     private View makeSectionTitle(String label) {
         TextView tv = new TextView(this);
         tv.setText(label);
-        tv.setTextColor(0xFFBB86FC);
+        tv.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         tv.setPadding(0, px(8), 0, px(4));
         return tv;
@@ -185,7 +185,7 @@ public class EditMoreActivity extends BaseWatchActivity {
 
         TextView check = new TextView(this);
         check.setText("＋");
-        check.setTextColor(0xFFBB86FC);
+        check.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         check.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
         check.setGravity(Gravity.CENTER);
         check.setPadding(px(6), 0, 0, 0);

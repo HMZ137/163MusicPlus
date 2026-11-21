@@ -255,7 +255,7 @@ public class ProfileActivity extends BaseWatchActivity {
 
         TextView tvLevel = new TextView(this);
         tvLevel.setText("Lv." + level);
-        tvLevel.setTextColor(0xFFBB86FC);
+        tvLevel.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tvLevel.setTypeface(null, android.graphics.Typeface.BOLD);
         tvLevel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(20));
         row.addView(tvLevel);
@@ -290,7 +290,7 @@ public class ProfileActivity extends BaseWatchActivity {
         float left = (float) Math.max(1d - ratio, 0.0001d);
         View filled = new View(this);
         GradientDrawable fillBg = new GradientDrawable();
-        fillBg.setColor(0xFFBB86FC);
+        fillBg.setColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         fillBg.setCornerRadius(px(3));
         filled.setBackground(fillBg);
         bar.addView(filled, new LinearLayout.LayoutParams(0,
@@ -498,7 +498,7 @@ public class ProfileActivity extends BaseWatchActivity {
     private void addSectionTitle(String title) {
         TextView tv = new TextView(this);
         tv.setText("── " + title + " ──");
-        tv.setTextColor(0xFFBB86FC);
+        tv.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, px(8), 0, px(4));

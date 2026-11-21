@@ -104,7 +104,7 @@ public class BilibiliHistoryActivity extends BaseWatchActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT));
         btnClear.setGravity(Gravity.CENTER);
         btnClear.setText("清空");
-        btnClear.setTextColor(getResources().getColor(R.color.colorPrimary));
+        btnClear.setTextColor(com.qinghe.music163pro.util.ThemeManager.accentColor(this));
         btnClear.setTextSize(12);
         btnClear.setPadding(px(4), px(6), px(4), px(6));
         btnClear.setClickable(true);

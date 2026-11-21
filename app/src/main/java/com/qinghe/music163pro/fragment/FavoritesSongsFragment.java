@@ -77,14 +77,31 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                 new MultiSelectController.Callback() {
                     @Override
                     public List<MultiSelectController.Action> getActions() {
-                        return java.util.Collections.singletonList(
-                                MultiSelectController.Action.delete(requireActivity()));
+                        // 需求 2026-11-21 任务 6：加入「下一首播放」（可叠加）
+                        List<MultiSelectController.Action> acts = new java.util.ArrayList<>();
+                        acts.add(MultiSelectController.Action.playNext(requireActivity()));
+                        // 任务 3（2026-11-21）：收藏的在线歌曲也能加入本地歌单
+                        acts.add(new MultiSelectController.Action("add_to_local_playlist", "加入本地歌单",
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(requireContext())));
+                        acts.add(MultiSelectController.Action.delete(requireActivity()));
+                        return acts;
                     }
 
                     @Override
                     public void onAction(MultiSelectController.Action action, List<Integer> positions) {
                         if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
                             confirmDeleteSelected(positions);
+                        } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
+                            playNextSelected(positions);
+                        } else if ("add_to_local_playlist".equals(action.id)) {
+                            java.util.List<Song> targets = new java.util.ArrayList<>();
+                            for (int p : positions) {
+                                if (p >= 0 && p < items.size()) {
+                                    targets.add(items.get(p));
+                                }
+                            }
+                            com.qinghe.music163pro.util.LocalPlaylistPicker.show(
+                                    requireActivity(), targets, null);
                         }
                     }
                 });
@@ -107,10 +124,25 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
 
     @Override
     protected void bindRow(View row, Song song) {
-        TextView tvName = row.findViewById(R.id.tv_item_name);
-        TextView tvArtist = row.findViewById(R.id.tv_item_artist);
-        ImageView ivCover = row.findViewById(R.id.iv_cover);
-        tvName.setText(song.getDisplayName());
+        // 任务 5（2026-11-21）：ViewHolder 化，避免每次绑定都 findViewById
+        Object tag = row.getTag();
+        TextView tvName;
+        TextView tvArtist;
+        ImageView ivCover;
+        if (tag instanceof View[]) {
+            View[] h = (View[]) tag;
+            tvName = (TextView) h[0];
+            tvArtist = (TextView) h[1];
+            ivCover = (ImageView) h[2];
+        } else {
+            tvName = row.findViewById(R.id.tv_item_name);
+            tvArtist = row.findViewById(R.id.tv_item_artist);
+            ivCover = row.findViewById(R.id.iv_cover);
+            row.setTag(new View[]{tvName, tvArtist, ivCover});
+        }
+        if (tvName != null) {
+            tvName.setText(song.getDisplayName());
+        }
         // 本地收藏带「本地」标签：它的 id 是路径派生的负数，
         // 不属于网易云曲目体系（没有云端音质/评论/歌单可用）。
         if (LocalTracks.isLocalId(song.getId())) {
@@ -158,13 +190,28 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
         if (isCloud) {
             loadCloudFavorites();
         } else {
+            // 2026-11-21 任务 2：恢复本地收藏列表（内部已过滤掉本地文件歌曲，保留在线歌曲的收藏）
             loadLocalFavorites();
         }
     }
 
     private void loadLocalFavorites() {
         // 先本地立即可见（离线/未登录也能看），再异步补详情。
-        applyItems(favoritesManager.getFavorites());
+        // 2026-11-21 任务 2：本地歌曲收藏不再展示。
+        // 注意「本地收藏」里同时存着**在线歌曲**的收藏记录，这些必须保留 ——
+        // 只过滤掉本地文件歌曲（id 由路径派生，LocalTracks.isLocalId 可判定）。
+        List<Song> all = favoritesManager.getFavorites();
+        List<Song> visible = new ArrayList<>();
+        for (Song s : all) {
+            if (s == null) {
+                continue;
+            }
+            if (com.qinghe.music163pro.util.LocalTracks.isLocalId(s.getId())) {
+                continue;
+            }
+            visible.add(s);
+        }
+        applyItems(visible);
         // 快照一份 favorites.json 的内容当兜底：详情回来时用它补「不在 id 索引里」的条目（见下）。
         final List<Song> localSnapshot = new ArrayList<>(items);
 
@@ -176,12 +223,21 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
         if (cookie == null || cookie.isEmpty()) {
             return;
         }
+        // 任务 5（2026-11-21）：5 分钟内不重复补详情，避免每次进页都打网络。
+        // 列表本身已经用本地快照立即渲染，这里只影响"补音质/评论数"这类详情。
+        final android.content.SharedPreferences uiPrefs = requireContext()
+                .getSharedPreferences("favorites_ui_prefs", android.content.Context.MODE_PRIVATE);
+        if (System.currentTimeMillis() - uiPrefs.getLong("detail_fetched_at", 0)
+                < 5 * 60 * 1000L) {
+            return;
+        }
         MusicApiHelper.fetchSongsDetails(ids, cookie, new MusicApiHelper.BatchSongDetailsCallback() {
             @Override
             public void onResult(java.util.Map<Long, Song> songMap) {
                 if (songMap.isEmpty() || !isViewReady()) {
                     return;
                 }
+                uiPrefs.edit().putLong("detail_fetched_at", System.currentTimeMillis()).apply();
                 // 本地收藏优先：先用本地那条，只有本地没有时才用 API 返回的曲目。
                 // 反过来（先放 API 结果）会把本地收藏顶成"在线版本"，
                 // 表现就是本地歌一闪而过、最后只剩在线收藏。
@@ -235,18 +291,8 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                 if (!isViewReady()) {
                     return;
                 }
-                // 云端收藏 + 本地收藏 合并显示：本地歌曲不该受"收藏模式"影响，联网也要能看到
-                java.util.Set<Long> cloudIds = new java.util.HashSet<>();
-                for (Song cs : songs) {
-                    cloudIds.add(cs.getId());
-                }
-                List<Song> merged = new ArrayList<>(songs);
-                for (Song local : favoritesManager.getFavorites()) {
-                    if (local != null && !cloudIds.contains(local.getId())) {
-                        merged.add(local);
-                    }
-                }
-                applyItems(merged);
+                // 2026-11-21 任务 2：不再合并本地收藏（本地歌曲收藏不展示），只显示云端收藏。
+                applyItems(new ArrayList<>(songs));
             }
 
             @Override
@@ -261,6 +307,29 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
     // ── 取消收藏 ────────────────────────────────────────────────────────────
 
     /** 删除选中的本地收藏歌曲（长按多选 → 底部动作栏「删除」）。 */
+    /**
+     * 任务 6（2026-11-21）：把选中的收藏歌曲排到「下一首播放」，可叠加、同一首不重复。
+     */
+    private void playNextSelected(List<Integer> positions) {
+        if (positions == null || positions.isEmpty()) {
+            return;
+        }
+        com.qinghe.music163pro.player.MusicPlayerManager pm =
+                com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+        int added = 0;
+        for (int position : positions) {
+            if (position < 0 || position >= items.size()) {
+                continue;
+            }
+            if (pm.queueNextSong(items.get(position))) {
+                added++;
+            }
+        }
+        android.widget.Toast.makeText(requireContext(),
+                added > 0 ? "已加入下一首播放：" + added + " 首" : "所选歌曲已在下一首播放队列中",
+                android.widget.Toast.LENGTH_SHORT).show();
+    }
+
     private void confirmDeleteSelected(List<Integer> positions) {
         final List<Song> targets = new ArrayList<>();
         for (int position : positions) {

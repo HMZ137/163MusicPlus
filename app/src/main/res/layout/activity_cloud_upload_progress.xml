@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="center"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorPrimary"
             android:textSize="12sp" />
 
         <TextView
@@ -50,7 +50,7 @@
             android:layout_marginTop="18dp"
             android:max="100"
             android:progress="0"
-            android:progressTint="@color/colorPrimary" />
+            android:progressTint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/tv_upload_progress"
@@ -81,7 +81,7 @@
             android:layout_marginTop="18dp"
             android:text="完成"
             android:visibility="gone"
-            app:backgroundTint="@color/colorPrimary" />
+            app:backgroundTint="?attr/colorPrimary" />
 
     </LinearLayout>
 </ScrollView>

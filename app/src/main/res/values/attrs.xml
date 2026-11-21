@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      P1-10：主题的「半透明强调色」，用于按下态底色 / 选中态填充。
+      以前这些地方直接写 #33BB86FC，换主题后不跟随；现在各主题 style 覆盖这个 attr，
+      drawable 用 ?attr/colorAccentSoft 引用即可。
+    -->
+    <attr name="colorAccentSoft" format="color" />
+</resources>

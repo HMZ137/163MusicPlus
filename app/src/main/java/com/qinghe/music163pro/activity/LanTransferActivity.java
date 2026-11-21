@@ -100,7 +100,7 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         addrLabel.setText("电脑 / 手机浏览器打开");
         addrCard.addView(addrLabel);
 
-        tvUrl = bodyText(0xFFBB86FC, 19);
+        tvUrl = bodyText(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 19);
         tvUrl.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         tvUrl.setTextIsSelectable(true);
         tvUrl.setPadding(px(4), px(6), px(4), px(6));
@@ -133,7 +133,7 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         btnToggle.setPadding(px(10), px(10), px(10), px(10));
         android.graphics.drawable.GradientDrawable bg =
                 new android.graphics.drawable.GradientDrawable();
-        bg.setColor(0xFFBB86FC);
+        bg.setColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         bg.setCornerRadius(UiKit.dp(this, UiKit.DP_BUTTON_RADIUS));
         btnToggle.setBackground(bg);
         btnToggle.setClickable(true);

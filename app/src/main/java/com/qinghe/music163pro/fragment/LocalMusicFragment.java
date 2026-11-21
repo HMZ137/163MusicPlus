@@ -28,6 +28,7 @@ import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.BatchFavoriteHelper;
 import com.qinghe.music163pro.util.LocalLibraryCache;
 import com.qinghe.music163pro.util.LocalMetadataIndex;
+import com.qinghe.music163pro.util.LocalMusicCache;
 import com.qinghe.music163pro.util.LocalMusicHides;
 import com.qinghe.music163pro.util.LocalMusicLoader;
 import com.qinghe.music163pro.util.LocalPlaylistManager;
@@ -152,12 +153,30 @@ public class LocalMusicFragment extends Fragment {
                 View row = super.getView(position, convertView, parent);
                 Song song = getItem(position);
                 if (song != null) {
-                    TextView tvName = row.findViewById(R.id.tv_item_name);
-                    TextView tvArtist = row.findViewById(R.id.tv_item_artist);
-                    ImageView ivCover = row.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getDisplayName());
-                    // 元信息里可能根本没有歌手 —— 兜底会给出空串，这里再防一次 null
-                    tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());
+                    // 任务 5（2026-11-21）：ViewHolder 化 —— 原来每次 getView 都 findViewById 三次，
+                    // 2~3k 首滚动时是明显的卡顿来源。子 View 缓存挂在 row 的 tag 上。
+                    Object tag = row.getTag();
+                    TextView tvName;
+                    TextView tvArtist;
+                    ImageView ivCover;
+                    if (tag instanceof View[]) {
+                        View[] h = (View[]) tag;
+                        tvName = (TextView) h[0];
+                        tvArtist = (TextView) h[1];
+                        ivCover = (ImageView) h[2];
+                    } else {
+                        tvName = row.findViewById(R.id.tv_item_name);
+                        tvArtist = row.findViewById(R.id.tv_item_artist);
+                        ivCover = row.findViewById(R.id.iv_cover);
+                        row.setTag(new View[]{tvName, tvArtist, ivCover});
+                    }
+                    if (tvName != null) {
+                        tvName.setText(song.getDisplayName());
+                    }
+                    if (tvArtist != null) {
+                        // 元信息里可能根本没有歌手 —— 兜底会给出空串，这里再防一次 null
+                        tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());
+                    }
                     if (ivCover != null) {
                         // 本地封面走 file:// ，NetworkImageLoader 已经支持这条分支
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
@@ -231,7 +250,9 @@ public class LocalMusicFragment extends Fragment {
             statusView.setClickable(advanced);
             statusView.setFocusable(advanced);
         }
-        if (advanced) {
+        // 2026-11-21：长按多选在「完整页」和「本地标签页」两种模式下都启用
+        // （之前只在 advanced=true 时 attach，标签页长按没反应）
+        {
             if (multiSelect == null) {
                 multiSelect = MultiSelectController.attach(requireActivity(), listView,
                         new MultiSelectController.Callback() {
@@ -239,11 +260,13 @@ public class LocalMusicFragment extends Fragment {
                             public List<MultiSelectController.Action> getActions() {
                                 List<MultiSelectController.Action> actions = new ArrayList<>();
                                 actions.add(MultiSelectController.Action.favorite(requireActivity()));
+                                // 任务 6（2026-11-21）：下一首播放（可叠加、同一首不重复）
+                                actions.add(MultiSelectController.Action.playNext(requireActivity()));
                                 // 「加入歌单」：把选中的本地歌曲归类进某个本地歌单（本地收藏模式才有意义）
                                 actions.add(new MultiSelectController.Action(
                                         "add_to_local_playlist",
                                         getString(R.string.add_to_local_playlist),
-                                        getResources().getColor(R.color.colorPrimary)));
+                                        com.qinghe.music163pro.util.ThemeManager.accentColor(requireContext())));
                                 // 「移出列表」：只从这个列表里去掉，**不删**卡里的文件（见 LocalMusicHides）
                                 actions.add(new MultiSelectController.Action(
                                         "hide_from_list",
@@ -257,6 +280,8 @@ public class LocalMusicFragment extends Fragment {
                                                  List<Integer> positions) {
                                 if (MultiSelectController.Action.ID_FAVORITE.equals(action.id)) {
                                     favoriteSelected(positions);
+                                } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
+                                    playNextSelected(positions);
                                 } else if ("add_to_local_playlist".equals(action.id)) {
                                     addSelectedToPlaylist(positions);
                                 } else if ("hide_from_list".equals(action.id)) {
@@ -265,9 +290,6 @@ public class LocalMusicFragment extends Fragment {
                             }
                         });
             }
-        } else if (multiSelect != null) {
-            multiSelect.exitSelectionMode();
-            multiSelect.setEnabled(false);
         }
     }
 
@@ -280,6 +302,77 @@ public class LocalMusicFragment extends Fragment {
     /** 发起一轮扫描；真正的两阶段加载在 {@link LocalMusicLoader} 里。 */
     private void startScan() {
         if (scanning) {
+            return;
+        }
+        // 需求 2026-11-21 任务 2：进页只读缓存立即渲染，非刷新不重新读取歌曲信息。
+        // 「手动刷新」（refreshLocalCache）会先 invalidate 清缓存，此时缓存为空才会走完整扫描。
+        LocalMusicCache.Snapshot snap = LocalMusicCache.read(requireContext());
+        if (!snap.songs.isEmpty()) {
+            // 补齐封面（2026-11-21）：JSON 缓存可能在封面抽取完成前就落盘了，
+            // 空 coverUrl 的歌就近查一次索引，有封面就补上，避免整列表都显示默认图。
+            for (Song s : snap.songs) {
+                if (!TextUtils.isEmpty(s.getCoverUrl())) {
+                    continue;
+                }
+                String audioPath = s.getUrl();
+                if (TextUtils.isEmpty(audioPath)) {
+                    continue;
+                }
+                java.io.File cover = com.qinghe.music163pro.util.LocalMetadata
+                        .cachedCoverFile(requireContext(), audioPath);
+                if (cover != null && cover.isFile()) {
+                    s.setCoverUrl("file://" + cover.getAbsolutePath());
+                }
+            }
+            allSongs.clear();
+            allSongs.addAll(snap.songs);
+            scanStatus = null;
+            // 任务 5（2026-11-21）：缓存里带了排好序的顺序 + 字母分组。
+            // 排序方式一致时直接复用，跳过全量拼音排序（这就是「点本地音乐卡几秒」的根因）。
+            if (snap.sortMode == sortMode && snap.hasGroups()) {
+                groupLetters.clear();
+                for (char c : snap.letters) {
+                    groupLetters.add(c);
+                }
+                groupStarts = snap.starts;
+                groupCounts = snap.counts;
+                refreshStatus();
+                updateEmptyState();
+                applySearch(searchQuery, false);
+                return;
+            }
+            // 旧缓存没有分组，或者用户换了排序方式：先把列表按缓存顺序渲染出来，
+            // 排序 + 字母分组挪到后台线程，跑完再主线程替换 —— 页面不再等拼音转写。
+            localSongs.clear();
+            localSongs.addAll(allSongs);
+            if (adapter != null) {
+                adapter.notifyDataSetChanged();
+            }
+            updateEmptyState();
+            final int sortGeneration = scanGeneration;
+            final int mode = sortMode;
+            final List<Song> source = new ArrayList<>(allSongs);
+            new Thread(() -> {
+                List<Song> sorted = new ArrayList<>(source);
+                sortSongsInPlace(sorted, mode);
+                Groups g = computeGroups(sorted, mode);
+                if (getActivity() == null) {
+                    return;
+                }
+                getActivity().runOnUiThread(() -> {
+                    if (isStale(sortGeneration)) {
+                        return;
+                    }
+                    allSongs.clear();
+                    allSongs.addAll(sorted);
+                    applyGroups(g);
+                    refreshStatus();
+                    updateEmptyState();
+                    applySearch(searchQuery, false);
+                    LocalMusicCache.write(requireContext(), allSongs, mode,
+                            groupLetters, groupStarts, groupCounts);
+                });
+            }, "local-sort").start();
             return;
         }
         scanning = true;
@@ -313,6 +406,8 @@ public class LocalMusicFragment extends Fragment {
                         allSongs.addAll(songs);
                         // 扫描结果写进缓存：下次启动不必等扫描完就能解析本地歌路径
                         LocalLibraryCache.putAll(songs);
+                        // 完整列表的 JSON 缓存统一在 finalizeScan（封面抽完后）写一次，
+                        // 避免这里写入的 coverUrl 还是空的。
                         if (advanced && !songs.isEmpty() && misses > 0) {
                             scanStatus = "读取歌曲信息中… 0/" + songs.size();
                         } else if (!advanced) {
@@ -379,6 +474,9 @@ public class LocalMusicFragment extends Fragment {
                 adapter.notifyDataSetChanged();
             }
         }
+        // 2026-11-21：扫描 + 封面抽取全部完成后重写一次缓存（含排序与字母分组，供下次秒开）
+        LocalMusicCache.write(requireContext(), allSongs, sortMode,
+                groupLetters, groupStarts, groupCounts);
         scanning = false;
         updateEmptyState();
     }
@@ -421,28 +519,62 @@ public class LocalMusicFragment extends Fragment {
      */
     private void sortAndIndex() {
         // 排序口径见 ScriptSort：先按文字分段（拉丁→汉字→假名→西里尔→#），段内各用自己的序。
-        Collections.sort(localSongs, (left, right) -> {
-            int byScript = ScriptSort.TEXT_ORDER.compare(sortKey(left), sortKey(right));
-            if (byScript != 0) {
-                return byScript;
-            }
-            // 同段同字面：再按曲名兜底，保证顺序稳定
-            String leftName = left.getName() == null ? "" : left.getName();
-            String rightName = right.getName() == null ? "" : right.getName();
-            return ScriptSort.TEXT_ORDER.compare(leftName, rightName);
-        });
+        // 2026-11-21：具体比较逻辑抽到了 sortSongsInPlace（纯函数），后台线程复用同一套口径。
+        sortSongsInPlace(localSongs, sortMode);
         buildLetterGroups();
     }
 
     /** 按排好序的列表生成分组信息，供字母选择页使用。 */
     private void buildLetterGroups() {
-        // 分组键带「文字」前缀：拉丁的 A 与汉字的 A 是两组（排序也是先分文字段，否则索引会错位）
+        applyGroups(computeGroups(localSongs, sortMode));
+    }
+
+    /** 排序键（纯函数版，供后台线程使用）。 */
+    private static String keyOf(Song song, int mode) {
+        if (song == null) {
+            return "";
+        }
+        switch (mode) {
+            case SORT_ARTIST:
+                return song.getArtist() == null ? "" : song.getArtist();
+            case SORT_ALBUM:
+                return song.getAlbum() == null ? "" : song.getAlbum();
+            default:
+                return song.getName() == null ? "" : song.getName();
+        }
+    }
+
+    /**
+     * 纯函数版排序（可在后台线程跑，不读写实例字段）。
+     * 需求 2026-11-21：排序要逐字做 GBK 拼音转写，2~3k 首在主线程跑是「卡几秒」的根因。
+     */
+    private static void sortSongsInPlace(List<Song> target, int mode) {
+        Collections.sort(target, (left, right) -> {
+            int byScript = ScriptSort.TEXT_ORDER.compare(keyOf(left, mode), keyOf(right, mode));
+            if (byScript != 0) {
+                return byScript;
+            }
+            String leftName = left.getName() == null ? "" : left.getName();
+            String rightName = right.getName() == null ? "" : right.getName();
+            return ScriptSort.TEXT_ORDER.compare(leftName, rightName);
+        });
+    }
+
+    /** 字母分组的纯数据（可供后台线程产出）。 */
+    private static final class Groups {
+        final List<Character> letters = new ArrayList<>();
+        int[] starts = new int[0];
+        int[] counts = new int[0];
+    }
+
+    /** 纯函数版分组构建（不读写实例字段）。 */
+    private static Groups computeGroups(List<Song> songs, int mode) {
+        Groups out = new Groups();
         Map<String, Integer> firstIndex = new LinkedHashMap<>();
         Map<String, Integer> counts = new LinkedHashMap<>();
         Map<String, Character> labels = new LinkedHashMap<>();
-        for (int i = 0; i < localSongs.size(); i++) {
-            String sk = sortKey(localSongs.get(i));
-            // 以「显示标签」为分组单位：拉丁 A 与汉字 A 合并成一个 A
+        for (int i = 0; i < songs.size(); i++) {
+            String sk = keyOf(songs.get(i), mode);
             String key = String.valueOf(ScriptSort.groupLabel(sk).charAt(0));
             if (!firstIndex.containsKey(key)) {
                 firstIndex.put(key, i);
@@ -451,21 +583,28 @@ public class LocalMusicFragment extends Fragment {
             Integer count = counts.get(key);
             counts.put(key, count == null ? 1 : count + 1);
         }
-        groupLetters.clear();
-        groupStarts = new int[firstIndex.size()];
-        groupCounts = new int[firstIndex.size()];
-        // 索引页按字母表顺序展示；跳转仍指向该字母在当前列表里的第一首
+        out.starts = new int[firstIndex.size()];
+        out.counts = new int[firstIndex.size()];
         List<String> keys = new ArrayList<>(firstIndex.keySet());
         Collections.sort(keys);
         int index = 0;
         for (String key : keys) {
             Character label = labels.get(key);
-            groupLetters.add(label == null ? PinyinUtils.OTHER : label);
-            groupStarts[index] = firstIndex.get(key);
+            out.letters.add(label == null ? PinyinUtils.OTHER : label);
+            out.starts[index] = firstIndex.get(key);
             Integer count = counts.get(key);
-            groupCounts[index] = count == null ? 0 : count;
+            out.counts[index] = count == null ? 0 : count;
             index++;
         }
+        return out;
+    }
+
+    /** 把分组数据写到实例字段（只在主线程调）。 */
+    private void applyGroups(Groups g) {
+        groupLetters.clear();
+        groupLetters.addAll(g.letters);
+        groupStarts = g.starts;
+        groupCounts = g.counts;
     }
 
     /**
@@ -609,6 +748,8 @@ public class LocalMusicFragment extends Fragment {
      */
     private void refreshLocalCache() {
         LocalMetadataIndex.clear(requireContext());
+        // 任务 2：手动刷新 = 明确要求重读，先清掉列表缓存，startScan 才会走完整扫描
+        LocalMusicCache.invalidate(requireContext());
         scanGeneration++;
         scanning = false;
         allSongs.clear();
@@ -659,6 +800,30 @@ public class LocalMusicFragment extends Fragment {
         } else if (getActivity() != null) {
             getActivity().finish();
         }
+    }
+
+    /**
+     * 任务 6（2026-11-21）：把选中的歌排到「下一首播放」。
+     * 可叠加；同一首不会重复排入（播放器内部判重），已在队列里的会跳过。
+     */
+    private void playNextSelected(List<Integer> positions) {
+        if (positions == null || positions.isEmpty()) {
+            return;
+        }
+        com.qinghe.music163pro.player.MusicPlayerManager pm =
+                com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+        int added = 0;
+        for (int position : positions) {
+            if (position < 0 || position >= localSongs.size()) {
+                continue;
+            }
+            if (pm.queueNextSong(localSongs.get(position))) {
+                added++;
+            }
+        }
+        toast(added > 0
+                ? "已加入下一首播放：" + added + " 首"
+                : "所选歌曲已在下一首播放队列中");
     }
 
     private void favoriteSelected(List<Integer> positions) {

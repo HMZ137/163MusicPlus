@@ -98,7 +98,7 @@ public class LocalPlaylistsFragment extends MyPlaylistsPageFragment {
         // 本地歌单统一用音符图标，不区分归属
         icon.clearColorFilter();
         icon.setImageResource(R.drawable.ic_music_note);
-        icon.setColorFilter(0xFFBB86FC);
+        icon.setColorFilter(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tvName.setText(pl.getName());
         tvName.setTextColor(0xFFFFFFFF);
         tvName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));

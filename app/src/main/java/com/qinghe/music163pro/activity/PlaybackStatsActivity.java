@@ -96,7 +96,7 @@ public class PlaybackStatsActivity extends BaseWatchActivity {
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(tvLabel);
 
-        TextView tvValue = makeText(value, 0xFFBB86FC, 13);
+        TextView tvValue = makeText(value, com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 13);
         row.addView(tvValue);
 
         contentLayout.addView(row);

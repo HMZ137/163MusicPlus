@@ -42,6 +42,15 @@
         <activity android:name=".activity.HiddenTracksActivity" android:exported="false" />
         <!-- T1：本地歌曲设置页（黑名单 / 响度 / 后续扫描范围） -->
         <activity android:name=".activity.LocalMusicSettingsActivity" android:exported="false" />
+        <activity android:name=".activity.EqualizerActivity" android:exported="false" />
+        <activity android:name=".activity.ThemeActivity" android:exported="false" />
+        <activity android:name=".activity.CustomThemeActivity" android:exported="false" />
+        <activity android:name=".activity.BackgroundHubActivity" android:exported="false" />
+        <activity android:name=".activity.LanPageBackgroundActivity" android:exported="false" />
+        <activity android:name=".activity.DefaultCoverActivity" android:exported="false" />
+        <activity android:name=".activity.SettingsHomeActivity" android:exported="false" />
+        <activity android:name=".activity.SettingsPageActivity" android:exported="false" />
+        <activity android:name=".activity.FontSettingsActivity" android:exported="false" />
         <!-- L6：自定义扫描目录管理页 -->
         <activity android:name=".activity.ScanDirsActivity" android:exported="false" />
         <activity android:name=".activity.FavoritesListActivity" android:exported="false" />

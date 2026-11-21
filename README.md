@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="163MusicPro" width="120" height="120">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="163MusicPlus" width="120" height="120">
 </p>
 
-<h1 align="center">163MusicPro</h1>
+<h1 align="center">163MusicPlus</h1>
 
 <p align="center">
   <strong>适用于小天才电话手表的网易云音乐播放器</strong>
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/9xhk-1/163MusicPro?style=flat-square" alt="Latest Release"></a>
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/9xhk-1/163MusicPlus?style=flat-square" alt="Latest Release"></a>
   <img src="https://img.shields.io/badge/platform-Android%207.0%2B-brightgreen?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/screen-320%C3%97360-blue?style=flat-square" alt="Screen">
-  <img src="https://img.shields.io/github/license/9xhk-1/163MusicPro?style=flat-square" alt="License">
+  <img src="https://img.shields.io/github/license/9xhk-1/163MusicPlus?style=flat-square" alt="License">
 </p>
 
 <p align="center">
@@ -58,8 +58,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/9xhk-1/163MusicPro.git
-cd 163MusicPro
+git clone https://github.com/9xhk-1/163MusicPlus.git
+cd 163MusicPlus
 
 # 构建调试版本
 ./gradlew assembleDebug

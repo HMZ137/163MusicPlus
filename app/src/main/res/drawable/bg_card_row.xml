@@ -19,7 +19,7 @@
             android:insetRight="6dp"
             android:insetBottom="3dp">
             <shape android:shape="rectangle">
-                <solid android:color="#33BB86FC" />
+                <solid android:color="?attr/colorAccentSoft" />
                 <corners android:radius="14dp" />
             </shape>
         </inset>

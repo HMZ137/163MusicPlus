@@ -51,7 +51,7 @@ public class SongInfoActivity extends BaseWatchActivity {
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int COLOR_TEXT_SECONDARY = 0x80FFFFFF;
     private static final int COLOR_TEXT_DESC = 0xB3FFFFFF;
-    private static final int COLOR_ACCENT = 0xFF03DAC6;
+    // P1-10：强调色统一走 UiKit.COLOR_ACCENT（随主题刷新），不再本地定义
     private static final int COLOR_DIVIDER = 0xFF1E1E1E;
     private static final int COLOR_CARD_BG = 0xFF252525;
 
@@ -521,7 +521,7 @@ public class SongInfoActivity extends BaseWatchActivity {
                     String display = s.getArtist().isEmpty() ? s.getName() : s.getName() + " - " + s.getArtist();
                     if (isSongBlock) {
                         final int idx = currentBlockSongs.size() - blockSongList.size() + i;
-                        TextView tv = makeText("▶ " + display, COLOR_ACCENT, px(14), false, Gravity.START);
+                        TextView tv = makeText("▶ " + display, com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, px(14), false, Gravity.START);
                         tv.setPadding(0, px(2), 0, px(2));
                         tv.setOnClickListener(v -> playSimilarSongs(currentBlockSongs, idx));
                         contentLayout.addView(tv);
@@ -550,7 +550,7 @@ public class SongInfoActivity extends BaseWatchActivity {
                             final long plId = pl.optLong("id", 0);
                             final String fPlName = plName;
                             final int fTrackCount = pl.optInt("trackCount", 0);
-                            TextView tv = makeText("" + display, COLOR_ACCENT, px(14), false, Gravity.START);
+                            TextView tv = makeText("" + display, com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, px(14), false, Gravity.START);
                             tv.setPadding(0, px(2), 0, px(2));
                             if (plId > 0) {
                                 tv.setOnClickListener(v -> openPlaylistDetail(plId, fPlName, fTrackCount, ""));
@@ -1029,7 +1029,7 @@ public class SongInfoActivity extends BaseWatchActivity {
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
-        icon.setColorFilter(COLOR_ACCENT);
+        icon.setColorFilter(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         int iconSize = px(15);
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
         iconParams.setMarginEnd(px(5));
@@ -1038,7 +1038,7 @@ public class SongInfoActivity extends BaseWatchActivity {
 
         TextView tv = new TextView(this);
         tv.setText(title);
-        tv.setTextColor(COLOR_ACCENT);
+        tv.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
         tv.setTypeface(null, Typeface.BOLD);
         row.addView(tv);
@@ -1117,7 +1117,7 @@ public class SongInfoActivity extends BaseWatchActivity {
     private TextView buildEntryPill(String text, View.OnClickListener listener) {
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextColor(0xFFBB86FC);
+        tv.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
         tv.setGravity(android.view.Gravity.CENTER);
         tv.setPadding(px(10), px(4), px(10), px(4));

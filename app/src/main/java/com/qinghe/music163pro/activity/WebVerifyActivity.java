@@ -108,7 +108,7 @@ public class WebVerifyActivity extends BaseWatchActivity {
         btnDone.setTextSize(13);
         btnDone.setGravity(android.view.Gravity.CENTER);
         btnDone.setPadding(12, 14, 12, 14);
-        btnDone.setBackgroundColor(0xFFBB86FC);
+        btnDone.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         btnDone.setClickable(true);
         btnDone.setFocusable(true);
         btnDone.setOnClickListener(v -> deliverResult());

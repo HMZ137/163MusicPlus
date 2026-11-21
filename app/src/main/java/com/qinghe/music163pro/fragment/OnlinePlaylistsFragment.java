@@ -117,7 +117,7 @@ public class OnlinePlaylistsFragment extends MyPlaylistsPageFragment {
         } else if (pl.getUserId() == currentUserId) {
             icon.clearColorFilter();
             icon.setImageResource(R.drawable.ic_music_note);
-            icon.setColorFilter(0xFFBB86FC);
+            icon.setColorFilter(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         } else {
             icon.clearColorFilter();
             icon.setImageResource(R.drawable.ic_queue_music);

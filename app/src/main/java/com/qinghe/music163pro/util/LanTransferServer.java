@@ -127,6 +127,13 @@ public final class LanTransferServer {
 
     /** 美化后的上传页（从 assets 读取注入；为空时回退到内置精简页）。 */
     private String indexHtml;
+
+    /** 应用上下文：读音量 / 电量 / 网络 / 播放状态用，由 {@code LanTransferService} 注入。 */
+    private static volatile android.content.Context appContext;
+
+    public static void setAppContext(android.content.Context context) {
+        appContext = context == null ? null : context.getApplicationContext();
+    }
     /** 已接收文件列表，供「收件箱」面板展示与回下载。单线程处理连接，synchronized 仅作保险。 */
     private final List<ReceivedFile> received = Collections.synchronizedList(new ArrayList<>());
     private final java.util.concurrent.atomic.AtomicInteger rxSeq =
@@ -215,7 +222,55 @@ public final class LanTransferServer {
     }
 
     private String getIndexHtml() {
-        return indexHtml != null ? indexHtml : FALLBACK_HTML;
+        String html = indexHtml != null ? indexHtml : FALLBACK_HTML;
+        // P1-10：网页主题色跟随 App 主题（每次请求动态注入，切主题后刷新页面即可看到）
+        return applyTheme(html);
+    }
+
+    /**
+     * 把上传页 {@code :root} 里的强调色变量换成 App 当前主题色。
+     *
+     * <p>页面里写死的是初音绿（39c5bb）占位，这里按 {@link ThemeManager#accentColor}
+     * 派生四个变量：accent / accent-strong（向白推 25%）/ accent-soft（13%）/ accent-line（34%）。</p>
+     */
+    private String applyTheme(String html) {
+        try {
+            if (html == null) return html;
+            int accent = com.qinghe.music163pro.util.ThemeManager.accentColor(appContext);
+            int r = (accent >> 16) & 0xFF;
+            int g = (accent >> 8) & 0xFF;
+            int b = accent & 0xFF;
+            int sr = r + (255 - r) / 4;
+            int sg = g + (255 - g) / 4;
+            int sb = b + (255 - b) / 4;
+            String hex = String.format(java.util.Locale.ROOT, "#%02X%02X%02X", r, g, b);
+            String strong = String.format(java.util.Locale.ROOT, "#%02X%02X%02X", sr, sg, sb);
+            String soft = String.format(java.util.Locale.ROOT, "rgba(%d,%d,%d,.13)", r, g, b);
+            String dim = String.format(java.util.Locale.ROOT, "rgba(%d,%d,%d,.12)", r, g, b);
+            String line = String.format(java.util.Locale.ROOT, "rgba(%d,%d,%d,.34)", r, g, b);
+            html = html
+                    .replace("--accent:#39c5bb", "--accent:" + hex)
+                    .replace("--accent-strong:#5fe3d8", "--accent-strong:" + strong)
+                    .replace("--accent-bright:#5fe3d8", "--accent-bright:" + strong)
+                    .replace("--accent-soft:rgba(57,197,187,.13)", "--accent-soft:" + soft)
+                    .replace("--accent-dim:rgba(57,197,187,.12)", "--accent-dim:" + dim)
+                    .replace("--accent-line:rgba(57,197,187,.34)", "--accent-line:" + line)
+                    .replace("--accent-edge:rgba(57,197,187,.34)", "--accent-edge:" + line);
+            // 兜底：页面里可能还有以字面量形式出现的旧主题色（不在 CSS 变量里的），全部换掉
+            html = html.replace("#39C5BB", hex).replace("#39c5bb", hex)
+                    .replace("#5FE3D8", strong).replace("#5fe3d8", strong)
+                    .replace("rgba(57,197,187", "rgba(" + r + "," + g + "," + b)
+                    .replace("rgba(95,227,216", "rgba(" + sr + "," + sg + "," + sb);
+            // 需求 2026-11-21 任务 1：设置过「局域网网页背景」时，给页面注入背景样式
+            if (LanPageBackground.has(appContext)) {
+                html = html.replace("</head>",
+                        "<style>body{background:url('/api/lan-bg') center/cover no-repeat fixed;"
+                                + "}</style></head>");
+            }
+            return html;
+        } catch (Throwable ignored) {
+            return html;
+        }
     }
 
     /**
@@ -386,8 +441,15 @@ public final class LanTransferServer {
                 writeResponse(out, 200, "OK", "text/html; charset=utf-8", body);
             } else if ("POST".equalsIgnoreCase(method) && "/upload".equals(path)) {
                 handleUpload(socket, in, out, query, contentLength);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/status".equals(path)) {
+                handleStatus(out);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/events".equals(path)) {
+                handleEvents(out);
             } else if ("GET".equalsIgnoreCase(method) && "/api/inbox".equals(path)) {
                 handleInboxList(out);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/lan-bg".equals(path)) {
+                // 需求 2026-11-21 任务 1：网页背景图（独立存储 LanPageBackground，与播放页背景无关）
+                handleLanBackground(out);
             } else if ("GET".equalsIgnoreCase(method) && path.startsWith("/api/download/")) {
                 handleDownload(out, path.substring("/api/download/".length()));
             } else if ("DELETE".equalsIgnoreCase(method) && path.startsWith("/api/inbox/")) {
@@ -538,13 +600,11 @@ public final class LanTransferServer {
         // O(1) 命中；不再每次 .lrc 都递归扫 4 层 Music 目录（几十首歌时是 O(N²) I/O）。
         ensureAudioIndex();
         String stemKey = stem.toLowerCase(Locale.ROOT);
-        File audio = audioIndex.get(stemKey);
-        if (audio == null) {
-            String pair = queryValue(query, "pair");   // 发送端显式指定的配对音频名
-            if (pair != null && !pair.isEmpty()) {
-                audio = audioIndex.get(stripExt(pair).toLowerCase(Locale.ROOT));
-            }
-        }
+        String pair = queryValue(query, "pair");   // 发送端显式指定的配对音频名（同批待上传）
+        boolean waitForUpload = pair != null && !pair.isEmpty();
+        // 需求（2026-11-20）：带 pair 说明歌词与音频同批上传，先暂存、等这首音频落盘再配对，
+        // 不能拿设备里已有的同名旧曲目顶替（匹配对象必须是「待上传曲目」）。
+        File audio = waitForUpload ? null : audioIndex.get(stemKey);
         boolean matched = false;
         String audioName = "";
         if (audio != null) {
@@ -685,6 +745,227 @@ public final class LanTransferServer {
     }
 
     // ==================== 收件箱（已接收文件）接口 ====================
+
+    /** 手表实时状态（播放 / 音量 / 电量 / 网络 / 定时 / 下载），供上传页的「状态监控」面板用。 */
+    /** 需求 2026-11-21 任务 1：输出网页背景图（JPEG）。未设置时返回 404，网页保持默认深色。 */
+    private void handleLanBackground(OutputStream out) throws Exception {
+        android.graphics.Bitmap bmp = LanPageBackground.load(appContext);
+        if (bmp == null) {
+            byte[] notFound = "{\"ok\":false,\"error\":\"no background\"}".getBytes("UTF-8");
+            out.write(("HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\n"
+                    + "Content-Length: " + notFound.length + "\r\nConnection: close\r\n\r\n")
+                    .getBytes("UTF-8"));
+            out.write(notFound);
+            return;
+        }
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, bos);
+        byte[] body = bos.toByteArray();
+        out.write(("HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\n"
+                + "Content-Length: " + body.length
+                + "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
+        out.write(body);
+    }
+
+    private void handleStatus(OutputStream out) throws Exception {        byte[] body = buildStatusJson().getBytes("UTF-8");
+        writeResponse(out, 200, "OK", "application/json; charset=utf-8", body);
+    }
+
+    /** SSE：每秒推一次状态；客户端断开后 write 抛异常，循环自然结束。 */
+    private void handleEvents(OutputStream out) throws Exception {
+        String head = "HTTP/1.1 200 OK\r\n"
+                + "Content-Type: text/event-stream; charset=utf-8\r\n"
+                + "Cache-Control: no-cache\r\n"
+                + "Connection: keep-alive\r\n"
+                + "Access-Control-Allow-Origin: *\r\n\r\n";
+        out.write(head.getBytes("UTF-8"));
+        out.flush();
+        while (running) {
+            out.write(("data: " + buildStatusJson() + "\n\n").getBytes("UTF-8"));
+            out.flush();
+            Thread.sleep(1000L);
+        }
+    }
+
+    private String buildStatusJson() {
+        boolean playing = false;
+        String songName = "";
+        String artist = "";
+        long position = 0;
+        long duration = 0;
+        String playMode = "";
+        boolean timerActive = false;
+        long timerRemain = 0;
+        String timerMode = "";
+        try {
+            com.qinghe.music163pro.player.MusicPlayerManager pm =
+                    com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+            if (pm != null) {
+                playing = pm.isPlaying();
+                com.qinghe.music163pro.model.Song song = pm.getCurrentSong();
+                if (song != null) {
+                    songName = song.getName() == null ? "" : song.getName();
+                    artist = song.getArtist() == null ? "" : song.getArtist();
+                }
+                position = Math.max(0, pm.getCurrentPosition());
+                duration = Math.max(0, pm.getDuration());
+                if (pm.getPlayMode() != null) {
+                    playMode = pm.getPlayMode().name();
+                }
+                timerActive = pm.isSleepTimerActive();
+                if (timerActive) {
+                    timerRemain = Math.max(0, pm.getSleepTimerRemainingMs());
+                    timerMode = pm.isSleepTimerStopAfterCurrentPending()
+                            ? "本曲结束后停" : "倒计时";
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        int volume = -1;
+        int battery = -1;
+        boolean charging = false;
+        String network = "";
+        String networkDetail = "";
+        try {
+            android.content.Context ctx = appContext;
+            if (ctx != null) {
+                android.media.AudioManager am = (android.media.AudioManager)
+                        ctx.getSystemService(android.content.Context.AUDIO_SERVICE);
+                if (am != null) {
+                    int max = Math.max(1, am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC));
+                    volume = Math.round(am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                            * 100f / max);
+                }
+                android.os.BatteryManager bm = (android.os.BatteryManager)
+                        ctx.getSystemService(android.content.Context.BATTERY_SERVICE);
+                if (bm != null) {
+                    battery = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                }
+                android.content.Intent batt = ctx.registerReceiver(null,
+                        new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED));
+                if (batt != null) {
+                    int status = batt.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+                    charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+                            || status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+                }
+                android.net.ConnectivityManager cm = (android.net.ConnectivityManager)
+                        ctx.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+                if (cm != null) {
+                    android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
+                    if (ni != null && ni.isConnected()) {
+                        network = ni.getType() == android.net.ConnectivityManager.TYPE_WIFI
+                                ? "WiFi" : "移动网络";
+                        networkDetail = ni.getExtraInfo() == null ? "" : ni.getExtraInfo();
+                    } else {
+                        network = "未连接";
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        int downloading = 0;
+        String downloadName = "";
+        int downloadPercent = -1;
+        try {
+            java.util.List<com.qinghe.music163pro.manager.DownloadManager.DownloadTask> tasks =
+                    com.qinghe.music163pro.manager.DownloadManager.getActiveDownloads();
+            if (tasks != null && !tasks.isEmpty()) {
+                downloading = tasks.size();
+                com.qinghe.music163pro.manager.DownloadManager.DownloadTask t = tasks.get(0);
+                downloadName = t.songName == null ? "" : t.songName;
+                downloadPercent = t.percent;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        // 2026-11-21：内存 / CPU 占用（网页监控面板展示）
+        int memUsedMb = 0;
+        int memTotalMb = 0;
+        int memMaxMb = 0;
+        try {
+            Runtime rt = Runtime.getRuntime();
+            memTotalMb = (int) (rt.totalMemory() / (1024 * 1024));
+            memMaxMb = (int) (rt.maxMemory() / (1024 * 1024));
+            memUsedMb = (int) ((rt.totalMemory() - rt.freeMemory()) / (1024 * 1024));
+        } catch (Throwable ignored) {
+        }
+        int cpuPercent = readCpuPercent();
+
+        return "{"
+                + "\"playing\":" + playing + ","
+                + "\"song\":\"" + jsonEscape(songName) + "\","
+                + "\"artist\":\"" + jsonEscape(artist) + "\","
+                + "\"positionMs\":" + position + ","
+                + "\"durationMs\":" + duration + ","
+                + "\"playMode\":\"" + jsonEscape(playMode) + "\","
+                + "\"volume\":" + volume + ","
+                + "\"battery\":" + battery + ","
+                + "\"charging\":" + charging + ","
+                + "\"network\":\"" + jsonEscape(network) + "\","
+                + "\"networkDetail\":\"" + jsonEscape(networkDetail) + "\","
+                + "\"sleepTimerActive\":" + timerActive + ","
+                + "\"sleepTimerRemainingMs\":" + timerRemain + ","
+                + "\"sleepTimerMode\":\"" + jsonEscape(timerMode) + "\","
+                + "\"downloading\":" + downloading + ","
+                + "\"downloadName\":\"" + jsonEscape(downloadName) + "\","
+                + "\"downloadPercent\":" + downloadPercent + ","
+                + "\"memUsedMb\":" + memUsedMb + ","
+                + "\"memTotalMb\":" + memTotalMb + ","
+                + "\"memMaxMb\":" + memMaxMb + ","
+                + "\"cpuPercent\":" + cpuPercent + ","
+                + "\"ts\":" + System.currentTimeMillis()
+                + "}";
+    }
+
+    private static long sLastCpuJiffies = -1;
+    private static long sLastCpuSampleMs = 0;
+
+    /**
+     * 进程 CPU 占用百分比（两次采样间隔计算，首帧返回 -1）。
+     * 读 /proc/self/stat 的 utime+stime；USER_HZ 按 100 处理（1 jiffy = 10ms）。
+     */
+    private static int readCpuPercent() {
+        try {
+            String stat = readOneLine("/proc/self/stat");
+            if (stat == null) {
+                return -1;
+            }
+            int close = stat.lastIndexOf(')');
+            if (close < 0) {
+                return -1;
+            }
+            String[] parts = stat.substring(close + 2).split("\\s+");
+            if (parts.length < 13) {
+                return -1;
+            }
+            long jiffies = Long.parseLong(parts[11]) + Long.parseLong(parts[12]);
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (sLastCpuJiffies < 0 || now <= sLastCpuSampleMs) {
+                sLastCpuJiffies = jiffies;
+                sLastCpuSampleMs = now;
+                return -1;
+            }
+            long deltaJ = Math.max(0, jiffies - sLastCpuJiffies);
+            long deltaMs = Math.max(1, now - sLastCpuSampleMs);
+            sLastCpuJiffies = jiffies;
+            sLastCpuSampleMs = now;
+            double cpuMs = deltaJ * 10.0;
+            return (int) Math.max(0, Math.min(100, Math.round(cpuMs * 100.0 / deltaMs)));
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    private static String readOneLine(String path) {
+        try (java.io.BufferedReader br = new java.io.BufferedReader(
+                new java.io.FileReader(path))) {
+            return br.readLine();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
 
     private void handleInboxList(OutputStream out) throws Exception {
         StringBuilder sb = new StringBuilder();
@@ -936,7 +1217,7 @@ public final class LanTransferServer {
             + "sans-serif;background:#121212;color:#eee;margin:0;padding:24px;line-height:1.6}"
             + "h1{font-size:20px;margin:0 0 4px}.sub{color:#9a9a9a;font-size:13px;"
             + "margin-bottom:20px}.box{border:1px dashed #4a4a4a;border-radius:10px;"
-            + "padding:24px;text-align:center}button{background:#BB86FC;color:#1d1d1d;"
+            + "padding:24px;text-align:center}button{background:#39C5BB;color:#1d1d1d;"
             + "border:0;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;"
             + "margin-top:12px}button:disabled{opacity:.5;cursor:default}"
             + "ul{list-style:none;padding:0;margin-top:18px;font-size:13px}"

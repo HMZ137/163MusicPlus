@@ -60,6 +60,8 @@ public class LanTransferService extends Service {
         }
         if (server == null) {
             server = new LanTransferServer();
+            // 状态监控（/api/status、/api/events）需要读音量/电量/网络
+            server.setAppContext(getApplicationContext());
             // 注入美化后的上传页（参考 UI.html 的 LAN Drop 设计）；读不到就用内置回退页
             injectLanUploadPage(server);
         }

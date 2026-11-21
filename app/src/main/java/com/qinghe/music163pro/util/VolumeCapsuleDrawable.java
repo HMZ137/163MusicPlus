@@ -27,7 +27,8 @@ public class VolumeCapsuleDrawable extends Drawable {
 
     // M3 配色（对齐仓库版 LinearProgressIndicator：indicator=主色紫，track=surfaceVariant）
     private static final int TRACK_COLOR = 0xFF49454F;
-    private static final int FILL_COLOR = 0xFFBB86FC;
+    /** 主题强调色：非 final，由 {@link ThemeManager#applyTo} 刷新（P1-10）。 */
+    static int FILL_COLOR = 0xFFBB86FC;
     private static final int FILL_OVER_THRESHOLD_COLOR = 0xFFFFA726;
     private static final int THRESHOLD_COLOR = 0xFFFFA726;
 
@@ -49,6 +50,10 @@ public class VolumeCapsuleDrawable extends Drawable {
             return;
         }
         float radius = bounds.height() / 2f;
+        // 2026-11-21：左右各内缩 0.08 倍半径（约 1.3dp），既保证圆角不被 SeekBar 边界裁掉，
+        // 又尽量把宽度留给进度条本身。
+        float inset = Math.max(0.5f, radius * 0.08f);
+        bounds.inset(inset, 0f);
 
         // 1) 灰色胶囊底
         paint.setColor(TRACK_COLOR);

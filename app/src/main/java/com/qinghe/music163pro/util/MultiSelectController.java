@@ -50,6 +50,8 @@ public final class MultiSelectController {
     public static final class Action {
         public static final String ID_DELETE = "delete";
         public static final String ID_FAVORITE = "favorite";
+        /** 需求 2026-11-21 任务 6：下一首播放（可叠加）。 */
+        public static final String ID_PLAY_NEXT = "play_next";
 
         public final String id;
         public final String label;
@@ -69,8 +71,14 @@ public final class MultiSelectController {
 
         /** 默认的「收藏」动作。语义与单曲收藏一致，具体走本地还是云端由页面决定。 */
         public static Action favorite(Activity activity) {
-            int color = activity.getResources().getColor(R.color.colorPrimary);
+            int color = ThemeManager.accentColor(activity);
             return new Action(ID_FAVORITE, activity.getString(R.string.multi_select_favorite), color);
+        }
+
+        /** 需求 2026-11-21 任务 6：「下一首播放」，可叠加、同一首不重复。 */
+        public static Action playNext(Activity activity) {
+            int color = ThemeManager.accentColor(activity);
+            return new Action(ID_PLAY_NEXT, "下一首播放", color);
         }
     }
 
@@ -83,11 +91,13 @@ public final class MultiSelectController {
         void onAction(Action action, List<Integer> positions);
     }
 
-    private static final int SELECTED_TINT = 0x33BB86FC;
+    /** 主题强调色（20% 透明）：非 final，由 ThemeManager 刷新（P1-10）。 */
+    static int SELECTED_TINT = 0x33BB86FC;
     /** 与 {@code bg_card_row} 的 inset 对齐：左右 6dp / 上下 3dp。 */
     private static final int SELECT_INSET_H_DP = 6;
     private static final int SELECT_INSET_V_DP = 3;
-    private static final int CHECK_ACTIVE_COLOR = 0xFFBB86FC;
+    /** 主题强调色：非 final，由 ThemeManager 刷新（P1-10）。 */
+    static int CHECK_ACTIVE_COLOR = 0xFFBB86FC;
     private static final int CHECK_INACTIVE_COLOR = 0x80FFFFFF;
     private static final int ACTION_BUTTON_BG = 0xFF2D2D2D;
 
@@ -353,7 +363,7 @@ public final class MultiSelectController {
         TextView cancel = new TextView(activity);
         cancel.setText(R.string.multi_select_cancel);
         cancel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-        cancel.setTextColor(activity.getResources().getColor(R.color.colorPrimary));
+        cancel.setTextColor(ThemeManager.accentColor(activity));
         cancel.setGravity(Gravity.CENTER);
         cancel.setPadding(px(12), px(4), px(8), px(4));
         cancel.setClickable(true);

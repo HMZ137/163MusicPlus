@@ -27,6 +27,60 @@ import com.qinghe.music163pro.util.UiScale;
  */
 public class ToggleSettingsActivity extends BaseWatchActivity {
 
+    /** 需求 2026-11-21：分类过滤参数（appearance / playback / interaction），不传则显示全部。 */
+    public static final String EXTRA_SECTION = "settings_section";
+
+    /**
+     * 按分类隐藏不属于本类的行（连同所在行容器一起隐藏）。
+     * 逻辑仍复用本页原有实现，零重写、零回归风险。
+     */
+    private void applySectionFilter(String section) {
+        if (section == null || section.isEmpty()) return;
+        int[] allRows = {
+                R.id.switch_local_only_mode, R.id.switch_online_only_mode,
+                R.id.row_random_skip_mode, R.id.switch_keep_screen_on,
+                R.id.switch_oled_burn_protection, R.id.switch_sleep_timer_exit_app,
+                R.id.row_back_gesture, R.id.row_show_back_button,
+                R.id.switch_use_watch_api, R.id.switch_skip_trial_songs,
+                R.id.row_fav_mode, R.id.row_sleep_timer_mode, R.id.row_speed_mode,
+                R.id.row_lyric_scroll_mode, R.id.row_lyric_offset,
+                R.id.row_lyric_resume_interval, R.id.row_recognition_mode
+        };
+        java.util.Set<Integer> keep = new java.util.HashSet<>();
+        if ("appearance".equals(section)) {
+            keep.add(R.id.switch_keep_screen_on);
+            keep.add(R.id.switch_oled_burn_protection);
+        } else if ("playback".equals(section)) {
+            keep.add(R.id.switch_local_only_mode);
+            keep.add(R.id.switch_online_only_mode);
+            keep.add(R.id.row_random_skip_mode);
+            keep.add(R.id.row_fav_mode);
+            keep.add(R.id.row_speed_mode);
+            keep.add(R.id.switch_skip_trial_songs);
+        } else {
+            keep.add(R.id.row_back_gesture);
+            keep.add(R.id.row_show_back_button);
+            keep.add(R.id.switch_sleep_timer_exit_app);
+            keep.add(R.id.row_sleep_timer_mode);
+            keep.add(R.id.row_lyric_scroll_mode);
+            keep.add(R.id.row_lyric_offset);
+            keep.add(R.id.row_lyric_resume_interval);
+            keep.add(R.id.row_recognition_mode);
+            keep.add(R.id.switch_use_watch_api);
+        }
+        for (int id : allRows) {
+            if (keep.contains(id)) continue;
+            android.view.View v = findViewById(id);
+            if (v == null) continue;
+            android.view.View parent = (android.view.View) v.getParent();
+            if (parent != null && parent.getId() != R.id.layout_toggle_settings_content) {
+                parent.setVisibility(android.view.View.GONE);
+            } else {
+                v.setVisibility(android.view.View.GONE);
+            }
+        }
+    }
+
     private static final String PREFS_NAME = "music163_settings";
     private static final String PREF_RECOGNITION_MODE = "song_recognition_mode";
     private static final String PREF_LYRIC_SCROLL_MODE = "lyric_scroll_mode";
@@ -98,6 +152,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
         addSectionHeader(findViewById(R.id.row_lyric_scroll_mode), "歌词");
         addSectionHeader(findViewById(R.id.row_recognition_mode), "识别与其它");
         // 返回手势 / 返回按钮显隐单独成组，位置在「播放与定时」之后
+
+        // 需求 2026-11-21：新设置页按类拆分，这里按传入的分类只保留对应行
+        applySectionFilter(getIntent().getStringExtra(EXTRA_SECTION));
         addSectionHeader(findViewById(R.id.row_back_gesture), "交互");
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -350,28 +407,65 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
             });
         });
 
-        // 主界面播放页歌名显示（需求方 2026-11-15）：去曲师 / 去括号内容
-        final TextView artistSuffixValue = buildValueRow(container, "播放页歌名·去曲师",
-                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, false)
-                        ? "开" : "关");
-        ((LinearLayout) artistSuffixValue.getParent()).setOnClickListener(v -> {
-            boolean on = !prefs.getBoolean(
-                    com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, false);
-            prefs.edit().putBoolean(
-                    com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, on).apply();
-            artistSuffixValue.setText(on ? "开" : "关");
+        // 均衡器（需求 2026-11-20）：只影响播放输出，不改文件
+        final TextView eqValue = buildValueRow(container, "均衡器",
+                com.qinghe.music163pro.util.EqualizerController.isEnabled(this) ? "已开启" : "已关闭");
+        ((LinearLayout) eqValue.getParent()).setOnClickListener(v ->
+                startActivity(new android.content.Intent(this, EqualizerActivity.class)));
+
+        // 主题（P1-10）：点开浮窗式选择页
+        final TextView themeValue = buildValueRow(container, "主题",
+                com.qinghe.music163pro.util.ThemeManager.name(this));
+        ((LinearLayout) themeValue.getParent()).setOnClickListener(v ->
+                startActivity(new android.content.Intent(this, ThemeActivity.class)));
+
+        // 表冠调音量（需求 2026-11-21）：总开关 / 灵敏度 / 上限，点按循环切换
+        // 表冠调音量（需求 2026-11-21）：纯开关，改用 MD3 开关
+        buildSwitchRow(container, "表冠调音量", "关闭后表冠不再调整音量",
+                com.qinghe.music163pro.util.CrownVolumePrefs.isEnabled(this),
+                (btn, checked) -> {
+                    com.qinghe.music163pro.util.CrownVolumePrefs.setEnabled(this, checked);
+                    Toast.makeText(this, checked ? "表冠已恢复调音量" : "表冠不再响应音量调整",
+                            Toast.LENGTH_SHORT).show();
+                });
+
+        final TextView crownSensValue = buildValueRow(container, "表冠灵敏度",
+                "档位 " + com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this));
+        ((LinearLayout) crownSensValue.getParent()).setOnClickListener(v -> {
+            int next = com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this) % 3 + 1;
+            com.qinghe.music163pro.util.CrownVolumePrefs.setSensitivity(this, next);
+            crownSensValue.setText("档位 " + next);
+            Toast.makeText(this, next == 1 ? "灵敏度 1（连转步进最慢，防误触）"
+                            : next == 2 ? "灵敏度 2（默认）" : "灵敏度 3（连转步进最快）",
+                    Toast.LENGTH_SHORT).show();
         });
 
-        final TextView bracketValue = buildValueRow(container, "播放页歌名·去括号内容",
-                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, false)
-                        ? "开" : "关");
-        ((LinearLayout) bracketValue.getParent()).setOnClickListener(v -> {
-            boolean on = !prefs.getBoolean(
-                    com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, false);
-            prefs.edit().putBoolean(
-                    com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, on).apply();
-            bracketValue.setText(on ? "开" : "关");
-        });
+        final TextView crownMaxValue = buildValueRow(container, "表冠音量上限",
+                com.qinghe.music163pro.util.CrownVolumePrefs.getMaxPercent(this) + "%");
+        ((LinearLayout) crownMaxValue.getParent()).setOnClickListener(v ->
+                com.qinghe.music163pro.util.WatchPopup.input(this, "表冠音量上限（%）",
+                        "10~100；到达后表冠不再加大音量（减小不受限）", "%",
+                        String.valueOf(com.qinghe.music163pro.util.CrownVolumePrefs.getMaxPercent(this)),
+                        "确定", text -> {
+                            try {
+                                int percent = Math.max(10, Math.min(100, Integer.parseInt(text.trim())));
+                                com.qinghe.music163pro.util.CrownVolumePrefs.setMaxPercent(this, percent);
+                                crownMaxValue.setText(percent + "%");
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }));
+
+        // 主界面播放页歌名显示（需求方 2026-11-15）：去曲师 / 去括号内容
+        // 主界面播放页歌名显示（需求方 2026-11-15）：去曲师 / 去括号内容 —— 改用 MD3 开关
+        buildSwitchRow(container, "播放页歌名·去曲师", "隐藏歌名末尾的「 / 曲师」",
+                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, false),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, on).apply());
+
+        buildSwitchRow(container, "播放页歌名·去括号内容", "隐藏歌名里的「(Remix)」等括号内容",
+                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, false),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, on).apply());
 
         // 歌词字号：音 / 词 / 译 各一个
         final TextView originalValue = buildStepperRow(container, "歌词字号·原文",
@@ -536,12 +630,63 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
     }
 
     /** 分组小标题。 */
+    /**
+     * 生成一行「标题 + 副标题 + MD3 开关」（需求 2026-11-21：纯开/关项不再用文字指示）。
+     */
+    private com.google.android.material.materialswitch.MaterialSwitch buildSwitchRow(
+            LinearLayout container, String title, String sub, boolean initial,
+            android.widget.CompoundButton.OnCheckedChangeListener listener) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(dpToPx(16), dpToPx(6), dpToPx(16), dpToPx(6));
+        row.setMinimumHeight(dpToPx(48));
+        row.setBackground(getResources().getDrawable(R.drawable.bg_card_tile));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rp.bottomMargin = dpToPx(4);
+        row.setLayoutParams(rp);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView t = new TextView(this);
+        t.setText(title);
+        t.setTextColor(getResources().getColor(R.color.text_primary));
+        t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        t.setSingleLine(true);
+        textCol.addView(t);
+        if (sub != null && !sub.isEmpty()) {
+            TextView s = new TextView(this);
+            s.setText(sub);
+            s.setTextColor(getResources().getColor(R.color.text_secondary));
+            s.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
+            s.setMaxLines(1);
+            s.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            textCol.addView(s);
+        }
+        row.addView(textCol);
+
+        com.google.android.material.materialswitch.MaterialSwitch sw =
+                new com.google.android.material.materialswitch.MaterialSwitch(this);
+        sw.setTextOn("");
+        sw.setTextOff("");
+        sw.setScaleX(0.8f);
+        sw.setScaleY(0.8f);
+        sw.setChecked(initial);
+        sw.setOnCheckedChangeListener(listener);
+        row.addView(sw);
+
+        row.setOnClickListener(v -> sw.toggle());
+        container.addView(row);
+        return sw;
+    }
+
     private TextView buildSectionTitle(String text) {
+        // 需求 2026-11-21：设置页冗余小标题（如「显示」）已清理，返回不可见占位
         TextView tv = new TextView(this);
-        tv.setText(text);
-        tv.setTextColor(0x80FFFFFF);
-        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
-        tv.setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(4));
+        tv.setVisibility(android.view.View.GONE);
         return tv;
     }
 
@@ -574,7 +719,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
         TextView tvValue = new TextView(this);
         tvValue.setText(initialValue);
-        tvValue.setTextColor(getResources().getColor(R.color.colorPrimary));
+        tvValue.setTextColor(com.qinghe.music163pro.util.ThemeManager.accentColor(this));
         tvValue.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
         textColumn.addView(tvValue);
         row.addView(textColumn);
@@ -608,7 +753,7 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
 
         TextView tvValue = new TextView(this);
         tvValue.setText(initialValue);
-        tvValue.setTextColor(getResources().getColor(R.color.colorPrimary));
+        tvValue.setTextColor(com.qinghe.music163pro.util.ThemeManager.accentColor(this));
         tvValue.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
         textColumn.addView(tvValue);
         row.addView(textColumn);
@@ -867,35 +1012,9 @@ public class ToggleSettingsActivity extends BaseWatchActivity {
      * 而不是全部塞到一个页面里」，且「页面不要分的太多」。因此按「用户会去哪里找」
      * 在现有页面里分区，而不是再拆新页。</p>
      */
+    /** 小标题（需求 2026-11-21：冗余标题已清理，不再渲染；方法保留避免改调用点）。 */
     private void addSectionHeader(android.view.View anchor, String title) {
-        if (anchor == null) {
-            return;
-        }
-        // 锚点可能是「开关」本身（它在水平行里），也可能就是「整行」；统一换算成排版单元再插标题。
-        android.view.View row = anchor;
-        android.view.ViewParent parent = row.getParent();
-        if (parent instanceof LinearLayout
-                && ((LinearLayout) parent).getOrientation() == LinearLayout.HORIZONTAL) {
-            row = (android.view.View) parent;
-        }
-        if (!(row.getParent() instanceof android.view.ViewGroup)) {
-            return;
-        }
-        android.view.ViewGroup content = (android.view.ViewGroup) row.getParent();
-        int index = content.indexOfChild(row);
-        if (index < 0) {
-            return;
-        }
-        TextView tv = new TextView(this);
-        tv.setText(title);
-        tv.setTextColor(0x80FFFFFF);
-        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
-                com.qinghe.music163pro.util.WatchUiUtils.px(this, 11));
-        tv.setPadding(com.qinghe.music163pro.util.WatchUiUtils.px(this, 4),
-                com.qinghe.music163pro.util.WatchUiUtils.px(this, 10),
-                com.qinghe.music163pro.util.WatchUiUtils.px(this, 4),
-                com.qinghe.music163pro.util.WatchUiUtils.px(this, 2));
-        content.addView(tv, index);
+        // no-op
     }
 
 }

@@ -391,9 +391,11 @@ public final class LocalPlaylistManager {
 
     private static Song jsonToSong(JSONObject obj) {
         String path = obj.optString("path", "");
+        long savedId = obj.optLong("id", 0);
         Song s = new Song();
-        // 应用内部定位/去重用按路径哈希的负数 id；落盘时仍写 0（见 songToJson）。
-        s.setId(LocalTracks.idForPath(path));
+        // 任务 3（2026-11-21）：在线歌曲（正 id + 无本地路径）保留原 id，播放时走网络；
+        // 本地曲目仍用路径哈希 id（应用内定位/去重口径不变）。
+        s.setId(savedId > 0 ? savedId : LocalTracks.idForPath(path));
         String title = obj.optString("title", "");
         if (title.isEmpty() && !path.isEmpty()) {
             title = stripExt(new File(path).getName());
@@ -402,18 +404,21 @@ public final class LocalPlaylistManager {
         s.setArtist(obj.optString("artist", ""));
         s.setAlbum(obj.optString("album", ""));
         s.setUrl(path);
+        s.setCoverUrl(obj.optString("cover", ""));
         s.setForceLocalPlayback(true);
         return s;
     }
 
     private static JSONObject songToJson(Song s) throws Exception {
         JSONObject obj = new JSONObject();
-        // 本地曲目没有网易云 id，按格式要求落 0；有正 id 的（理论上不会出现在本地歌单）原样保留。
+        // 本地曲目没有网易云 id，按格式要求落 0；
+        // 任务 3（2026-11-21）：在线歌曲带正 id、path 为空，这里原样保留 id 与封面。
         obj.put("id", s.getId() > 0 ? s.getId() : 0);
         obj.put("title", s.getName() == null ? "" : s.getName());
         obj.put("artist", s.getArtist() == null ? "" : s.getArtist());
         obj.put("album", s.getAlbum() == null ? "" : s.getAlbum());
         obj.put("path", s.getUrl() == null ? "" : s.getUrl());
+        obj.put("cover", s.getCoverUrl() == null ? "" : s.getCoverUrl());
         return obj;
     }
 

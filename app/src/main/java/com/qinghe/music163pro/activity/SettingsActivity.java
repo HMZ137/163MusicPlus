@@ -75,8 +75,9 @@ public class SettingsActivity extends BaseWatchActivity {
         View btnCache = findViewById(R.id.btn_settings_cache);
         tvCacheValue = findViewById(R.id.tv_settings_cache_value);
 
+        // 需求 2026-11-21：设置项按类拆分，入口改成新的设置首页（五类分页）
         btnToggle.setOnClickListener(v ->
-                startActivity(new Intent(this, ToggleSettingsActivity.class)));
+                startActivity(new Intent(this, SettingsHomeActivity.class)));
 
         btnEditMore.setOnClickListener(v ->
                 startActivity(new Intent(this, EditMoreActivity.class)));
@@ -96,7 +97,7 @@ public class SettingsActivity extends BaseWatchActivity {
                 startActivity(new Intent(this, XtcModuleActivity.class)));
 
         btnBackground.setOnClickListener(v ->
-                startActivity(new Intent(this, BackgroundSettingsActivity.class)));
+                startActivity(new Intent(this, BackgroundHubActivity.class)));
 
         if (btnCache != null) {
             btnCache.setOnClickListener(v -> confirmClearCache());

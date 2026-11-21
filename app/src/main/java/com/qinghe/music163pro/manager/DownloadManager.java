@@ -93,12 +93,23 @@ public class DownloadManager {
         public final DownloadState state;
         /** 0~100；还不知道总大小时为 -1 */
         public final int percent;
+        /** 已写入字节数；未知时为 0。 */
+        public final long downloadedBytes;
+        /** 服务器 Content-Length；未知时为 -1。 */
+        public final long totalBytes;
 
         DownloadTask(long songId, String songName, DownloadState state, int percent) {
+            this(songId, songName, state, percent, 0L, -1L);
+        }
+
+        DownloadTask(long songId, String songName, DownloadState state, int percent,
+                     long downloadedBytes, long totalBytes) {
             this.songId = songId;
             this.songName = songName;
             this.state = state;
             this.percent = percent;
+            this.downloadedBytes = downloadedBytes;
+            this.totalBytes = totalBytes;
         }
     }
 
@@ -108,6 +119,8 @@ public class DownloadManager {
         final String songName;
         volatile DownloadState state = DownloadState.QUEUED;
         volatile int percent = -1;
+        volatile long downloadedBytes = 0L;
+        volatile long totalBytes = -1L;
 
         MutableTask(long songId, String songName) {
             this.songId = songId;
@@ -127,7 +140,8 @@ public class DownloadManager {
     public static DownloadTask getActiveDownload(long songId) {
         MutableTask task = activeTasks.get(songId);
         return task == null ? null
-                : new DownloadTask(task.songId, task.songName, task.state, task.percent);
+                : new DownloadTask(task.songId, task.songName, task.state, task.percent,
+                        task.downloadedBytes, task.totalBytes);
     }
 
     /** 是否正在下载或排队中。 */
@@ -139,7 +153,8 @@ public class DownloadManager {
     public static List<DownloadTask> getActiveDownloads() {
         List<DownloadTask> snapshot = new ArrayList<>();
         for (MutableTask task : activeTasks.values()) {
-            snapshot.add(new DownloadTask(task.songId, task.songName, task.state, task.percent));
+            snapshot.add(new DownloadTask(task.songId, task.songName, task.state, task.percent,
+                    task.downloadedBytes, task.totalBytes));
         }
         return snapshot;
     }
@@ -361,7 +376,8 @@ public class DownloadManager {
             try {
                 InputStream is = conn.getInputStream();
                 FileOutputStream fos = new FileOutputStream(outputFile);
-                copyWithProgress(is, fos, conn.getContentLength(), callback);
+                // 该路径用于缓存/铃声，不参与下载列表的进度展示，传 -1 表示不更新任务字节数
+                copyWithProgress(is, fos, conn.getContentLength(), callback, -1L);
                 fos.flush();
                 fos.close();
                 is.close();
@@ -386,7 +402,7 @@ public class DownloadManager {
      * @return 实际写入的字节数
      */
     private static long copyWithProgress(InputStream is, FileOutputStream fos, long totalLength,
-                                         DownloadCallback callback) throws Exception {
+                                         DownloadCallback callback, long songId) throws Exception {
         byte[] buffer = new byte[8192];
         long written = 0;
         int lastPercent = -1;
@@ -394,6 +410,13 @@ public class DownloadManager {
         while ((len = is.read(buffer)) != -1) {
             fos.write(buffer, 0, len);
             written += len;
+            MutableTask task = activeTasks.get(songId);
+            if (task != null) {
+                task.downloadedBytes = written;
+                if (totalLength > 0) {
+                    task.totalBytes = totalLength;
+                }
+            }
             if (totalLength > 0) {
                 int percent = (int) (written * 100 / totalLength);
                 if (percent != lastPercent) {
@@ -406,8 +429,16 @@ public class DownloadManager {
         return written;
     }
 
+    /** 下载失败最多重试 2 次（需求 2026-11-20）。 */
+    private static final int MAX_DOWNLOAD_RETRY = 2;
+
     private static void doDownload(Song song, String urlStr, String quality, boolean bilibili,
                                    DownloadCallback callback) {
+        doDownload(song, urlStr, quality, bilibili, callback, 0);
+    }
+
+    private static void doDownload(Song song, String urlStr, String quality, boolean bilibili,
+                                   DownloadCallback callback, int attempt) {
         // 这里已经是真正开始传输了，状态从「排队中」切到「下载中」
         if (song.getId() > 0) {
             markTaskDownloading(song.getId());
@@ -449,7 +480,7 @@ public class DownloadManager {
             try {
                 InputStream is = conn.getInputStream();
                 FileOutputStream fos = new FileOutputStream(outputFile);
-                copyWithProgress(is, fos, conn.getContentLength(), callback);
+                copyWithProgress(is, fos, conn.getContentLength(), callback, song.getId());
                 fos.flush();
                 fos.close();
                 is.close();
@@ -471,8 +502,15 @@ public class DownloadManager {
                 conn.disconnect();
             }
         } catch (Exception e) {
-            Log.w(TAG, "Download error", e);
-            mainHandler.post(() -> callback.onError("下载失败: " + e.getMessage()));
+            Log.w(TAG, "Download error (attempt " + attempt + ")", e);
+            if (attempt < MAX_DOWNLOAD_RETRY) {
+                final int next = attempt + 1;
+                // 稍等再试，避免瞬时网络抖动直接判死
+                mainHandler.postDelayed(() -> doDownload(song, urlStr, quality, bilibili, callback, next),
+                        1000L * next);
+            } else {
+                mainHandler.post(() -> callback.onError("下载失败: " + e.getMessage()));
+            }
         }
     }
 

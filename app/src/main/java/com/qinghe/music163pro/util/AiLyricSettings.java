@@ -29,7 +29,7 @@ public final class AiLyricSettings {
     /** 默认模型（用户可在设置页自行改成别的模型名）。 */
     public static final String DEFAULT_MODEL = "deepseek-flash";
 
-    private static final String XOR_MASK = "163MusicPro#aiLyric#v1";
+    private static final String XOR_MASK = "163MusicPlus#aiLyric#v1";
 
     private AiLyricSettings() {
     }

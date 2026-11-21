@@ -34,6 +34,9 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
     /** P9：「模糊强度」按钮，文案里带当前档位。 */
     private TextView btnBlur;
 
+    /** P1-10：二级页面背景开关按钮。 */
+    private TextView btnPageBg;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,7 +65,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
 
         // P9：状态行 —— 一眼看出当前是哪种背景、模糊几档
         tvStatus = new TextView(this);
-        tvStatus.setTextColor(0xFFBB86FC);
+        tvStatus.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         tvStatus.setGravity(Gravity.CENTER);
         tvStatus.setPadding(px(10), 0, px(10), px(6));
@@ -83,6 +86,8 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         root.addView(buildButton("流体背景", v -> useFluidBackground()));
         btnBlur = buildButton("模糊强度", v -> cycleBlurStrength());
         root.addView(btnBlur);
+        // 2026-11-21：二级页背景入口暂时隐藏（需求方：改设置页背景要动大手术），
+        // isPageBackgroundEnabled 已强制 false，按钮不再展示；逻辑保留便于日后恢复。
         root.addView(buildButton("恢复默认背景", v -> resetBackground()));
 
         refreshPreview();
@@ -101,7 +106,7 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
     private TextView buildButton(String label, View.OnClickListener listener) {
         TextView btn = new TextView(this);
         btn.setText(label);
-        btn.setTextColor(0xFFBB86FC);
+        btn.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
         btn.setGravity(Gravity.CENTER);
         btn.setPadding(px(12), px(13), px(12), px(13));
@@ -214,6 +219,17 @@ public class BackgroundSettingsActivity extends BaseWatchActivity {
         BackgroundUtil.setMode(this, BackgroundUtil.MODE_FLUID);
         refreshPreview();
         com.qinghe.music163pro.util.UiKit.toast(this, "已切换到流体背景");
+    }
+
+    /** P1-10：切换「二级页面背景」开关（设置页 / 歌单页等）。 */
+    private void togglePageBackground() {
+        boolean on = !com.qinghe.music163pro.util.BackgroundUtil.isPageBackgroundEnabled(this);
+        com.qinghe.music163pro.util.BackgroundUtil.setPageBackgroundEnabled(this, on);
+        if (btnPageBg != null) {
+            btnPageBg.setText(on ? "页面背景：所有页面" : "页面背景：仅播放/歌词页");
+        }
+        com.qinghe.music163pro.util.UiKit.toast(this,
+                on ? "设置/歌单等页面已应用背景" : "设置/歌单等页面恢复纯色");
     }
 
     /** 循环切换模糊档位（关闭 → 弱 → 中 → 强 → 关闭），封面 / 图片背景立即按新档位重算。 */

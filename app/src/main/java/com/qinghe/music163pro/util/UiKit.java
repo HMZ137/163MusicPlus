@@ -35,11 +35,22 @@ public final class UiKit {
 
     public static final int COLOR_PAGE = 0xFF121212;
     public static final int COLOR_CARD = 0xFF1E1F24;
-    public static final int COLOR_ACCENT = 0xFFBB86FC;
+    /**
+     * 主题强调色（P1-10）。
+     *
+     * <p><b>故意不加 final</b>：static final int 会被编译器内联到引用处，
+     * 主题切换后引用方拿到的仍是旧值；由 {@link ThemeManager#applyTo} 在页面创建时刷新。</p>
+     */
+    public static int COLOR_ACCENT = 0xFFBB86FC;
     public static final int COLOR_ON_ACCENT = 0xFF1D1D1D;
 
-    /** 页内二级标签的选中 / 未选中文字色（与「收藏」页一致）。 */
-    public static final int COLOR_TAB_ACTIVE = COLOR_ACCENT;
+    /** 给颜色套一个 alpha（0x00~0xFF），用于选中态 / 高亮底色（P1-10 主题化）。 */
+    public static int withAlpha(int color, int alpha) {
+        return (alpha << 24) | (color & 0x00FFFFFF);
+    }
+
+    /** 页内二级标签的选中 / 未选中文字色（与「收藏」页一致）。同样随主题刷新。 */
+    public static int COLOR_TAB_ACTIVE = COLOR_ACCENT;
     public static final int COLOR_TAB_INACTIVE = 0xB3FFFFFF;
     /** 标签行高度（与「收藏」页一致）。 */
     public static final int DP_TAB_ROW_HEIGHT = 32;

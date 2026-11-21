@@ -109,11 +109,28 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
                 View view = super.getView(position, convertView, parent);
                 Song song = getItem(position);
                 if (song != null) {
-                    TextView tvName = view.findViewById(R.id.tv_item_name);
-                    TextView tvArtist = view.findViewById(R.id.tv_item_artist);
-                    ImageView ivCover = view.findViewById(R.id.iv_cover);
-                    tvName.setText(song.getDisplayName());
-                    tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());
+                    // 任务 5（2026-11-21）：ViewHolder 化
+                    Object tag = view.getTag();
+                    TextView tvName;
+                    TextView tvArtist;
+                    ImageView ivCover;
+                    if (tag instanceof View[]) {
+                        View[] h = (View[]) tag;
+                        tvName = (TextView) h[0];
+                        tvArtist = (TextView) h[1];
+                        ivCover = (ImageView) h[2];
+                    } else {
+                        tvName = view.findViewById(R.id.tv_item_name);
+                        tvArtist = view.findViewById(R.id.tv_item_artist);
+                        ivCover = view.findViewById(R.id.iv_cover);
+                        view.setTag(new View[]{tvName, tvArtist, ivCover});
+                    }
+                    if (tvName != null) {
+                        tvName.setText(song.getDisplayName());
+                    }
+                    if (tvArtist != null) {
+                        tvArtist.setText(song.getArtist() == null ? "" : song.getArtist());
+                    }
                     if (ivCover != null) {
                         NetworkImageLoader.load(ivCover, song.getCoverUrl());
                     }
@@ -130,12 +147,14 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
                     @Override
                     public List<MultiSelectController.Action> getActions() {
                         List<MultiSelectController.Action> actions = new ArrayList<>();
+                        // 任务 6（2026-11-21）：本地歌单内的歌曲同样支持「下一首播放」
+                        actions.add(MultiSelectController.Action.playNext(LocalPlaylistDetailActivity.this));
                         actions.add(MultiSelectController.Action.delete(LocalPlaylistDetailActivity.this));
                         actions.add(MultiSelectController.Action.favorite(LocalPlaylistDetailActivity.this));
                         actions.add(new MultiSelectController.Action("move_up", "上移",
-                                getResources().getColor(R.color.colorPrimary)));
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(LocalPlaylistDetailActivity.this)));
                         actions.add(new MultiSelectController.Action("move_down", "下移",
-                                getResources().getColor(R.color.colorPrimary)));
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(LocalPlaylistDetailActivity.this)));
                         return actions;
                     }
 
@@ -149,6 +168,8 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
                             moveSelected(positions, -1);
                         } else if ("move_down".equals(action.id)) {
                             moveSelected(positions, 1);
+                        } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
+                            playNextSelected(positions);
                         }
                     }
                 });
@@ -292,6 +313,27 @@ public class LocalPlaylistDetailActivity extends BaseWatchActivity {
      * <p>与改动前「长按单首移出」的语义完全一致：**只从歌单里去引用，不删卡上的文件**，
      * 且同样二次确认。区别只是能一次处理多首。</p>
      */
+    /**
+     * 任务 6（2026-11-21）：把选中的歌单曲目排到「下一首播放」，可叠加、同一首不重复。
+     */
+    private void playNextSelected(List<Integer> positions) {
+        final List<Song> targets = pick(positions);
+        if (targets.isEmpty()) {
+            return;
+        }
+        com.qinghe.music163pro.player.MusicPlayerManager pm =
+                com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+        int added = 0;
+        for (Song song : targets) {
+            if (pm.queueNextSong(song)) {
+                added++;
+            }
+        }
+        com.qinghe.music163pro.util.UiKit.toast(this,
+                added > 0 ? "已加入下一首播放：" + added + " 首"
+                        : "所选歌曲已在下一首播放队列中");
+    }
+
     private void confirmRemoveSelected(List<Integer> positions) {
         final List<Song> targets = pick(positions);
         if (targets.isEmpty()) {

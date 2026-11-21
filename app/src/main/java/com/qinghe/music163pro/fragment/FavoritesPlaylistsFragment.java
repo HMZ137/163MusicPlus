@@ -6,6 +6,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.qinghe.music163pro.R;
+import com.qinghe.music163pro.activity.AlbumDetailActivity;
 import com.qinghe.music163pro.activity.PlaylistDetailActivity;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.PlaylistManager;
@@ -71,11 +72,16 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
         TextView tvInfo = row.findViewById(R.id.tv_playlist_info);
         ImageView ivCover = row.findViewById(R.id.iv_cover);
         tvName.setText(pl.getName());
-        String info = pl.getTrackCount() + "\u9996";
-        if (pl.getCreator() != null && !pl.getCreator().isEmpty()) {
-            info += " \u00b7 " + pl.getCreator();
+        // P0-8：专辑与歌单混排，靠「专辑」前缀区分
+        boolean isAlbum = com.qinghe.music163pro.util.LocalAlbumFavorites.isAlbumEntry(pl);
+        StringBuilder info = new StringBuilder(isAlbum ? "专辑" : "歌单");
+        if (pl.getTrackCount() > 0) {
+            info.append(" \u00b7 ").append(pl.getTrackCount()).append("\u9996");
         }
-        tvInfo.setText(info);
+        if (pl.getCreator() != null && !pl.getCreator().isEmpty()) {
+            info.append(" \u00b7 ").append(pl.getCreator());
+        }
+        tvInfo.setText(info.toString());
         if (ivCover != null) {
             NetworkImageLoader.load(ivCover, pl.getCoverUrl());
         }
@@ -83,6 +89,15 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
 
     @Override
     protected void onItemClicked(int position, PlaylistInfo pl) {
+        // P0-8：专辑条目 → 专辑详情；歌单条目 → 歌单详情
+        if (com.qinghe.music163pro.util.LocalAlbumFavorites.isAlbumEntry(pl)) {
+            Intent intent = new Intent(requireContext(), AlbumDetailActivity.class);
+            intent.putExtra("album_id", com.qinghe.music163pro.util.LocalAlbumFavorites.albumIdOf(pl));
+            intent.putExtra("album_name", pl.getName());
+            intent.putExtra("album_cover_url", pl.getCoverUrl());
+            startActivity(intent);
+            return;
+        }
         Intent intent = new Intent(requireContext(), PlaylistDetailActivity.class);
         intent.putExtra("playlist_id", pl.getId());
         intent.putExtra("playlist_name", pl.getName());
@@ -95,6 +110,16 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
 
     @Override
     protected boolean onItemLongClicked(int position, PlaylistInfo pl) {
+        // P0-8：专辑条目长按 = 取消收藏（只动本地记录）
+        if (com.qinghe.music163pro.util.LocalAlbumFavorites.isAlbumEntry(pl)) {
+            showConfirmDialog("取消收藏", "把「" + pl.getName() + "」从收藏专辑移除？", () -> {
+                com.qinghe.music163pro.util.LocalAlbumFavorites.remove(requireContext(),
+                        com.qinghe.music163pro.util.LocalAlbumFavorites.albumIdOf(pl));
+                removeItemAt(position);
+                toast("已取消收藏");
+            });
+            return true;
+        }
         // 只有本地模式（自己保存的歌单）才能删除；云端收藏的歌单由 API 管理，长按不提供删除。
         if (!isCloudMode()) {
             showConfirmDialog("确认删除", "确定删除歌单「" + pl.getName() + "」？", () -> {
@@ -119,7 +144,9 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
     }
 
     private void loadLocalPlaylists() {
-        final List<PlaylistInfo> local = playlistManager.getPlaylists();
+        final List<PlaylistInfo> local = new java.util.ArrayList<>(playlistManager.getPlaylists());
+        // P0-8：本地收藏专辑与歌单混排（专辑用负数 id 标记）
+        local.addAll(com.qinghe.music163pro.util.LocalAlbumFavorites.list(requireContext()));
         applyItems(local);
 
         // 逐个补「曲目数 / 创建者 / 封面」（与原实现一致：拿到就刷新该行并回写本地元信息）。
@@ -173,16 +200,47 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
             @Override
             public void onResult(List<PlaylistInfo> playlists) {
                 if (isViewReady()) {
-                    applyItems(playlists);
+                    // P0-8：云端歌单 + 本地收藏专辑先混排，再异步补「云端收藏专辑」
+                    List<PlaylistInfo> merged = new java.util.ArrayList<>(playlists);
+                    merged.addAll(com.qinghe.music163pro.util.LocalAlbumFavorites.list(requireContext()));
+                    applyItems(merged);
+                    loadCloudAlbums();
                 }
             }
 
             @Override
             public void onError(String message) {
                 if (isViewReady()) {
-                    showStatus("加载失败: " + message);
+                    // 歌单拉失败也要把本地收藏专辑显示出来
+                    applyItems(com.qinghe.music163pro.util.LocalAlbumFavorites.list(requireContext()));
                 }
             }
         });
+    }
+
+    /** P0-8：云端收藏的专辑，追加到列表尾部，与本地收藏专辑、歌单混排。 */
+    private void loadCloudAlbums() {
+        final String cookie = cookie();
+        if (cookie == null || cookie.isEmpty()) return;
+        MusicApiHelper.getSubscribedAlbums(30, 0, cookie,
+                new MusicApiHelper.SubscribedAlbumsCallback() {
+                    @Override
+                    public void onResult(int total, boolean hasMore,
+                                         List<MusicApiHelper.AlbumBrief> albums) {
+                        if (!isViewReady() || albums == null || albums.isEmpty()) return;
+                        for (MusicApiHelper.AlbumBrief a : albums) {
+                            if (a == null || a.id <= 0) continue;
+                            PlaylistInfo info = new PlaylistInfo(-a.id, a.name, a.size, a.artist);
+                            info.setCoverUrl(a.picUrl);
+                            items.add(info);
+                        }
+                        notifyItemsChanged();
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        // 静默：本地与歌单部分已经显示
+                    }
+                });
     }
 }

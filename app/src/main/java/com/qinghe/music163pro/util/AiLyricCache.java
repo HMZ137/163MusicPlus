@@ -17,13 +17,13 @@ import java.util.Locale;
  * 本地文件被替换）会自动失效重算，而不是拿旧结果硬套。</p>
  *
  * <h3>为什么放公开目录</h3>
- * <p>按约定放在 {@code /sdcard/163MusicPro/ai_lyrics/}：不进 App 私有目录，用户/文件管理器
+ * <p>按约定放在 {@code /sdcard/163MusicPlus/ai_lyrics/}：不进 App 私有目录，用户/文件管理器
  * 可随时手动清理；设置页也提供「占用统计 + 一键清空」。纯文本 JSON，方便排查。</p>
  */
 public final class AiLyricCache {
 
     private static final String TAG = "AiLyricCache";
-    private static final String DIR_NAME = "163MusicPro/ai_lyrics";
+    private static final String DIR_NAME = "163MusicPlus/ai_lyrics";
 
     private AiLyricCache() {
     }

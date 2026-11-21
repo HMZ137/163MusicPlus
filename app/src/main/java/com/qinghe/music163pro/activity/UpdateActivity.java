@@ -294,7 +294,7 @@ public class UpdateActivity extends BaseWatchActivity {
 
             TextView tvIndex = new TextView(this);
             tvIndex.setText(String.valueOf(index + 1));
-            tvIndex.setTextColor(0xFFBB86FC);
+            tvIndex.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
             tvIndex.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
             tvIndex.setTypeface(tvIndex.getTypeface(), Typeface.BOLD);
             tvIndex.setGravity(Gravity.CENTER);
@@ -313,7 +313,7 @@ public class UpdateActivity extends BaseWatchActivity {
 
             TextView tvDownload = new TextView(this);
             tvDownload.setText("仅提示");
-            tvDownload.setTextColor(0xFFBB86FC);
+            tvDownload.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
             tvDownload.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(13));
             tvDownload.setGravity(Gravity.CENTER);
 

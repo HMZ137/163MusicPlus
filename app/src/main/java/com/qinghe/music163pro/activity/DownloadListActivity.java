@@ -50,6 +50,9 @@ public class DownloadListActivity extends BaseWatchActivity
 
     /** 4-1：内容区容器 —— 承载「下载 / 本地」两页。 */
     private ViewPager2 vpDownloadTabs;
+
+    /** P1-10：外部指定初始页（0=下载 1=本地）。 */
+    public static final String EXTRA_INITIAL_TAB = "initial_tab";
     /**
      * 「本地」入口是否可见。纯在线模式会把它收起；为 {@code false} 时容器只保留「下载」一页，
      * 并关掉左右滑动（滑到一页空白没有意义）。
@@ -170,6 +173,11 @@ public class DownloadListActivity extends BaseWatchActivity
         // 预加载限 1：下一页提前建好够用；多建只会白读盘（4-5 会实测首屏耗时再定值）。
         vpDownloadTabs.setOffscreenPageLimit(1);
         vpDownloadTabs.setUserInputEnabled(tabsVisible);
+        // 支持从外部指定初始页：0=下载 1=本地（「本机音乐」入口直接落到本地页）
+        int initialTab = getIntent().getIntExtra(EXTRA_INITIAL_TAB, 0);
+        if (initialTab == 1 && tabsVisible) {
+            vpDownloadTabs.setCurrentItem(1, false);
+        }
         // L2：「其他需要展示的内容」行只在下载页显示（本地页自带状态行）
         vpDownloadTabs.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
@@ -218,6 +226,12 @@ public class DownloadListActivity extends BaseWatchActivity
     }
 
     /** 4-1：ViewPager2 的页面适配器（第 0 页 = 下载，第 1 页 = 本地）。 */
+    /**
+     * 下载 / 本地 两页（左右滑切换，无 Tab 按钮）。
+     *
+     * <p>需求方 2026-11-21：只保留这一个「本地音乐管理」入口（pager1），
+     * 带「下载 / 本地」按钮的旧页（`LocalMusicActivity`）不再使用。</p>
+     */
     private final class TabsAdapter extends FragmentStateAdapter {
         TabsAdapter(FragmentActivity activity) {
             super(activity);
@@ -264,6 +278,8 @@ public class DownloadListActivity extends BaseWatchActivity
                     @Override
                     public List<MultiSelectController.Action> getActions() {
                         List<MultiSelectController.Action> actions = new ArrayList<>();
+                        // 任务 6（2026-11-21）：下载列表同样支持「下一首播放」
+                        actions.add(MultiSelectController.Action.playNext(DownloadListActivity.this));
                         actions.add(MultiSelectController.Action.favorite(DownloadListActivity.this));
                         actions.add(MultiSelectController.Action.delete(DownloadListActivity.this));
                         return actions;
@@ -275,6 +291,8 @@ public class DownloadListActivity extends BaseWatchActivity
                             favoriteSelected(positions);
                         } else if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
                             confirmDeleteSelected(positions);
+                        } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
+                            playNextSelected(positions);
                         }
                     }
                 });
@@ -364,11 +382,29 @@ public class DownloadListActivity extends BaseWatchActivity
         tvProgress.setVisibility(View.VISIBLE);
         if (task.state == DownloadManager.DownloadState.QUEUED) {
             tvProgress.setText("排队中…");
-        } else if (task.percent >= 0) {
-            tvProgress.setText("下载中 " + task.percent + "%");
         } else {
-            tvProgress.setText("下载中…");
+            // 需求（2026-11-20）：歌名下方显示「已下载 / 总大小」
+            String sizeText = formatBytes(task.downloadedBytes)
+                    + (task.totalBytes > 0 ? " / " + formatBytes(task.totalBytes) : "");
+            if (task.percent >= 0) {
+                tvProgress.setText("已下载 " + sizeText + " · " + task.percent + "%");
+            } else {
+                tvProgress.setText("已下载 " + sizeText);
+            }
         }
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        if (bytes < 1024 * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        }
+        if (bytes < 1024L * 1024 * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1048576.0);
+        }
+        return String.format(java.util.Locale.ROOT, "%.2f GB", bytes / 1073741824.0);
     }
 
     /** L2：标题栏右上角「更多」菜单。L7：按当前页分发 —— 本地页给本地音乐的完整功能菜单。 */
@@ -510,6 +546,24 @@ public class DownloadListActivity extends BaseWatchActivity
     /**
      * 删除选中的下载项。先确认，再逐首删除本地文件。
      */
+    /** 任务 6（2026-11-21）：把选中的下载歌曲排到「下一首播放」，可叠加、同一首不重复。 */
+    private void playNextSelected(List<Integer> positions) {
+        com.qinghe.music163pro.player.MusicPlayerManager pm =
+                com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+        int added = 0;
+        for (int position : positions) {
+            if (position < 0 || position >= downloadedSongs.size()) {
+                continue;
+            }
+            if (pm.queueNextSong(downloadedSongs.get(position))) {
+                added++;
+            }
+        }
+        com.qinghe.music163pro.util.UiKit.toast(this,
+                added > 0 ? "已加入下一首播放：" + added + " 首"
+                        : "所选歌曲已在下一首播放队列中");
+    }
+
     private void confirmDeleteSelected(List<Integer> positions) {
         final List<Song> targets = new ArrayList<>();
         for (int position : positions) {

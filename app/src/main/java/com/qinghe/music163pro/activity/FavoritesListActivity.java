@@ -40,7 +40,8 @@ import com.qinghe.music163pro.util.WatchMenuDialog;
 public class FavoritesListActivity extends BaseWatchActivity implements FavoritesPageFragment.Host {
 
     /** 「其他需要展示的内容」行里的页名，下标与 ViewPager2 的页一一对应。 */
-    private static final String[] PAGE_NAMES = {"单曲", "歌单", "专辑"};
+    // P0-8（2026-11-20）：专辑页签已砍掉，收藏专辑改为与歌单混排（见 FavoritesPlaylistsFragment）
+    private static final String[] PAGE_NAMES = {"单曲", "歌单"};
 
     private ViewPager2 vpFavoritesTabs;
     private TextView tvFavInfo;
@@ -156,7 +157,7 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
         return null;
     }
 
-    /** ViewPager2 的页面适配器（第 0 页单曲 / 第 1 页歌单 / 第 2 页专辑）。 */
+    /** ViewPager2 的页面适配器（第 0 页单曲 / 第 1 页歌单；专辑已并入歌单页混排）。 */
     private static final class TabsAdapter extends FragmentStateAdapter {
         TabsAdapter(FragmentActivity activity) {
             super(activity);
@@ -167,9 +168,6 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
         public Fragment createFragment(int position) {
             if (position == FavoritesPageFragment.PAGE_PLAYLISTS) {
                 return new FavoritesPlaylistsFragment();
-            }
-            if (position == FavoritesPageFragment.PAGE_ALBUMS) {
-                return new FavoritesAlbumsFragment();
             }
             return new FavoritesSongsFragment();
         }

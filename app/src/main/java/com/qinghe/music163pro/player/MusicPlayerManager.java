@@ -684,12 +684,16 @@ public class MusicPlayerManager {
      */
     private void applyLoudnessBalance() {
         releaseLoudnessEnhancer();
+        int session = getAudioSessionId();
+        // 均衡器：与响度增益共用同一个 audio session，且独立于响度索引（没分析过也能用）
+        if (session != 0) {
+            com.qinghe.music163pro.util.EqualizerController.attach(appContext, session);
+        }
         float gainDb = com.qinghe.music163pro.util.LoudnessBalance.gainDbFor(appContext, currentSourcePath);
         if (gainDb == 0f) {
             MusicLog.i("Loudness", "本曲不施加增益（未启用/无有效索引）: " + currentSourcePath);
             return;
         }
-        int session = getAudioSessionId();
         if (session == 0) {
             MusicLog.w("Loudness", "无 audio session，无法施加增益");
             return;
@@ -1111,8 +1115,47 @@ public class MusicPlayerManager {
      *
      * @return true 表示确实排入了；点当前正在播放的那首、或已经排过的，返回 false
      */
-    public boolean queueNextInPlaylist(int index) {
-        if (index < 0 || index >= playlist.size() || index == currentIndex) {
+    /**
+     * 需求 2026-11-21 任务 6：清空「下一首播放」队列。
+     * 只去掉优先标记，不改动播放列表里的曲目位置（它们仍在队列里正常播放）。
+     */
+    public void clearPlayNextQueue() {
+        playNextQueue.clear();
+        savePlaybackState();
+    }
+
+    /**
+     * 需求 2026-11-21 任务 6：把任意一首歌排到「下一首播放」，歌曲不在当前播放列表里也能用。
+     *
+     * <p>多选场景里选中的歌通常不在当前队列（例如收藏页、本地列表），不能直接用
+     * {@link #queueNextInPlaylist(int)}（它按下标操作），所以这里先按下标找，找不到就插入。</p>
+     *
+     * @return true 表示已排入；已在队列中、或就是当前正在播放的那首，返回 false
+     */
+    public boolean queueNextSong(Song song) {
+        if (song == null) {
+            return false;
+        }
+        if (isQueuedNext(song)) {
+            return false;
+        }
+        Song current = getCurrentSong();
+        if (current != null && isSameSong(current, song)) {
+            return false;
+        }
+        int existing = indexOfSongInPlaylist(song);
+        if (existing >= 0) {
+            return queueNextInPlaylist(existing);
+        }
+        int insertAt = Math.min(currentIndex + 1 + playNextQueue.size(), playlist.size());
+        playlist.add(insertAt, song);
+        playNextQueue.add(song);
+        invalidateShuffleOrder();
+        savePlaybackState();
+        return true;
+    }
+
+    public boolean queueNextInPlaylist(int index) {        if (index < 0 || index >= playlist.size() || index == currentIndex) {
             return false;
         }
         Song song = playlist.get(index);
@@ -1864,6 +1907,14 @@ public class MusicPlayerManager {
     /** 定时关闭模式：到点后不立刻停，等当前这首放完再停。 */
     public static final int SLEEP_TIMER_MODE_FINISH_TRACK = 2;
 
+    /**
+     * 「播完当前」（需求 2026-11-20）：不设倒计时，当前曲放完立即停止，保留队列位置。
+     *
+     * <p>与 {@link #SLEEP_TIMER_MODE_FINISH_TRACK}（「播放完毕」）区分：后者是倒计时到点后
+     * 再等本曲放完；本模式没有倒计时，选中即生效。</p>
+     */
+    public static final int SLEEP_TIMER_MODE_STOP_AFTER_CURRENT = 3;
+
     private long sleepTimerEndMs = 0;
     private Runnable sleepTimerRunnable;
 
@@ -1902,8 +1953,16 @@ public class MusicPlayerManager {
         }
         if (mode == SLEEP_TIMER_MODE_NET) {
             startSleepTimerNetSeconds(seconds);
+        } else if (mode == SLEEP_TIMER_MODE_STOP_AFTER_CURRENT) {
+            // 「播完当前」：不设倒计时，直接武装待停标志，本曲自然结束时停（seconds 被忽略）
+            cancelSleepTimer();
+            sleepTimerStopAfterCurrent = true;
+            if (callback != null) {
+                mainHandler.post(() -> callback.onSleepTimerPendingStop());
+            }
+            Log.i(TAG, "sleepTimer(stop-after-current) armed");
         } else {
-            // 总时长与「放完当前曲」共用同一套倒计时，区别只在于到点后的动作
+            // 总时长与「播放完毕」共用同一套倒计时，区别只在于到点后的动作
             startSleepTimerTotalSeconds(seconds, mode == SLEEP_TIMER_MODE_FINISH_TRACK);
         }
     }

@@ -49,8 +49,14 @@ public final class LocalScanScope {
 
     /** 递归深度上限（沿用改造前的值，勿随意放大）。 */
     public static final int MAX_DEPTH = 4;
-    /** 单次扫描曲目上限（沿用改造前的值，勿随意放大）。 */
-    public static final int MAX_TRACKS = 500;
+    /**
+     * 单次扫描曲目上限。
+     *
+     * <p>2026-11-20 需求：去掉 500 硬上限，目标支持 2–3k 曲库。本地列表是
+     * {@code ListView + adapter}（只渲染可见行，天然懒加载），扫描在后台线程执行，
+     * 因此把上限提到 2000；若后续实测仍不够再往上调。</p>
+     */
+    public static final int MAX_TRACKS = 2000;
 
     private LocalScanScope() {
     }

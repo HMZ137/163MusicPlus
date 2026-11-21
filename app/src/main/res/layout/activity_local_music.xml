@@ -40,7 +40,7 @@
                 android:focusable="true"
                 android:padding="8dp"
                 android:src="@drawable/ic_menu"
-                android:tint="@color/colorPrimary" />
+                android:tint="?attr/colorPrimary" />
 
             <TextView
                 android:id="@+id/tv_local_music_title"
@@ -94,7 +94,7 @@
                 android:focusable="true"
                 android:gravity="center"
                 android:text="@string/local_music_entry"
-                android:textColor="@color/colorPrimary"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="13sp" />
         </LinearLayout>
     </LinearLayout>

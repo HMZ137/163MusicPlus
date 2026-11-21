@@ -60,7 +60,7 @@ public class HistoryActivity extends BaseWatchActivity {
 
         TextView btnClear = new TextView(this);
         btnClear.setText("清空");
-        btnClear.setTextColor(0xFFBB86FC);
+        btnClear.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         btnClear.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         btnClear.setPadding(px(8), px(4), px(8), px(4));
         btnClear.setClickable(true);
@@ -152,6 +152,8 @@ public class HistoryActivity extends BaseWatchActivity {
                     @Override
                     public List<MultiSelectController.Action> getActions() {
                         List<MultiSelectController.Action> actions = new ArrayList<>();
+                        // 任务 6（2026-11-21）：播放历史同样支持「下一首播放」
+                        actions.add(MultiSelectController.Action.playNext(HistoryActivity.this));
                         actions.add(MultiSelectController.Action.favorite(HistoryActivity.this));
                         actions.add(MultiSelectController.Action.delete(HistoryActivity.this));
                         return actions;
@@ -163,6 +165,8 @@ public class HistoryActivity extends BaseWatchActivity {
                             favoriteSelected(positions);
                         } else if (MultiSelectController.Action.ID_DELETE.equals(action.id)) {
                             confirmDeleteSelected(positions);
+                        } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
+                            playNextSelected(positions);
                         }
                     }
                 });
@@ -186,6 +190,24 @@ public class HistoryActivity extends BaseWatchActivity {
     /**
      * 删除选中的播放记录。
      */
+    /** 任务 6（2026-11-21）：把选中的历史歌曲排到「下一首播放」，可叠加、同一首不重复。 */
+    private void playNextSelected(List<Integer> positions) {
+        com.qinghe.music163pro.player.MusicPlayerManager pm =
+                com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+        int added = 0;
+        for (int position : positions) {
+            if (position < 0 || position >= displayList.size()) {
+                continue;
+            }
+            if (pm.queueNextSong(displayList.get(position))) {
+                added++;
+            }
+        }
+        com.qinghe.music163pro.util.UiKit.toast(this,
+                added > 0 ? "已加入下一首播放：" + added + " 首"
+                        : "所选歌曲已在下一首播放队列中");
+    }
+
     private void confirmDeleteSelected(List<Integer> positions) {
         final List<Long> songIds = new ArrayList<>();
         for (int position : positions) {

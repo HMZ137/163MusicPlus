@@ -64,7 +64,7 @@
                 android:background="@drawable/bg_btn_outline"
                 android:gravity="center"
                 android:text="发送验证码"
-                android:textColor="@color/colorPrimary"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="13sp"
                 android:clickable="true"
                 android:focusable="true" />

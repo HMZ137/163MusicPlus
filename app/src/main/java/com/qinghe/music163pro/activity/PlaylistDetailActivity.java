@@ -134,7 +134,7 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         // P3：右上角只保留 ☰ 矢量菜单（搜索 / 排序 / A-Z / 收藏 / 删除 全收进菜单）
         ImageView btnMore = new ImageView(this);
         btnMore.setImageResource(R.drawable.ic_menu);
-        btnMore.setColorFilter(getResources().getColor(R.color.colorPrimary));
+        btnMore.setColorFilter(com.qinghe.music163pro.util.ThemeManager.accentColor(this));
         btnMore.setClickable(true);
         btnMore.setFocusable(true);
         btnMore.setContentDescription("更多");
@@ -266,10 +266,15 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                     @Override
                     public List<MultiSelectController.Action> getActions() {
                         List<MultiSelectController.Action> actions = new ArrayList<>();
+                        // 任务 6（2026-11-21）：歌单内的歌曲也要支持「下一首播放」
+                        actions.add(MultiSelectController.Action.playNext(PlaylistDetailActivity.this));
                         actions.add(MultiSelectController.Action.delete(PlaylistDetailActivity.this));
                         actions.add(MultiSelectController.Action.favorite(PlaylistDetailActivity.this));
                         actions.add(new MultiSelectController.Action("download", "下载",
-                                getResources().getColor(R.color.colorPrimary)));
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(PlaylistDetailActivity.this)));
+                        // 任务 3（2026-11-21）：在线歌曲也能加入本地歌单
+                        actions.add(new MultiSelectController.Action("add_to_local_playlist", "加入本地歌单",
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(PlaylistDetailActivity.this)));
                         return actions;
                     }
 
@@ -281,6 +286,11 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
                             favoriteSelected(positions);
                         } else if ("download".equals(action.id)) {
                             downloadSelected(positions);
+                        } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
+                            playNextSelected(positions);
+                        } else if ("add_to_local_playlist".equals(action.id)) {
+                            com.qinghe.music163pro.util.LocalPlaylistPicker.show(
+                                    PlaylistDetailActivity.this, pick(positions), null);
                         }
                     }
                 });
@@ -417,6 +427,25 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
     }
 
     /** 批量下载：串行提交，避免一次起一堆请求（与批量收藏同一思路）。 */
+    /**
+     * 任务 6（2026-11-21）：把选中的歌曲排到「下一首播放」，可叠加、同一首不重复。
+     */
+    private void playNextSelected(List<Integer> positions) {
+        List<Song> targets = pick(positions);
+        if (targets.isEmpty()) {
+            return;
+        }
+        int added = 0;
+        for (Song song : targets) {
+            if (playerManager.queueNextSong(song)) {
+                added++;
+            }
+        }
+        com.qinghe.music163pro.util.UiKit.toast(this,
+                added > 0 ? "已加入下一首播放：" + added + " 首"
+                        : "所选歌曲已在下一首播放队列中");
+    }
+
     private void downloadSelected(List<Integer> positions) {
         final List<Song> targets = pick(positions);
         if (targets.isEmpty()) {
@@ -486,6 +515,20 @@ public class PlaylistDetailActivity extends BaseWatchActivity {
         actions.add(() -> setSortMode(3));
         labels.add("A-Z 跳转");
         actions.add(this::openLetterPicker);
+        // 任务 6（2026-11-21）：队列里有「下一首播放」时提供清空入口
+        com.qinghe.music163pro.player.MusicPlayerManager pm =
+                com.qinghe.music163pro.player.MusicPlayerManager.getInstance();
+        if (!pm.getPlayNextQueue().isEmpty()) {
+            labels.add("清空下一首播放（" + pm.getPlayNextQueue().size() + " 首）");
+            actions.add(() -> {
+                pm.clearPlayNextQueue();
+                android.widget.Toast.makeText(this, "已清空下一首播放",
+                        android.widget.Toast.LENGTH_SHORT).show();
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
+            });
+        }
         // P3：收藏 / 删除也收进同一个 ☰ 菜单（原先是标题栏内联图标）
         if (canFavoritePlaylist()) {
             boolean saved = isCloudMode ? isSubscribed

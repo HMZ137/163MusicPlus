@@ -51,7 +51,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
     private static final int COLOR_BG = 0xFF121212;
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int COLOR_TEXT_SECONDARY = 0x80FFFFFF;
-    private static final int COLOR_ACCENT = 0xFF03DAC6;
+    // P1-10：强调色统一走 UiKit.COLOR_ACCENT（随主题刷新），不再本地定义
     private static final int COLOR_DIVIDER = 0xFF1E1E1E;
     private static final int COLOR_INPUT_BG = 0xFF333333;
     private static final int COLOR_PARENT_BG = 0xFF2A2A2A;
@@ -225,7 +225,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
 
         sendButton = new TextView(this);
         sendButton.setText("发送");
-        sendButton.setTextColor(COLOR_ACCENT);
+        sendButton.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
         sendButton.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         sendButton.setTypeface(sendButton.getTypeface(), Typeface.BOLD);
         sendButton.setPadding(px(10), px(8), px(6), px(8));
@@ -744,11 +744,11 @@ public class CommentFloorActivity extends BaseWatchActivity {
         android.graphics.drawable.Drawable icon = getResources().getDrawable(iconRes, null);
         int iconSize = px(14);
         icon.setBounds(0, 0, iconSize, iconSize);
-        icon.setColorFilter(liked ? COLOR_ACCENT : 0x80FFFFFF,
+        icon.setColorFilter(liked ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0x80FFFFFF,
                 android.graphics.PorterDuff.Mode.SRC_IN);
         tv.setCompoundDrawables(icon, null, null, null);
         tv.setCompoundDrawablePadding(px(3));
-        tv.setTextColor(liked ? COLOR_ACCENT : 0x80FFFFFF);
+        tv.setTextColor(liked ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0x80FFFFFF);
     }
 
     // ──────────────────────────────────────────────────────
@@ -831,7 +831,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                     public void onResult(boolean success) {
                         runOnUiThread(() -> {
                             sendButton.setEnabled(true);
-                            sendButton.setTextColor(COLOR_ACCENT);
+                            sendButton.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
                             if (success) {
                                 inputField.setText("");
                                 exitReplyMode();
@@ -851,7 +851,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
                     public void onError(String message) {
                         runOnUiThread(() -> {
                             sendButton.setEnabled(true);
-                            sendButton.setTextColor(COLOR_ACCENT);
+                            sendButton.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
                             MusicLog.e(TAG, "发送回复失败: " + message);
                             com.qinghe.music163pro.util.UiKit.toast(CommentFloorActivity.this, "发送失败: " + message);
                         });

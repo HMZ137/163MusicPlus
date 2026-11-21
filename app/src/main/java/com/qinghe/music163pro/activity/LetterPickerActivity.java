@@ -195,8 +195,9 @@ public class LetterPickerActivity extends BaseWatchActivity {
             // 列表当前停留在这个分组里的话，用主色点出来 —— 相当于把「我现在在哪儿」
             // 从原来那条索引条手里接过来
             boolean current = position == indexOfCurrentGroup();
-            tvLetter.setTextColor(getResources().getColor(
-                    current ? R.color.colorPrimary : R.color.text_primary));
+            tvLetter.setTextColor(current
+                    ? com.qinghe.music163pro.util.ThemeManager.accentColor(LetterPickerActivity.this)
+                    : getResources().getColor(R.color.text_primary));
             tvCount.setText(getString(R.string.letter_picker_count, group.count));
             return cell;
         }
