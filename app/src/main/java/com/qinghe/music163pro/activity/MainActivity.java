@@ -1685,6 +1685,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private int crownDir;
     /** 方向判定用的累计位移。 */
     private float crownDirAccum;
+    /** 2026-11-22：本手势内幅值最大的采样 —— 方向用它判定（大幅值采样比累计和更可信）。 */
+    private float crownMaxAbsDelta;
+    /** 2026-11-22：连续音量百分比（权威值）。每个事件的带符号增量直接累加，不做方向判定/节拍。 */
+    private float crownVolumePercent = -1f;
 
     /**
      * F1：表冠旋转调音量（转动 = 一格一格连续调）。
@@ -1724,46 +1728,80 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         long now = SystemClock.uptimeMillis();
-        // 方向防抖：方向由累计位移确认（单事件幅值 1~84 不等，直接取符号容易抖）
-        float clamped = Math.max(-10f, Math.min(10f, delta));
-        crownDirAccum += clamped;
-        boolean stepped = false;
-        if (Math.abs(crownDirAccum) >= CROWN_DIR_THRESHOLD) {
-            // 方向映射（需求方 2026-10-17 要求「上下两个方向调整一下」）：
-            // 本机向上转 = AXIS_VSCROLL 负值，映射为**音量增大**；向下转为减小。
-            // 若以后固件方向又反了，只改这一行的三元表达式即可。
-            int dir = crownDirAccum > 0 ? -1 : 1;
-            crownDirAccum = 0;
-            boolean newGesture = now - crownLastEventMs > CROWN_GESTURE_GAP_MS;
-            crownLastEventMs = now;
-            if (newGesture || dir != crownDir) {
-                // 新手势 / 反向：立刻响应一步（不许「转很久才第一步」）
-                crownDir = dir;
-                crownLastStepMs = now;
-                stepped = handleCrownScroll(dir);
-            } else if (now - crownLastStepMs >= crownStepInterval()) {
-                // 持续旋转：按节拍一格一格走，不再随事件突发跳变
-                crownLastStepMs = now;
-                stepped = handleCrownScroll(dir);
-            }
-        } else {
-            crownLastEventMs = now;
+        // 2026-11-22：对齐零度音乐的做法（逆向文档 08-表冠响应与跟手机制）——
+        // 不判定方向、不分节拍：单个事件的带符号增量直接累加进「连续音量百分比」。
+        // 已删除上一版的 crownDirAccum 阈值 + crownStepInterval 节拍 + 最大幅值方向判定：
+        // 那套模型会拿「起转时的反向小 kick」当方向依据，反而造成「向上转第一步却是减音量」。
+        int max = crownStreamMax();
+        if (max <= 0) {
+            return true;
+        }
+        // 手势中断超过 800ms 视为新手势：重新同步为系统当前音量，避免与外部改动脱节
+        if (crownVolumePercent < 0f || now - crownLastEventMs > 800L) {
+            crownVolumePercent = crownStreamCurrent() * 100f / max;
+        }
+        crownLastEventMs = now;
+
+        // 本机 AXIS_VSCROLL 幅值 1~84（约 10 单位 ≈ 一格），一格 ≈ 3%；灵敏度档位再缩放。
+        float deltaPercent = -delta * 0.003f * crownSensFactor();
+        // 单事件限幅：异常大事件不许一次跳太多
+        deltaPercent = Math.max(-15f, Math.min(15f, deltaPercent));
+
+        int cap = com.qinghe.music163pro.util.CrownVolumePrefs.getMaxPercent(this);
+        float target = crownVolumePercent + deltaPercent;
+        if (target > cap) {
+            target = cap;
+        }
+        if (target < 0f) {
+            target = 0f;
+        }
+        crownVolumePercent = target;
+
+        // ① UI 立即同步 —— 跟手的关键，这条链路上不许有 delay / 动画
+        showCrownVolumeBar(Math.round(target));
+
+        // ② 系统音量：档位真的变了才写（天然节流），复用带安全确认的写入路径
+        int level = Math.max(0, Math.min(max, Math.round(target * max / 100f)));
+        if (level != crownStreamCurrent()) {
+            applyUserVolume(level, max);
         }
 
         if (sCrownDiagLogged < CROWN_DIAG_LIMIT) {
             sCrownDiagLogged++;
-            android.media.AudioManager am =
-                    (android.media.AudioManager) getSystemService(android.content.Context.AUDIO_SERVICE);
-            String vol = am == null ? "?" : (am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
-                    + "/" + am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC));
             MusicLog.i("CrownDiag", "事件 #" + sCrownDiagLogged
                     + " t=" + event.getEventTime()
                     + " src=0x" + Integer.toHexString(event.getSource())
                     + " S=" + rawScroll + " V=" + vscroll + " H=" + hscroll
-                    + " delta=" + delta + " dirAcc=" + crownDirAccum
-                    + " dir=" + crownDir + " stepped=" + stepped + " 音量=" + vol);
+                    + " axis=" + delta + " d%=" + deltaPercent
+                    + " pct=" + crownVolumePercent + " level=" + level + "/" + max);
         }
         return true;   // 表冠事件自己消费，避免被父类/其它控件再当滚轮处理
+    }
+
+    /** 系统媒体音量上限。 */
+    private int crownStreamMax() {
+        android.media.AudioManager am = (android.media.AudioManager)
+                getSystemService(android.content.Context.AUDIO_SERVICE);
+        return am == null ? 0 : am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+    }
+
+    /** 系统媒体音量当前档位。 */
+    private int crownStreamCurrent() {
+        android.media.AudioManager am = (android.media.AudioManager)
+                getSystemService(android.content.Context.AUDIO_SERVICE);
+        return am == null ? 0 : am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+    }
+
+    /** 灵敏度档位 → 增量缩放系数。 */
+    private float crownSensFactor() {
+        int sens = com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this);
+        if (sens <= 1) {
+            return 0.5f;
+        }
+        if (sens >= 3) {
+            return 2.0f;
+        }
+        return 1.0f;
     }
 
     // ==================== 右侧滚轮音量细条（2026-11-21 重做） ====================

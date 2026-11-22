@@ -111,6 +111,18 @@
         <item name="colorAccentSoft">#33FE65A6</item>
     </style>
 
+    <!-- 网易云红：需求方指定的 (252,61,73) = #FC3D49 -->
+    <style name="Theme.App.NeteaseRed" parent="AppTheme">
+        <item name="colorPrimary">#FC3D49</item>
+        <item name="colorPrimaryDark">#A82830</item>
+        <item name="colorAccent">#FC3D49</item>
+        <item name="colorPrimaryContainer">#FC3D49</item>
+        <item name="colorSecondary">#FF6E78</item>
+        <item name="colorSecondaryContainer">#FF6E78</item>
+        <item name="android:colorControlHighlight">#33FC3D49</item>
+        <item name="colorAccentSoft">#33FC3D49</item>
+    </style>
+
     <!-- 星蓝：需求方指定的 (86,134,254) = #5686FE -->
     <style name="Theme.App.StarBlue" parent="AppTheme">
         <item name="colorPrimary">#5686FE</item>

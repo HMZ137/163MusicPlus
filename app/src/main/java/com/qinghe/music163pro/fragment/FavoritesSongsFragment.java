@@ -9,6 +9,7 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.activity.MainActivity;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.FavoritesManager;
+import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.LocalTracks;
@@ -83,6 +84,9 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                         // 任务 3（2026-11-21）：收藏的在线歌曲也能加入本地歌单
                         acts.add(new MultiSelectController.Action("add_to_local_playlist", "加入本地歌单",
                                 com.qinghe.music163pro.util.ThemeManager.accentColor(requireContext())));
+                        // 需求 2026-11-22：与「加入本地歌单」并列的云端版 —— 收藏到网易云歌单
+                        acts.add(new MultiSelectController.Action("add_to_cloud_playlist", "收藏到歌单",
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(requireContext())));
                         acts.add(MultiSelectController.Action.delete(requireActivity()));
                         return acts;
                     }
@@ -93,6 +97,15 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                             confirmDeleteSelected(positions);
                         } else if (MultiSelectController.Action.ID_PLAY_NEXT.equals(action.id)) {
                             playNextSelected(positions);
+                        } else if ("add_to_cloud_playlist".equals(action.id)) {
+                            // 需求 2026-11-22：加入网易云歌单（选在线曲目，本地文件跳过）
+                            java.util.List<Long> ids = new java.util.ArrayList<>();
+                            for (int p : positions) {
+                                if (p >= 0 && p < items.size() && items.get(p).getId() > 0) {
+                                    ids.add(items.get(p).getId());
+                                }
+                            }
+                            addToCloudPlaylist(ids);
                         } else if ("add_to_local_playlist".equals(action.id)) {
                             java.util.List<Song> targets = new java.util.ArrayList<>();
                             for (int p : positions) {
@@ -313,6 +326,64 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
     /**
      * 任务 6（2026-11-21）：把选中的收藏歌曲排到「下一首播放」，可叠加、同一首不重复。
      */
+    /** 需求 2026-11-22：把选中的在线歌曲加入网易云歌单（弹歌单选择菜单）。 */
+    private void addToCloudPlaylist(java.util.List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(requireContext(),
+                    "选中的歌曲没有可收藏的在线曲目");
+            return;
+        }
+        String cookie = cookie();
+        if (cookie == null || cookie.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(requireContext(), "请先登录后再收藏到歌单");
+            return;
+        }
+        com.qinghe.music163pro.util.UiKit.toast(requireContext(), "正在获取歌单列表...");
+        MusicApiHelper.getUserPlaylists(cookie, new MusicApiHelper.UserPlaylistsCallback() {
+            @Override
+            public void onResult(java.util.List<PlaylistInfo> playlists) {
+                if (!isViewReady() || playlists == null || playlists.isEmpty()) {
+                    com.qinghe.music163pro.util.UiKit.toast(requireContext(), "没有可用歌单");
+                    return;
+                }
+                java.util.List<String> names = new java.util.ArrayList<>();
+                for (PlaylistInfo pl : playlists) {
+                    names.add(pl.getName());
+                }
+                com.qinghe.music163pro.util.WatchMenuDialog.show(requireActivity(), "收藏到歌单",
+                        names.toArray(new String[0]), which -> {
+                            if (which < 0 || which >= playlists.size()) {
+                                return;
+                            }
+                            long pid = playlists.get(which).getId();
+                            long[] trackIds = new long[ids.size()];
+                            for (int i = 0; i < ids.size(); i++) {
+                                trackIds[i] = ids.get(i);
+                            }
+                            MusicApiHelper.playlistTracks("add", pid, trackIds, cookie,
+                                    new MusicApiHelper.PlaylistActionCallback() {
+                                        @Override
+                                        public void onResult(boolean success) {
+                                            com.qinghe.music163pro.util.UiKit.toast(requireContext(),
+                                                    success ? "已收藏到歌单" : "收藏失败");
+                                        }
+
+                                        @Override
+                                        public void onError(String message) {
+                                            com.qinghe.music163pro.util.UiKit.toast(requireContext(),
+                                                    "收藏失败: " + message);
+                                        }
+                                    });
+                        });
+            }
+
+            @Override
+            public void onError(String message) {
+                com.qinghe.music163pro.util.UiKit.toast(requireContext(), "获取歌单失败: " + message);
+            }
+        });
+    }
+
     private void playNextSelected(List<Integer> positions) {
         if (positions == null || positions.isEmpty()) {
             return;

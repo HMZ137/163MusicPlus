@@ -4952,7 +4952,21 @@ public class MusicApiHelper {
                 data.put("csrf_token", extractCsrfToken(cookie));
                 String response = weapiPost("/api/album/sublist", data.toString(), cookie);
                 JSONObject json = new JSONObject(response);
-                JSONArray arr = json.optJSONArray("data");
+                // 2026-11-22：/api/album/sublist 的真实结构是 {code, data:{data:[...], total, hasMore}}——
+                // data 是对象、数组在 data.data 里。之前直接取顶层 "data" 当数组永远为 null，
+                // 收藏专辑页因此一直空白。
+                JSONObject dataObj = json.optJSONObject("data");
+                JSONArray arr = null;
+                int totalCount = -1;
+                boolean hasMoreFlag = false;
+                if (dataObj != null) {
+                    arr = dataObj.optJSONArray("data");
+                    if (arr == null) {
+                        arr = dataObj.optJSONArray("albums");
+                    }
+                    totalCount = dataObj.optInt("total", -1);
+                    hasMoreFlag = dataObj.optBoolean("hasMore", false);
+                }
                 if (arr == null) {
                     arr = json.optJSONArray("albums");
                 }
@@ -4977,8 +4991,10 @@ public class MusicApiHelper {
                         out.add(brief);
                     }
                 }
-                final int total = json.optInt("count", out.size());
-                final boolean hasMore = json.optBoolean("hasMore", false);
+                final int total = totalCount >= 0 ? totalCount : json.optInt("count", out.size());
+                final boolean hasMore = totalCount >= 0
+                        ? hasMoreFlag : json.optBoolean("hasMore", false);
+                MusicLog.op(TAG, "收藏专辑解析", "count=" + out.size() + " total=" + total);
                 mainHandler.post(() -> callback.onResult(total, hasMore, out));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取收藏专辑列表失败", e);

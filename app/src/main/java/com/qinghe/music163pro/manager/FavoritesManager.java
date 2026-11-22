@@ -295,6 +295,10 @@ public class FavoritesManager {
                 );
                 String url = obj.has("url") && !obj.isNull("url") ? obj.getString("url") : null;
                 song.setUrl(url);
+                // 2026-11-22：恢复封面 URL（旧记录没有 cover 字段则为空，补详情时会刷新）
+                if (obj.has("cover") && !obj.isNull("cover")) {
+                    song.setCoverUrl(obj.getString("cover"));
+                }
                 list.add(song);
             }
         } catch (Exception e) {
@@ -334,6 +338,10 @@ public class FavoritesManager {
             obj.put("name", s.getName());
             obj.put("artist", s.getArtist());
             obj.put("album", s.getAlbum());
+            // 2026-11-22：封面 URL 也要持久化 —— 之前没存，恢复后列表永远加载不出封面
+            if (s.getCoverUrl() != null) {
+                obj.put("cover", s.getCoverUrl());
+            }
             if (s.getUrl() != null) {
                 obj.put("url", s.getUrl());
             }

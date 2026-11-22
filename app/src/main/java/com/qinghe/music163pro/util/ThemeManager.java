@@ -24,7 +24,7 @@ public final class ThemeManager {
 
     /** 主题名（下标与 STYLES / COLORS 对齐）。 */
     public static final String[] NAMES = {
-            "经典紫", "初音绿", "Deepseek蓝", "必刷题绿", "暖橙", "B站粉"
+            "经典紫", "初音绿", "Deepseek蓝", "必刷题绿", "暖橙", "B站粉", "网易云红"
     };
 
     /** 每套主题的强调色（给自绘控件取色用）。 */
@@ -34,7 +34,8 @@ public final class ThemeManager {
             0xFF5686FE,   // Deepseek蓝（原星蓝，色值不变）
             0xFF93D50A,   // 必刷题绿（需求方取色 RGB 147,213,10）
             0xFFFF9F43,   // 暖橙
-            0xFFFE65A6    // B站粉（原樱花粉，需求方指定 fe65a6）
+            0xFFFE65A6,   // B站粉（原樱花粉，需求方指定 fe65a6）
+            0xFFFC3D49    // 网易云红（需求方指定 fc3d49）
     };
 
     private static final int[] STYLES = {
@@ -43,7 +44,8 @@ public final class ThemeManager {
             R.style.Theme_App_StarBlue,
             R.style.Theme_App_ExamYellow,
             R.style.Theme_App_Orange,
-            R.style.Theme_App_Pink
+            R.style.Theme_App_Pink,
+            R.style.Theme_App_NeteaseRed
     };
 
     private ThemeManager() {
