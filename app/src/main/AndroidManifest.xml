@@ -65,7 +65,6 @@
         <activity android:name=".activity.SimilarActivity" android:exported="false" />
         <activity android:name=".activity.ListeningRankActivity" android:exported="false" />
         <activity android:name=".activity.BackgroundSettingsActivity" android:exported="false" />
-        <activity android:name=".activity.ToggleSettingsActivity" android:exported="false" />
         <activity android:name=".activity.LoginActivity" android:exported="false" />
         <activity android:name=".activity.PasswordLoginActivity" android:exported="false" />
         <activity android:name=".activity.CaptchaLoginActivity" android:exported="false" />
@@ -77,7 +76,6 @@
         <activity android:name=".activity.QrLoginActivity" android:exported="false" />
         <activity android:name=".activity.SmsLoginActivity" android:exported="false" />
         <activity android:name=".activity.CookieLoginActivity" android:exported="false" />
-        <activity android:name=".activity.LyricsActivity" android:exported="false" />
         <activity android:name=".activity.RingtoneListActivity" android:exported="false" />
         <activity android:name=".activity.ProfileActivity" android:exported="false" />
         <activity android:name=".activity.TopListActivity" android:exported="false" />

@@ -78,6 +78,11 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         switchText.addView(hint("歌词按词性着色；没有翻译的歌交给 AI 翻译"));
         switchRow.addView(switchText);
         switchEnabled = new Switch(this);
+        // 2026-11-21：系统 Switch 的尺寸由 density 决定，不吃 px() 里的 UiScale 系数，
+        // 界面缩放调大后它不会跟着变，看着比旁边文字小一圈。这里按同一系数缩放补偿。
+        float switchScale = com.qinghe.music163pro.util.UiScale.getScale(this);
+        switchEnabled.setScaleX(switchScale);
+        switchEnabled.setScaleY(switchScale);
         switchEnabled.setChecked(AiLyricSettings.isEnabled(this));
         switchEnabled.setOnCheckedChangeListener((btn, checked) -> {
             if (!checked) {

@@ -65,10 +65,10 @@ public final class BackGesture implements Application.ActivityLifecycleCallbacks
         return null;
     }
 
-    /** 当前开关状态 (默认关). */
+    /** 当前开关状态（2026-11-21：默认改为开启，应用内左滑返回）。 */
     public static boolean isEnabled(Context context) {
         return context != null && context.getSharedPreferences(PREFS_NAME,
-                Context.MODE_PRIVATE).getBoolean(KEY_ENABLED, false);
+                Context.MODE_PRIVATE).getBoolean(KEY_ENABLED, true);
     }
 
     @Override

@@ -5,8 +5,10 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -26,6 +28,8 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
 
     private ImageView ivQrCode;
     private TextView tvStatus;
+    /** 2026-11-21：Cookie 登录输入框。 */
+    private EditText etCookie;
     private MaterialButton btnRefresh;
 
     private String qrcodeKey = "";
@@ -90,6 +94,47 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         btnRefresh.setOnClickListener(v -> startQrLogin());
         qrCard.addView(btnRefresh);
+
+        // ── 2026-11-21：Cookie 登录（扫码不便时的备用方式）──
+        LinearLayout cookieCard = new LinearLayout(this);
+        cookieCard.setOrientation(LinearLayout.VERTICAL);
+        cookieCard.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(
+                cookieCard.getContext(), getResources().getColor(R.color.surface_elevated)));
+        cookieCard.setPadding(px(10), px(10), px(10), px(10));
+        LinearLayout.LayoutParams cookieLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cookieLp.topMargin = px(8);
+        cookieCard.setLayoutParams(cookieLp);
+        container.addView(cookieCard);
+
+        TextView cookieLabel = new TextView(this);
+        cookieLabel.setText("或粘贴 Cookie 登录");
+        cookieLabel.setTextColor(getResources().getColor(R.color.text_secondary));
+        cookieLabel.setTextSize(12);
+        cookieCard.addView(cookieLabel);
+
+        etCookie = new EditText(this);
+        etCookie.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, px(64)));
+        ((LinearLayout.LayoutParams) etCookie.getLayoutParams()).topMargin = px(4);
+        etCookie.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(
+                etCookie.getContext(), getResources().getColor(R.color.bg_dark)));
+        etCookie.setHint("SESSDATA=... 或 {\"cookies\":\"...\"}");
+        etCookie.setHintTextColor(getResources().getColor(R.color.text_disabled));
+        etCookie.setTextColor(getResources().getColor(R.color.text_primary));
+        etCookie.setTextSize(11);
+        etCookie.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        etCookie.setPadding(px(8), px(6), px(8), px(6));
+        etCookie.setGravity(Gravity.TOP);
+        cookieCard.addView(etCookie);
+
+        MaterialButton btnCookieLogin = createWatchButton("使用 Cookie 登录", false);
+        btnCookieLogin.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) btnCookieLogin.getLayoutParams()).topMargin = px(6);
+        btnCookieLogin.setOnClickListener(v -> loginWithCookie());
+        cookieCard.addView(btnCookieLogin);
 
         scrollView.addView(container);
         setContentView(scrollView);
@@ -215,6 +260,39 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
             });
         }
     };
+
+    /**
+     * 2026-11-21：用粘贴的 Cookie 登录。
+     *
+     * <p>支持两种输入：纯 Cookie 串（{@code SESSDATA=...; bili_jct=...}），
+     * 或浏览器插件导出的 JSON（{@code {"cookies":"...","refresh_token":""}}）。</p>
+     */
+    private void loginWithCookie() {
+        String raw = etCookie.getText() == null ? "" : etCookie.getText().toString().trim();
+        if (raw.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "请先粘贴 Cookie");
+            return;
+        }
+        String cookie = raw;
+        if (raw.startsWith("{")) {
+            try {
+                org.json.JSONObject obj = new org.json.JSONObject(raw);
+                String inner = obj.optString("cookies", "");
+                if (!inner.isEmpty()) {
+                    cookie = inner.trim();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (!cookie.contains("SESSDATA=")) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "Cookie 里缺少 SESSDATA，无法登录");
+            return;
+        }
+        saveBilibiliCookie(cookie);
+        tvStatus.setText("Cookie 已保存，登录成功");
+        com.qinghe.music163pro.util.UiKit.toast(this, "登录成功");
+        finish();
+    }
 
     private void saveBilibiliCookie(String cookie) {
         if (cookie == null || cookie.isEmpty()) return;

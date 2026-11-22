@@ -1356,9 +1356,45 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 v -> onFuncPlayerInfo()));
         contentLayout.addView(row3);
 
+        // 2026-11-22：复制视频分享链接（分享页地址，不是播放直链）
+        LinearLayout row4 = new LinearLayout(this);
+        row4.setOrientation(LinearLayout.HORIZONTAL);
+        row4.setGravity(Gravity.CENTER);
+        row4.setPadding(0, dp(4), 0, 0);
+        row4.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row4.addView(createFuncItem(R.drawable.ic_link, "复制链接",
+                v -> copyBilibiliVideoLink(song)));
+        contentLayout.addView(row4);
+
         scrollView.addView(contentLayout);
         overlayContainer.addView(scrollView);
         rootView.addView(overlayContainer);
+    }
+
+    /**
+     * 2026-11-22：复制 B 站视频分享页地址（https://www.bilibili.com/video/{bvid}）。
+     * 是能发给别人、粘到浏览器就能打开的分享链接，不是有时效性的播放直链。
+     */
+    private void copyBilibiliVideoLink(Song song) {
+        String bvid = song == null ? null : song.getBvid();
+        if (bvid == null || bvid.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "这首歌不是 B 站视频");
+            return;
+        }
+        String link = "https://www.bilibili.com/video/" + bvid;
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(
+                        android.content.Context.CLIPBOARD_SERVICE);
+        if (cm == null) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "剪贴板不可用");
+            return;
+        }
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("bilibili", link));
+        if (overlayContainer != null) {
+            overlayContainer.setVisibility(android.view.View.GONE);
+        }
+        com.qinghe.music163pro.util.UiKit.toast(this, "已复制：" + link);
     }
 
     /**
@@ -3145,7 +3181,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     /**
      * M2：歌词页「设置」浮层 —— AI 着色 / 音译 / 翻译 三个开关，双向绑定 {@link LyricSettings}
-     * 既有键（AI 走当前歌曲的 AI 歌词激活态）；按设置项保留「全屏歌词」入口。
+     * 既有键（AI 走当前歌曲的 AI 歌词激活态）。
      * 每点一项立即生效，并重新打开浮层以刷新开/关状态。
      */
     private void showLyricSettingsMenu() {
@@ -3154,15 +3190,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // 两边万一不同步就会「功能变了、提示没变」（需求方 2026-10-17 反馈的同类问题）。
         final boolean romaOn = romanizationEnabled;
         final boolean transOn = translationEnabled;
-        final boolean fullscreen = LyricSettings.isFullscreenButtonEnabled(this);
         java.util.List<String> items = new java.util.ArrayList<>();
         // 点按 AI 后分析是异步的：分析期间显示「分析中」，避免用户以为"点了没反应/恒为关"。
         items.add("AI 着色：" + (aiOn ? "开" : (aiLyricLoading ? "分析中…" : "关")));
         items.add("音译：" + (romaOn ? "开" : "关"));
         items.add("翻译：" + (transOn ? "开" : "关"));
-        if (fullscreen) {
-            items.add("全屏歌词");
-        }
         final String[] entries = items.toArray(new String[0]);
         com.qinghe.music163pro.util.WatchMenuDialog.show(this, "歌词设置", entries, which -> {
             if (which == 0) {
@@ -3171,8 +3203,6 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 toggleLyricsRomanization();
             } else if (which == 2) {
                 toggleLyricsTranslation();
-            } else if (fullscreen && which == 3) {
-                startActivity(new Intent(this, LyricsActivity.class));
             }
             // 开关状态变化后重新弹出，让用户看到「开 / 关」已更新
             showLyricSettingsMenu();

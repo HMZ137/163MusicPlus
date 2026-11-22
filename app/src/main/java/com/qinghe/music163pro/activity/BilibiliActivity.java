@@ -3,6 +3,7 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -10,6 +11,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.qinghe.music163pro.R;
+import com.qinghe.music163pro.api.BilibiliApiHelper;
 
 /**
  * 「听bilibili」功能菜单。
@@ -30,11 +32,23 @@ import com.qinghe.music163pro.R;
 public class BilibiliActivity extends BaseWatchActivity {
 
     /**
-     * 页面标题栏里已经有返回控件，不再叠加左上角浮动返回按钮，避免出现两个返回入口。
+     * 2026-11-21：改为显示全局浮动返回按钮。
+     *
+     * <p>原来返回 false（靠标题栏的箭头），但页面内容比一屏长、滚动后标题栏看不见，
+     * 用户会觉得「没有返回入口」。现在统一用浮动按钮，标题栏的箭头同步移除。</p>
      */
     @Override
     protected boolean shouldShowBackButton() {
-        return false;
+        return true;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 2026-11-21：从登录页返回后刷新「已登录：昵称」
+        if (loginRow != null) {
+            refreshLoginState(loginRow);
+        }
     }
 
     @Override
@@ -55,9 +69,24 @@ public class BilibiliActivity extends BaseWatchActivity {
         container.addView(createMenuItem(R.drawable.ic_video_library, "从BV号打开",
                 () -> startActivity(new Intent(this, BilibiliBvidActivity.class))));
 
+        // 2026-11-21：搜索入口之前被移除了，搜索功能重做后加回来
+        container.addView(createMenuItem(R.drawable.ic_search, "搜索视频",
+                () -> startActivity(new Intent(this, BilibiliSearchActivity.class))));
+
         // 本机收藏的 B 站视频（不需要登录）
         container.addView(createMenuItem(R.drawable.ic_favorite_border, "收藏",
                 () -> startActivity(new Intent(this, BilibiliFavoritesActivity.class))));
+
+        // 2026-11-21：B 站账号登录（扫码 / Cookie）与云端收藏
+        LinearLayout loginRow = createMenuItem(R.drawable.ic_person, loginLabel(),
+                () -> startActivity(new Intent(this, BilibiliLoginActivity.class)));
+        container.addView(loginRow);
+        this.loginRow = loginRow;
+        // 登录后这里长期显示「已登录：昵称」，不必再点进去确认
+        refreshLoginState(loginRow);
+
+        container.addView(createMenuItem(R.drawable.ic_cloud, "在线收藏",
+                () -> startActivity(new Intent(this, BilibiliCloudFavoritesActivity.class))));
 
         // 打开过的 BV 号（BV 号记不住，靠它找回「刚才那个视频」）
         container.addView(createMenuItem(R.drawable.ic_history, "历史记录",
@@ -74,14 +103,7 @@ public class BilibiliActivity extends BaseWatchActivity {
         insetTitleBar(bar);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
-        ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(30), px(30)));
-        back.setPadding(px(5), px(5), px(5), px(5));
-        back.setImageResource(R.drawable.ic_arrow_back);
-        back.setColorFilter(getResources().getColor(R.color.text_primary));
-        back.setOnClickListener(v -> finish());
-        bar.addView(back);
-
+        // 2026-11-21：返回入口改由全局浮动按钮承担，这里不再画标题栏箭头（避免两个返回入口）
         TextView title = new TextView(this);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -100,12 +122,71 @@ public class BilibiliActivity extends BaseWatchActivity {
         return bar;
     }
 
+    /** 本地判断的登录文案（有 Cookie 就先显示「已登录」，昵称随后异步补上）。 */
+    private String loginLabel() {
+        String cookie = getSharedPreferences("music163_settings", MODE_PRIVATE)
+                .getString("bilibili_cookie", "");
+        return (cookie == null || cookie.trim().isEmpty()) ? "登录" : "已登录";
+    }
+
+    /** 异步拉一次账号信息，把「已登录」补成「已登录：昵称」。 */
+    private void refreshLoginState(LinearLayout row) {
+        final TextView title = findTitleText(row);
+        if (title == null) {
+            return;
+        }
+        String cookie = getSharedPreferences("music163_settings", MODE_PRIVATE)
+                .getString("bilibili_cookie", "");
+        if (cookie == null || cookie.trim().isEmpty()) {
+            title.setText("登录");
+            return;
+        }
+        title.setText("已登录");
+        BilibiliApiHelper.getNavInfo(cookie, new BilibiliApiHelper.NavCallback() {
+            @Override
+            public void onResult(boolean loggedIn, String uname) {
+                if (!loggedIn) {
+                    title.setText("已登录");
+                    return;
+                }
+                title.setText(uname == null || uname.trim().isEmpty()
+                        ? "已登录" : "已登录：" + uname.trim());
+            }
+
+            @Override
+            public void onError(String message) {
+                // 网络失败时保留本地判断（有 Cookie 就显示已登录）
+            }
+        });
+    }
+
+    /** 在菜单行里找标题 TextView（跳过图标）。 */
+    private TextView findTitleText(ViewGroup group) {
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof TextView) {
+                return (TextView) child;
+            }
+            if (child instanceof ViewGroup) {
+                TextView nested = findTitleText((ViewGroup) child);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
+    }
+
+    private LinearLayout loginRow;
+
     private LinearLayout createMenuItem(int iconRes, String label, Runnable onClick) {
         LinearLayout row = new LinearLayout(this);
+        // 2026-11-21：高度自适应（原来固定 52dp，「已登录：昵称」这类长文案会被裁掉一半）
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(52));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.topMargin = px(6);
         row.setLayoutParams(params);
+        row.setMinimumHeight(px(52));
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(px(14), 0, px(14), 0);
@@ -123,13 +204,16 @@ public class BilibiliActivity extends BaseWatchActivity {
         row.addView(icon);
 
         TextView tv = new TextView(this);
+        // 标题占满剩余宽度，最多两行，超出才省略 —— 昵称长也不会被裁
         LinearLayout.LayoutParams tvParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         tvParams.setMarginStart(px(10));
         tv.setLayoutParams(tvParams);
         tv.setText(label);
         tv.setTextColor(getResources().getColor(R.color.text_primary));
         tv.setTextSize(14);
+        tv.setMaxLines(2);
+        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
         row.addView(tv);
 
         return row;

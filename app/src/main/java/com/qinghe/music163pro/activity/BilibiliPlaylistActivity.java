@@ -84,6 +84,14 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         btnPlayAll.setOnClickListener(v -> playIndex(0));
         root.addView(btnPlayAll);
 
+        // 2026-11-22：复制视频分享链接（https://www.bilibili.com/video/{bvid}），不是播放直链
+        MaterialButton btnCopyLink = createWatchButton("复制视频链接", true);
+        btnCopyLink.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        ((LinearLayout.LayoutParams) btnCopyLink.getLayoutParams()).topMargin = px(8);
+        btnCopyLink.setOnClickListener(v -> copyVideoLink());
+        root.addView(btnCopyLink);
+
         tvEmpty = new TextView(this);
         tvEmpty.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -325,6 +333,29 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         int min = seconds / 60;
         int sec = seconds % 60;
         return String.format("%d:%02d", min, sec);
+    }
+
+    /**
+     * 2026-11-22：复制视频分享链接。
+     *
+     * <p>注意是<b>分享页地址</b>（{@code https://www.bilibili.com/video/{bvid}}），
+     * 不是播放直链 —— 直链有时效性而且没法分享给别人。</p>
+     */
+    private void copyVideoLink() {
+        if (bvid == null || bvid.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "还没有视频链接可复制");
+            return;
+        }
+        String link = "https://www.bilibili.com/video/" + bvid;
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(
+                        android.content.Context.CLIPBOARD_SERVICE);
+        if (cm == null) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "剪贴板不可用");
+            return;
+        }
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("bilibili", link));
+        com.qinghe.music163pro.util.UiKit.toast(this, "已复制：" + link);
     }
 
     private long buildBilibiliSongId(String bvid, long cid) {

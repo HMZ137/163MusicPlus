@@ -31,6 +31,8 @@ public class SettingsPageActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
         page = getIntent().getStringExtra(EXTRA_PAGE);
         if (page == null) page = "appearance";
+        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        buildStartMs = android.os.SystemClock.uptimeMillis();
 
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(getResources().getColor(R.color.bg_dark));
@@ -43,6 +45,8 @@ public class SettingsPageActivity extends BaseWatchActivity {
         setContentView(scroll);
 
         addTitle(titleOf(page));
+        // 2026-11-22：分类引导简介 —— 完整显示，不截断
+        addTitleIntro(introOf(page));
         if ("appearance".equals(page)) {
             buildAppearance();
         } else if ("playback".equals(page)) {
@@ -54,6 +58,12 @@ public class SettingsPageActivity extends BaseWatchActivity {
         } else {
             buildAbout();
         }
+        // 2026-11-22：首次进入设置，提示简介可展开（5 秒内不可关闭）
+        showExpandHintOnce();
+        // 2026-11-22：卡顿定位 —— 项数越多越卡，先量化整段构建耗时
+        com.qinghe.music163pro.util.MusicLog.i("SettingsPerf",
+                "page=" + page + " 构建完成，rows=" + container.getChildCount()
+                        + " 耗时=" + (android.os.SystemClock.uptimeMillis() - buildStartMs) + "ms");
     }
 
     private String titleOf(String p) {
@@ -65,6 +75,31 @@ public class SettingsPageActivity extends BaseWatchActivity {
             default: return "外观与显示";
         }
     }
+
+    // ==================== 存储键（2026-11-22 从 ToggleSettingsActivity 迁移） ====================
+
+    private static final String PREFS_NAME = "music163_settings";
+    private static final String PREF_RECOGNITION_MODE = "song_recognition_mode";
+    private static final String PREF_LYRIC_SCROLL_MODE = "lyric_scroll_mode";
+    private static final String PREF_LYRIC_RESUME_INTERVAL = "lyric_resume_interval";
+    private static final String PREF_SLEEP_TIMER_EXIT_APP = "sleep_timer_exit_app";
+    private static final String PREF_OLED_BURN_PROTECTION = "oled_burn_protection";
+    private static final String PREF_SLEEP_TIMER_MODE = "sleep_timer_mode";
+    private static final String PREF_FAV_MODE_CLOUD = "fav_mode_cloud";
+    private static final String PREF_USE_WATCH_API = "use_watch_parse";
+    private static final String PREF_SKIP_TRIAL_SONGS = "skip_trial_songs";
+    private static final String PREF_RANDOM_SKIP_RANDOM = "random_skip_random";
+    private static final int MODE_MANUAL = 0;
+    private static final int MODE_AUTO = 1;
+    private static final int LYRIC_MODE_FOLLOW = 0;
+    private static final int LYRIC_MODE_BLOCK = 1;
+    private static final int SLEEP_TIMER_TOTAL = com.qinghe.music163pro.player.MusicPlayerManager.SLEEP_TIMER_MODE_TOTAL;
+    private static final int SLEEP_TIMER_NET = com.qinghe.music163pro.player.MusicPlayerManager.SLEEP_TIMER_MODE_NET;
+    private static final int SLEEP_TIMER_FINISH_TRACK = com.qinghe.music163pro.player.MusicPlayerManager.SLEEP_TIMER_MODE_FINISH_TRACK;
+
+    private android.content.SharedPreferences prefs;
+    /** 2026-11-22：性能定位 —— 分类页整段构建耗时。 */
+    private long buildStartMs;
 
     // ==================== 外观与显示 ====================
 
@@ -107,11 +142,76 @@ public class SettingsPageActivity extends BaseWatchActivity {
         //         () -> startActivity(new Intent(this, FontSettingsActivity.class)));
 
         addSection("屏幕");
-        addRow("屏幕常亮", "保持屏幕不熄灭", () -> openToggle("appearance"));
-        addRow("OLED 防烧屏", "主页面内容周期移位", () -> openToggle("appearance"));
+        addSwitchRow("屏幕常亮", "保持屏幕不熄灭",
+                prefs.getBoolean("keep_screen_on", false),
+                (btn, on) -> {
+                    prefs.edit().putBoolean("keep_screen_on", on).apply();
+                    if (on) {
+                        getWindow().addFlags(
+                                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    } else {
+                        getWindow().clearFlags(
+                                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    }
+                });
+        addSwitchRow("OLED 防烧屏", "主页面内容周期移位",
+                prefs.getBoolean(PREF_OLED_BURN_PROTECTION, false),
+                (btn, on) -> prefs.edit().putBoolean(PREF_OLED_BURN_PROTECTION, on).apply());
 
         addSection("播放页歌名");
-        addRow("歌名显示选项", "去曲师 / 去括号内容", () -> openToggle("appearance"));
+        addSwitchRow("去曲师", "隐藏歌名末尾的「 / 曲师」",
+                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, false),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.SongDisplay.PREF_HIDE_ARTIST, on).apply());
+        addSwitchRow("去括号内容", "隐藏歌名里的「(Remix)」等括号内容",
+                prefs.getBoolean(com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, false),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.SongDisplay.PREF_STRIP_BRACKETS, on).apply());
+
+        addSection("歌词显示");
+        final TextView originalFont = addValueRow("歌词字号·原文",
+                com.qinghe.music163pro.util.LyricSettings.getOriginalFontSize(this) + " sp");
+        bindFontInput(originalFont, 0);
+        final TextView romajiFont = addValueRow("歌词字号·音译",
+                com.qinghe.music163pro.util.LyricSettings.getRomanizationFontSize(this) + " sp");
+        bindFontInput(romajiFont, 1);
+        final TextView translationFont = addValueRow("歌词字号·翻译",
+                com.qinghe.music163pro.util.LyricSettings.getTranslationFontSize(this) + " sp");
+        bindFontInput(translationFont, 2);
+        addSwitchRow("歌词底衬", "歌词文字后面的深色衬底",
+                com.qinghe.music163pro.util.LyricSettings.isBackdropEnabled(this),
+                (btn, on) -> com.qinghe.music163pro.util.LyricSettings.setBackdropEnabled(this, on));
+        addRow("高级歌词翻译", "AI 词性着色 / 自动翻译", () ->
+                startActivity(new Intent(this, LanguageLearningActivity.class)));
+    }
+
+    /** 2026-11-22：点击行弹输入框直接填字号（9~22 sp），不再「点一下加一、长按减一」。 */
+    private void bindFontInput(TextView valueRow, final int which) {
+        ((LinearLayout) valueRow.getParent()).setOnClickListener(v ->
+                com.qinghe.music163pro.util.WatchPopup.input(this, "歌词字号（9~22 sp）",
+                        "直接输入目标字号，确定后生效", "sp",
+                        String.valueOf(fontSizeOf(which)), "确定", text -> {
+                            try {
+                                int target = Integer.parseInt(text.trim());
+                                int guard = 0;
+                                while (fontSizeOf(which) != target && guard++ < 30) {
+                                    com.qinghe.music163pro.util.LyricSettings.stepFontSize(
+                                            this, which, target > fontSizeOf(which) ? 1 : -1);
+                                }
+                                valueRow.setText(fontSizeOf(which) + " sp");
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }));
+    }
+
+    private int fontSizeOf(int which) {
+        if (which == 1) {
+            return com.qinghe.music163pro.util.LyricSettings.getRomanizationFontSize(this);
+        }
+        if (which == 2) {
+            return com.qinghe.music163pro.util.LyricSettings.getTranslationFontSize(this);
+        }
+        return com.qinghe.music163pro.util.LyricSettings.getOriginalFontSize(this);
     }
 
     // ==================== 播放与音质 ====================
@@ -150,21 +250,152 @@ public class SettingsPageActivity extends BaseWatchActivity {
                         }));
 
         addSection("播放行为");
-        addRow("播放模式与切歌", "本地/纯在线、随机切序、变速、跳过试听、收藏模式",
-                () -> openToggle("playback"));
+        addSwitchRow("随机切歌", "随机播放模式下用表冠/按键随机切序",
+                prefs.getBoolean(PREF_RANDOM_SKIP_RANDOM, false),
+                (btn, on) -> prefs.edit().putBoolean(PREF_RANDOM_SKIP_RANDOM, on).apply());
+        addSwitchRow("跳过试听歌曲", "VIP 歌曲只播试听片段时自动跳下一首",
+                prefs.getBoolean(PREF_SKIP_TRIAL_SONGS, false),
+                (btn, on) -> prefs.edit().putBoolean(PREF_SKIP_TRIAL_SONGS, on).apply());
+        addSwitchRow("使用手表解析接口", "关闭后改用手机解析（默认开）",
+                prefs.getBoolean(PREF_USE_WATCH_API, true),
+                (btn, on) -> prefs.edit().putBoolean(PREF_USE_WATCH_API, on).apply());
+        addSwitchRow("定时结束后退出 App", "倒计时结束时关闭应用",
+                prefs.getBoolean(PREF_SLEEP_TIMER_EXIT_APP, false),
+                (btn, on) -> prefs.edit().putBoolean(PREF_SLEEP_TIMER_EXIT_APP, on).apply());
+
+        addSection("模式选择");
+        final TextView modeRow = addValueRow("播放模式", playbackModeLabel());
+        ((LinearLayout) modeRow.getParent()).setOnClickListener(v -> {
+            boolean localOnly = prefs.getBoolean(
+                    com.qinghe.music163pro.util.PlaybackMode.PREF_LOCAL_ONLY, false);
+            boolean onlineOnly = prefs.getBoolean(
+                    com.qinghe.music163pro.util.PlaybackMode.PREF_ONLINE_ONLY, false);
+            boolean nextLocalOnly = !localOnly && !onlineOnly;
+            boolean nextOnlineOnly = localOnly;
+            prefs.edit()
+                    .putBoolean(com.qinghe.music163pro.util.PlaybackMode.PREF_LOCAL_ONLY, nextLocalOnly)
+                    .putBoolean(com.qinghe.music163pro.util.PlaybackMode.PREF_ONLINE_ONLY, nextOnlineOnly)
+                    .apply();
+            modeRow.setText(playbackModeLabel());
+            com.qinghe.music163pro.util.UiKit.toast(this, "播放模式："
+                    + playbackModeLabel());
+        });
+        final TextView favRow = addValueRow("收藏模式",
+                prefs.getBoolean(PREF_FAV_MODE_CLOUD, false) ? "云端" : "本地");
+        ((LinearLayout) favRow.getParent()).setOnClickListener(v -> {
+            boolean next = !prefs.getBoolean(PREF_FAV_MODE_CLOUD, false);
+            prefs.edit().putBoolean(PREF_FAV_MODE_CLOUD, next).apply();
+            favRow.setText(next ? "云端" : "本地");
+        });
+        final TextView speedRow = addValueRow("变速模式", speedModeLabel());
+        ((LinearLayout) speedRow.getParent()).setOnClickListener(v -> {
+            int next = (prefs.getInt("speed_mode", 0) + 1) % 3;
+            prefs.edit().putInt("speed_mode", next).apply();
+            speedRow.setText(speedModeLabel());
+        });
+        final TextView sleepModeRow = addValueRow("定时计时口径", sleepTimerModeLabel());
+        ((LinearLayout) sleepModeRow.getParent()).setOnClickListener(v -> {
+            int cur = prefs.getInt(PREF_SLEEP_TIMER_MODE, SLEEP_TIMER_TOTAL);
+            int next = cur == SLEEP_TIMER_TOTAL ? SLEEP_TIMER_NET
+                    : cur == SLEEP_TIMER_NET ? SLEEP_TIMER_FINISH_TRACK : SLEEP_TIMER_TOTAL;
+            prefs.edit().putInt(PREF_SLEEP_TIMER_MODE, next).apply();
+            sleepModeRow.setText(sleepTimerModeLabel());
+        });
+    }
+
+    private String playbackModeLabel() {
+        boolean localOnly = prefs.getBoolean(
+                com.qinghe.music163pro.util.PlaybackMode.PREF_LOCAL_ONLY, false);
+        boolean onlineOnly = prefs.getBoolean(
+                com.qinghe.music163pro.util.PlaybackMode.PREF_ONLINE_ONLY, false);
+        if (localOnly) return "仅本机";
+        if (onlineOnly) return "仅在线";
+        return "本地与在线";
+    }
+
+    private String speedModeLabel() {
+        switch (prefs.getInt("speed_mode", 0)) {
+            case 1: return "慢速优先";
+            case 2: return "关闭";
+            default: return "自动";
+        }
+    }
+
+    private String sleepTimerModeLabel() {
+        switch (prefs.getInt(PREF_SLEEP_TIMER_MODE, SLEEP_TIMER_TOTAL)) {
+            case SLEEP_TIMER_NET: return "播放净时长";
+            case SLEEP_TIMER_FINISH_TRACK: return "放完当前曲";
+            default: return "总时长";
+        }
     }
 
     // ==================== 交互与浮层 ====================
 
     private void buildInteraction() {
-        addSection("手势与定时");
-        addRow("返回手势 / 定时关闭", "返回按钮、定时结束退出", () -> openToggle("interaction"));
+        addSection("手势与返回");
+        addSwitchRow("应用内左滑返回", "任意子页面从左往右滑返回上一页",
+                prefs.getBoolean(com.qinghe.music163pro.util.BackGesture.KEY_ENABLED, true),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.BackGesture.KEY_ENABLED, on).apply());
+        addSwitchRow("显示全局返回按钮", "左上角常驻的圆形返回按钮",
+                prefs.getBoolean("show_back_button", true),
+                (btn, on) -> prefs.edit().putBoolean("show_back_button", on).apply());
 
-        addSection("歌词");
-        addRow("歌词显示", "滚动模式、偏移、恢复间隔", () -> openToggle("interaction"));
+        addSection("听歌识曲");
+        final TextView recRow = addValueRow("识曲模式", recognitionModeLabel());
+        ((LinearLayout) recRow.getParent()).setOnClickListener(v -> {
+            int next = prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO) == MODE_MANUAL
+                    ? MODE_AUTO : MODE_MANUAL;
+            prefs.edit().putInt(PREF_RECOGNITION_MODE, next).apply();
+            recRow.setText(recognitionModeLabel());
+        });
 
-        addSection("其它");
-        addRow("听歌识曲 / 手表解析接口", "识曲模式、解析接口开关", () -> openToggle("interaction"));
+        addSection("歌词行为");
+        final TextView scrollRow = addValueRow("滚动模式", lyricScrollModeLabel());
+        ((LinearLayout) scrollRow.getParent()).setOnClickListener(v -> {
+            int next = prefs.getInt(PREF_LYRIC_SCROLL_MODE, LYRIC_MODE_BLOCK) == LYRIC_MODE_BLOCK
+                    ? LYRIC_MODE_FOLLOW : LYRIC_MODE_BLOCK;
+            prefs.edit().putInt(PREF_LYRIC_SCROLL_MODE, next).apply();
+            scrollRow.setText(lyricScrollModeLabel());
+        });
+        final TextView offsetRow = addValueRow("歌词偏移",
+                prefs.getInt("lyric_offset_ms", 0) + " ms");
+        ((LinearLayout) offsetRow.getParent()).setOnClickListener(v ->
+                com.qinghe.music163pro.util.WatchPopup.input(this, "歌词偏移（毫秒）",
+                        "正数让歌词提前，负数让歌词延后", "ms",
+                        String.valueOf(prefs.getInt("lyric_offset_ms", 0)),
+                        "确定", text -> {
+                            try {
+                                int offsetMs = Integer.parseInt(text.trim());
+                                prefs.edit().putInt("lyric_offset_ms", offsetMs).apply();
+                                offsetRow.setText(offsetMs + " ms");
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }));
+        final TextView resumeRow = addValueRow("歌词恢复间隔",
+                prefs.getInt(PREF_LYRIC_RESUME_INTERVAL, 3) + " 秒");
+        ((LinearLayout) resumeRow.getParent()).setOnClickListener(v ->
+                com.qinghe.music163pro.util.WatchPopup.input(this, "歌词恢复间隔（秒）",
+                        "暂停/拖动后多久恢复自动滚动", "秒",
+                        String.valueOf(prefs.getInt(PREF_LYRIC_RESUME_INTERVAL, 3)),
+                        "确定", text -> {
+                            try {
+                                int s = Math.max(1, Math.min(30, Integer.parseInt(text.trim())));
+                                prefs.edit().putInt(PREF_LYRIC_RESUME_INTERVAL, s).apply();
+                                resumeRow.setText(s + " 秒");
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }));
+    }
+
+    private String recognitionModeLabel() {
+        return prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO) == MODE_MANUAL
+                ? "手动" : "自动";
+    }
+
+    private String lyricScrollModeLabel() {
+        return prefs.getInt(PREF_LYRIC_SCROLL_MODE, LYRIC_MODE_BLOCK) == LYRIC_MODE_FOLLOW
+                ? "跟随" : "分块";
     }
 
     // ==================== 数据与工具 ====================
@@ -205,14 +436,108 @@ public class SettingsPageActivity extends BaseWatchActivity {
                 startActivity(new Intent(this, OpenSourceActivity.class)));
     }
 
-    // ==================== 行构建 ====================
-
-    /** 跳到原开关页的指定分类（复用同一套逻辑，只显示本类行）。 */
-    private void openToggle(String section) {
-        Intent i = new Intent(this, ToggleSettingsActivity.class);
-        i.putExtra(ToggleSettingsActivity.EXTRA_SECTION, section);
-        startActivity(i);
+    /** 首次进入设置时弹一次「简介可展开」的提示；5 秒倒计时内不可关闭。 */
+    private void showExpandHintOnce() {
+        try {
+            if (prefs.getBoolean("settings_expand_hint_shown", false)) {
+                return;
+            }
+            prefs.edit().putBoolean("settings_expand_hint_shown", true).apply();
+            getWindow().getDecorView().postDelayed(this::showExpandHintDialog, 600L);
+        } catch (Throwable ignored) {
+        }
     }
+
+    /** 提示弹窗：5 秒倒计时结束后才出现「知道了」并允许关闭。 */
+    private void showExpandHintDialog() {
+        if (isFinishing()) {
+            return;
+        }
+        final android.app.Dialog dialog = new android.app.Dialog(this,
+                android.R.style.Theme_Translucent_NoTitleBar);
+        final android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setBackground(com.qinghe.music163pro.util.UiKit.dialogCard(this));
+        int pad = dpToPx(16);
+        card.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("小提示");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        card.addView(title);
+
+        TextView body = new TextView(this);
+        body.setText("设置项下方灰色小字是说明文字，默认折叠；点灰色小字本身即可展开完整说明。");
+        body.setTextColor(0xFFAAAAAA);
+        body.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        android.widget.LinearLayout.LayoutParams bodyLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        bodyLp.topMargin = dpToPx(8);
+        card.addView(body, bodyLp);
+
+        final TextView countdown = new TextView(this);
+        countdown.setText("5 秒后可关闭");
+        countdown.setTextColor(0xFF888888);
+        countdown.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        countdown.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams cLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        cLp.topMargin = dpToPx(10);
+        card.addView(countdown, cLp);
+
+        final TextView ok = new TextView(this);
+        ok.setText("知道了");
+        ok.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
+        ok.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        ok.setGravity(android.view.Gravity.CENTER);
+        ok.setPadding(0, dpToPx(10), 0, dpToPx(10));
+        ok.setVisibility(android.view.View.GONE);
+        android.widget.LinearLayout.LayoutParams okLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        okLp.topMargin = dpToPx(8);
+        card.addView(ok, okLp);
+        ok.setOnClickListener(v -> dialog.dismiss());
+
+        android.widget.FrameLayout wrapper = new android.widget.FrameLayout(this);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int cardW = Math.min((int) (screenW * 0.9f), screenW - dpToPx(12));
+        android.widget.FrameLayout.LayoutParams cardLp = new android.widget.FrameLayout.LayoutParams(
+                cardW, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardLp.gravity = android.view.Gravity.CENTER;
+        wrapper.addView(card, cardLp);
+        dialog.setContentView(wrapper);
+        // 5 秒内：无按钮、返回键无效、点外部无效
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+
+        final android.os.Handler handler = new android.os.Handler(
+                android.os.Looper.getMainLooper());
+        final int[] remain = {5};
+        final Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                remain[0]--;
+                if (remain[0] > 0) {
+                    countdown.setText(remain[0] + " 秒后可关闭");
+                    handler.postDelayed(this, 1000L);
+                } else {
+                    countdown.setVisibility(android.view.View.GONE);
+                    ok.setVisibility(android.view.View.VISIBLE);
+                    dialog.setCancelable(true);
+                    dialog.setCanceledOnTouchOutside(true);
+                }
+            }
+        };
+        handler.postDelayed(tick, 1000L);
+    }
+
+    // ==================== 行构建 ====================
 
     private void addTitle(String text) {
         TextView t = new TextView(this);
@@ -221,7 +546,36 @@ public class SettingsPageActivity extends BaseWatchActivity {
         t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
         t.setGravity(android.view.Gravity.CENTER);
         t.setPadding(0, dpToPx(4), 0, dpToPx(10));
+        // 2026-11-22：页标题同样自适应（「外观与显示」这类四字标题在窄屏上也会被裁）
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            t.setAutoSizeTextTypeUniformWithConfiguration(11, 15, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
+        }
         container.addView(t);
+    }
+
+    /**
+     * 2026-11-22：分类下的引导性简介（告诉用户这一页有哪些设置项）。
+     * <b>不截断</b>：完整显示，字号也随内容自适应。
+     */
+    private void addTitleIntro(String intro) {
+        TextView t = new TextView(this);
+        t.setText(intro);
+        t.setTextColor(getResources().getColor(R.color.text_secondary));
+        t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        t.setPadding(dpToPx(4), 0, dpToPx(4), dpToPx(10));
+        container.addView(t);
+    }
+
+    /** 各分类的引导简介文案。 */
+    private String introOf(String p) {
+        switch (p) {
+            case "playback": return "均衡器、表冠调音量、随机切歌、试听跳过、解析接口、定时退出、播放/收藏/变速/计时模式";
+            case "interaction": return "左滑返回、全局返回按钮、识曲模式、歌词滚动模式与偏移校准";
+            case "data": return "缓存清理、导出、Cookie、开源信息";
+            case "about": return "版本信息、检测更新、开源许可";
+            default: return "主题、背景、界面缩放与字号、屏幕常亮与防烧屏、播放页歌名显示、歌词字号与底衬";
+        }
     }
 
     /** 小标题（需求 2026-11-21：设置页冗余标题已清理，不再渲染；方法保留避免改调用点）。 */
@@ -258,6 +612,11 @@ public class SettingsPageActivity extends BaseWatchActivity {
         t.setTextColor(getResources().getColor(R.color.text_primary));
         t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
         t.setSingleLine(true);
+        // 2026-11-22：开关行的标题也要自适应 —— 手表窄屏上开关占了宽度，长标题会被裁出半个字
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            t.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
+        }
         textCol.addView(t);
         TextView s = new TextView(this);
         s.setText(sub);
@@ -265,6 +624,11 @@ public class SettingsPageActivity extends BaseWatchActivity {
         s.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
         s.setMaxLines(1);
         s.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        s.setOnClickListener(v -> {
+            boolean expanded = s.getMaxLines() != Integer.MAX_VALUE;
+            s.setMaxLines(expanded ? Integer.MAX_VALUE : 1);
+            s.setEllipsize(expanded ? null : android.text.TextUtils.TruncateAt.END);
+        });
         textCol.addView(s);
         row.addView(textCol);
 
@@ -334,28 +698,52 @@ public class SettingsPageActivity extends BaseWatchActivity {
         t.setTextColor(getResources().getColor(R.color.text_primary));
         t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
         t.setSingleLine(true);
+        // 2026-11-22：标题超宽时自动缩小字号，避免出现「半个汉字」的裁切
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            t.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
+        }
         row.addView(t);
 
         TextView s = new TextView(this);
         s.setText(sub);
         s.setTextColor(getResources().getColor(R.color.text_secondary));
         s.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
-        s.setMaxLines(2);
+        // 2026-11-22：解释性简介默认折叠成一行省略；点简介文字本身展开/收起完整说明
+        s.setMaxLines(1);
         s.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        s.setPadding(0, dpToPx(2), 0, 0);
+        s.setOnClickListener(v -> {
+            boolean expanded = s.getMaxLines() != Integer.MAX_VALUE;
+            s.setMaxLines(expanded ? Integer.MAX_VALUE : 1);
+            s.setEllipsize(expanded ? null : android.text.TextUtils.TruncateAt.END);
+        });
         row.addView(s);
         return row;
     }
 
+    /** 2026-11-22：行背景缓存 —— 缓存 ConstantState，每行 newDrawable()：
+     *  各行共享内部常量（省内存省构造），但状态彼此独立（涟漪各自正常）。
+     *  之前直接缓存 Drawable 实例 + mutate() 是错的：mutate() 只复制一次，
+     *  后续所有行拿到的是同一个对象，涟漪永远只出现在最后设置的行上。 */
+    private android.graphics.drawable.Drawable.ConstantState rowBackgroundState;
+
     private android.graphics.drawable.Drawable rippleBackground() {
+        if (rowBackgroundState != null) {
+            return rowBackgroundState.newDrawable(getResources());
+        }
         android.graphics.drawable.GradientDrawable body = new android.graphics.drawable.GradientDrawable();
         body.setColor(0xFF1E1F24);
         body.setCornerRadius(dpToPx(14));
         android.graphics.drawable.GradientDrawable mask = new android.graphics.drawable.GradientDrawable();
         mask.setColor(0xFFFFFFFF);
         mask.setCornerRadius(dpToPx(14));
-        return new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(
-                        UiKit.withAlpha(ThemeManager.accentColor(this), 0x33)),
-                body, mask);
+        android.graphics.drawable.RippleDrawable ripple =
+                new android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(
+                                UiKit.withAlpha(ThemeManager.accentColor(this), 0x33)),
+                        body, mask);
+        rowBackgroundState = ripple.getConstantState();
+        return ripple;
     }
 }

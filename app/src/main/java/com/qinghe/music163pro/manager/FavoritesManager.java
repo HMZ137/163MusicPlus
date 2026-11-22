@@ -88,10 +88,20 @@ public class FavoritesManager {
         }
     }
 
+    /** 2026-11-22：收藏 ID 数组内存缓存 —— 每次读盘+解析 JSONArray 太贵，
+     *  主界面浮层、歌词页、列表页都在频繁调 isFavorite。写路径会同步更新缓存。 */
+    private JSONArray cachedIds;
+
     private JSONArray loadIdArray() {
         try {
+            if (cachedIds != null) {
+                return cachedIds;
+            }
             File idsFile = getIdsFile();
-            if (!idsFile.exists()) return new JSONArray();
+            if (!idsFile.exists()) {
+                cachedIds = new JSONArray();
+                return cachedIds;
+            }
             FileInputStream fis = new FileInputStream(idsFile);
             InputStreamReader reader = new InputStreamReader(fis, "UTF-8");
             StringBuilder sb = new StringBuilder();
@@ -100,14 +110,18 @@ public class FavoritesManager {
             while ((len = reader.read(buf)) != -1) sb.append(buf, 0, len);
             reader.close();
             fis.close();
-            return new JSONArray(sb.toString());
+            cachedIds = new JSONArray(sb.toString());
+            return cachedIds;
         } catch (Exception e) {
             Log.w(TAG, "Error loading favorite-ids.json", e);
-            return new JSONArray();
+            cachedIds = new JSONArray();
+            return cachedIds;
         }
     }
 
     private void saveIdFile(JSONArray arr) {
+        // 2026-11-22：写路径同步刷新内存缓存，保证下次 loadIdArray 拿到最新值
+        cachedIds = arr;
         try {
             File dir = new File(Environment.getExternalStorageDirectory(), EXT_DIR_NAME);
             if (!dir.exists()) dir.mkdirs();

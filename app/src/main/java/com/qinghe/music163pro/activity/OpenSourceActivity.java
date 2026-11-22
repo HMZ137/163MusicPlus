@@ -42,11 +42,11 @@ public class OpenSourceActivity extends BaseWatchActivity {
                 0xFFAAAAAA, px(15), false, Gravity.START));
         addProject(content,
                 "163MusicPlus",
-                "开发者：Qinghe",
+                "开发者：HMZ138",
                 "https://github.com/HMZ137/163MusicPlus");
         addProject(content,
                 "163MusicPro（上游项目）",
-                "开发者：9xhk-1",
+                "开发者：qinghe",
                 "https://github.com/9xhk-1/163MusicPro");
         addProject(content,
                 "Material Components for Android",

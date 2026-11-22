@@ -410,20 +410,27 @@ public class BilibiliApiHelper {
                                        SubtitleListCallback callback) {
         executor.execute(() -> {
             try {
-                String url = "https://api.bilibili.com/x/player/wbi/v2?bvid=" + bvid
-                        + "&cid=" + cid;
+                // 2026-11-21：这个接口早就升级成 wbi 版了，光换路径不带签名会被风控拦，
+                // 表现就是 data.subtitle 为 null / subtitles 空 → 歌词页永远「无歌词」。
+                String[] keys = ensureWbiKeys(cookie);
+                java.util.Map<String, String> wbiParams = new java.util.HashMap<>();
+                wbiParams.put("bvid", bvid == null ? "" : bvid);
+                wbiParams.put("cid", String.valueOf(cid));
+                String query = BiliWbi.signQuery(wbiParams, keys[0], keys[1]);
+                String url = "https://api.bilibili.com/x/player/wbi/v2?" + query;
                 String response = httpGet(url, cookie);
                 JSONObject json = new JSONObject(response);
 
                 int code = json.optInt("code", -1);
                 if (code != 0) {
-                    String msg = json.optString("message", "Unknown error");
-                    postError(callback, msg);
+                    Log.w(TAG, "getSubtitleList code=" + code + " msg=" + json.optString("message")
+                            + " bvid=" + bvid + " cid=" + cid);
+                    postError(callback, json.optString("message", "Unknown error"));
                     return;
                 }
 
-                JSONObject data = json.getJSONObject("data");
-                JSONObject subtitle = data.optJSONObject("subtitle");
+                JSONObject data = json.optJSONObject("data");
+                JSONObject subtitle = data == null ? null : data.optJSONObject("subtitle");
                 List<SubtitleInfo> subtitles = new ArrayList<>();
 
                 if (subtitle != null) {
@@ -438,6 +445,9 @@ public class BilibiliApiHelper {
                         }
                     }
                 }
+                Log.i(TAG, "getSubtitleList bvid=" + bvid + " cid=" + cid
+                        + " count=" + subtitles.size()
+                        + " dataKeys=" + (data == null ? "null" : data.names()));
 
                 mainHandler.post(() -> callback.onResult(subtitles));
             } catch (Exception e) {
@@ -495,7 +505,6 @@ public class BilibiliApiHelper {
                 String requestCookie = ensureSearchCookie(cookie);
                 String[] keys = ensureWbiKeys(requestCookie);
                 java.util.Map<String, String> params = new java.util.HashMap<>();
-                params.put("search_type", "video");
                 params.put("keyword", kw);
                 params.put("page", String.valueOf(Math.max(1, page)));
                 params.put("page_size", "20");
@@ -504,7 +513,10 @@ public class BilibiliApiHelper {
                     params.put("seid", seid);
                 }
                 String query = BiliWbi.signQuery(params, keys[0], keys[1]);
-                String url = "https://api.bilibili.com/x/web-interface/wbi/search/type?" + query;
+                // 2026-11-21：改用综合搜索接口（与 BiliTerminal 一致）。
+                // /wbi/search/type?search_type=video 在未登录 + 新 buvid 体系下经常返回空 result，
+                // 表现为「什么都搜不到」；all/v2 会返回按 result_type 分组的数组，取其中的 video 组。
+                String url = "https://api.bilibili.com/x/web-interface/wbi/search/all/v2?" + query;
                 String response = httpGet(url, requestCookie);
                 JSONObject json = new JSONObject(response);
                 int code = json.optInt("code", -1);
@@ -513,30 +525,52 @@ public class BilibiliApiHelper {
                     return;
                 }
                 JSONObject data = json.optJSONObject("data");
-                if (data != null) {
-                    String newSeid = data.optString("seid", "");
-                    if (!newSeid.isEmpty()) {
-                        SEID_CACHE.put(kw, newSeid);
-                    }
+                if (data == null) {
+                    // 风控时常见：code=0 但 data 为 null。把原始响应前 300 字打出来便于排查
+                    Log.w(TAG, "searchVideos data=null, resp="
+                            + (response.length() > 300 ? response.substring(0, 300) : response));
+                    mainHandler.post(() -> callback.onResult(new ArrayList<>()));
+                    return;
                 }
-                JSONArray resultArray = data != null ? data.optJSONArray("result") : null;
+                String newSeid = data.optString("seid", "");
+                if (!newSeid.isEmpty()) {
+                    SEID_CACHE.put(kw, newSeid);
+                }
                 List<BilibiliSearchVideo> videos = new ArrayList<>();
-                if (resultArray != null) {
-                    for (int i = 0; i < resultArray.length(); i++) {
-                        JSONObject item = resultArray.optJSONObject(i);
-                        if (item == null) {
+                JSONArray groups = data.optJSONArray("result");
+                if (groups != null) {
+                    for (int i = 0; i < groups.length(); i++) {
+                        JSONObject group = groups.optJSONObject(i);
+                        if (group == null) {
                             continue;
                         }
-                        videos.add(new BilibiliSearchVideo(
-                                item.optLong("aid", 0),
-                                item.optString("bvid", ""),
-                                stripHtml(item.optString("title", "")),
-                                stripHtml(item.optString("author", "")),
-                                stripHtml(item.optString("description", "")),
-                                parseDurationTextToSeconds(item.optString("duration", "0:00"))
-                        ));
+                        if (!"video".equals(group.optString("result_type", ""))) {
+                            continue;
+                        }
+                        JSONArray arr = group.optJSONArray("data");
+                        if (arr == null) {
+                            continue;
+                        }
+                        for (int j = 0; j < arr.length(); j++) {
+                            JSONObject item = arr.optJSONObject(j);
+                            if (item == null) {
+                                continue;
+                            }
+                            videos.add(new BilibiliSearchVideo(
+                                    item.optLong("aid", 0),
+                                    item.optString("bvid", ""),
+                                    stripHtml(item.optString("title", "")),
+                                    stripHtml(item.optString("author", "")),
+                                    stripHtml(item.optString("description", "")),
+                                    parseDurationTextToSeconds(item.optString("duration", "0:00"))
+                            ));
+                        }
                     }
                 }
+                Log.i(TAG, "searchVideos kw=" + kw + " page=" + page
+                        + " groups=" + (groups == null ? -1 : groups.length())
+                        + " videos=" + videos.size()
+                        + " dataKeys=" + data.names());
                 mainHandler.post(() -> callback.onResult(videos));
             } catch (Exception e) {
                 Log.e(TAG, "searchVideos error", e);
@@ -548,6 +582,31 @@ public class BilibiliApiHelper {
     /** 兼容旧调用（无分页语义，等价第一页）。 */
     public static void searchVideos(String keyword, String cookie, SearchVideosCallback callback) {
         searchVideos(keyword, 1, cookie, callback);
+    }
+
+    /** 账号信息（需求 2026-11-21：页面里展示登录状态用）。 */
+    public interface NavCallback {
+        void onResult(boolean loggedIn, String uname);
+
+        void onError(String message);
+    }
+
+    /** 查询当前 Cookie 的登录状态与昵称。 */
+    public static void getNavInfo(String cookie, NavCallback callback) {
+        executor.execute(() -> {
+            try {
+                String resp = httpGet("https://api.bilibili.com/x/web-interface/nav", cookie);
+                JSONObject json = new JSONObject(resp);
+                JSONObject data = json.optJSONObject("data");
+                final boolean loggedIn = data != null && data.optBoolean("isLogin", false);
+                final String uname = data == null ? "" : data.optString("uname", "");
+                mainHandler.post(() -> callback.onResult(loggedIn, uname));
+            } catch (Exception e) {
+                Log.e(TAG, "getNavInfo error", e);
+                final String msg = e.getMessage() == null ? "获取账号信息失败" : e.getMessage();
+                mainHandler.post(() -> callback.onError(msg));
+            }
+        });
     }
 
     /** 搜索联想词。 */
