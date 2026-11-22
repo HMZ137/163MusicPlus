@@ -228,12 +228,23 @@ public class SettingsPageActivity extends BaseWatchActivity {
                 (btn, checked) ->
                         com.qinghe.music163pro.util.CrownVolumePrefs.setEnabled(this, checked));
         final TextView sens = addValueRow("表冠灵敏度",
-                "档位 " + com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this));
-        ((LinearLayout) sens.getParent()).setOnClickListener(v -> {
-            int next = com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this) % 3 + 1;
-            com.qinghe.music163pro.util.CrownVolumePrefs.setSensitivity(this, next);
-            sens.setText("档位 " + next);
-        });
+                "×" + com.qinghe.music163pro.util.CrownVolumePrefs.getCustomSensitivity(this));
+        ((LinearLayout) sens.getParent()).setOnClickListener(v ->
+                com.qinghe.music163pro.util.WatchPopup.input(this,
+                        "表冠灵敏度倍率", "1.0 为标准，0.1~5.0；越大转同样角度音量变化越多",
+                        "×",
+                        String.valueOf(com.qinghe.music163pro.util.CrownVolumePrefs
+                                .getCustomSensitivity(this)),
+                        "确定", text -> {
+                            try {
+                                float mult = Math.max(0.1f,
+                                        Math.min(5.0f, Float.parseFloat(text.trim())));
+                                com.qinghe.music163pro.util.CrownVolumePrefs
+                                        .setCustomSensitivity(this, mult);
+                                sens.setText("×" + mult);
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }));
         final TextView cap = addValueRow("表冠音量上限",
                 com.qinghe.music163pro.util.CrownVolumePrefs.getMaxPercent(this) + "%");
         ((LinearLayout) cap.getParent()).setOnClickListener(v ->

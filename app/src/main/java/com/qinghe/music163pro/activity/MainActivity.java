@@ -1793,16 +1793,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         return am == null ? 0 : am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
     }
 
-    /** 灵敏度档位 → 增量缩放系数。 */
+    /** 灵敏度倍率：2026-11-22 起统一走自定义倍率（默认 1.0，0.1~5.0）。 */
     private float crownSensFactor() {
-        int sens = com.qinghe.music163pro.util.CrownVolumePrefs.getSensitivity(this);
-        if (sens <= 1) {
-            return 0.5f;
-        }
-        if (sens >= 3) {
-            return 2.0f;
-        }
-        return 1.0f;
+        return com.qinghe.music163pro.util.CrownVolumePrefs.getCustomSensitivity(this);
     }
 
     // ==================== 右侧滚轮音量细条（2026-11-21 重做） ====================

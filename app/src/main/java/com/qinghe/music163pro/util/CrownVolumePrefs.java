@@ -20,6 +20,8 @@ public final class CrownVolumePrefs {
     public static final String KEY_ENABLED = "crown_volume_enabled";
     public static final String KEY_SENSITIVITY = "crown_volume_sensitivity";
     public static final String KEY_MAX_PERCENT = "crown_volume_max_percent";
+    /** 2026-11-22：自定义灵敏度倍率（默认 1.0，0.1~5.0）。 */
+    public static final String KEY_CUSTOM_SENSITIVITY = "crown_volume_custom_sensitivity";
 
     private CrownVolumePrefs() {
     }
@@ -49,6 +51,22 @@ public final class CrownVolumePrefs {
         if (context == null) return;
         prefs(context).edit().putInt(KEY_SENSITIVITY,
                 Math.max(1, Math.min(3, level))).commit();
+    }
+
+    /**
+     * 2026-11-22：自定义灵敏度倍率（默认 1.0，范围 0.1~5.0）。
+     * 直接乘在表冠增量上：1.0 = 标准，2.0 = 快一倍，0.5 = 慢一半。
+     */
+    public static float getCustomSensitivity(Context context) {
+        if (context == null) return 1.0f;
+        return Math.max(0.1f, Math.min(5.0f,
+                prefs(context).getFloat(KEY_CUSTOM_SENSITIVITY, 1.0f)));
+    }
+
+    public static void setCustomSensitivity(Context context, float multiplier) {
+        if (context == null) return;
+        prefs(context).edit().putFloat(KEY_CUSTOM_SENSITIVITY,
+                Math.max(0.1f, Math.min(5.0f, multiplier))).commit();
     }
 
     /** 表冠可调到的最大音量百分比（10~100），默认 100。 */
