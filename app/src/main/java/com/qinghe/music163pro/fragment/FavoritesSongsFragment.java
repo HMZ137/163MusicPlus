@@ -265,7 +265,22 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                 List<Song> updated = new ArrayList<>();
                 for (Long id : ids) {
                     Song local = localMap.get(id);
+                    Song remote = songMap.get(id);
                     if (local != null) {
+                        // 2026-11-22：用远端详情补本地记录的缺失字段（尤其是封面）。
+                        // 以前这里直接用本地那条，远端带回 cover 的数据被整条丢弃，
+                        // 旧收藏记录（持久化里根本没有 cover 字段）就永远显示默认占位图。
+                        if (remote != null) {
+                            if (local.getCoverUrl() == null || local.getCoverUrl().isEmpty()) {
+                                local.setCoverUrl(remote.getCoverUrl());
+                            }
+                            if (local.getUrl() == null || local.getUrl().isEmpty()) {
+                                local.setUrl(remote.getUrl());
+                            }
+                            if (local.getAlbum() == null || local.getAlbum().isEmpty()) {
+                                local.setAlbum(remote.getAlbum());
+                            }
+                        }
                         updated.add(local);
                         continue;
                     }

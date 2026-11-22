@@ -4951,6 +4951,9 @@ public class MusicApiHelper {
                 data.put("total", true);
                 data.put("csrf_token", extractCsrfToken(cookie));
                 String response = weapiPost("/api/album/sublist", data.toString(), cookie);
+                // 2026-11-22：count 恒为 0 说明数组字段名/层级还是不对，打出原始响应定位
+                MusicLog.i(TAG, "sublist resp: "
+                        + (response.length() > 400 ? response.substring(0, 400) + "..." : response));
                 JSONObject json = new JSONObject(response);
                 // 2026-11-22：/api/album/sublist 的真实结构是 {code, data:{data:[...], total, hasMore}}——
                 // data 是对象、数组在 data.data 里。之前直接取顶层 "data" 当数组永远为 null，

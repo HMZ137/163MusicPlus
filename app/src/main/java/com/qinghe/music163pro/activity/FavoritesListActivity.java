@@ -77,6 +77,8 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
             }
         });
         updateInfoRow(0);
+        // 2026-11-22：首次进入收藏页提示「哪些页面支持长按」（5 秒内不可关闭）
+        showLongPressHintOnce();
 
         // 单曲页多选时由 Fragment 消费返回键；其余情况走默认返回。
         addBackInterceptor(() -> {
@@ -155,6 +157,114 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
             }
         }
         return null;
+    }
+
+    /** 首次进入收藏页弹一次「长按可多选」提示；5 秒倒计时内不可关闭。 */
+    private void showLongPressHintOnce() {
+        try {
+            android.content.SharedPreferences p = getSharedPreferences(
+                    "favorites_ui_prefs", MODE_PRIVATE);
+            if (p.getBoolean("long_press_hint_shown", false)) {
+                return;
+            }
+            p.edit().putBoolean("long_press_hint_shown", true).apply();
+            getWindow().getDecorView().postDelayed(this::showLongPressHint, 600L);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void showLongPressHint() {
+        if (isFinishing()) {
+            return;
+        }
+        final android.app.Dialog dialog = new android.app.Dialog(this,
+                android.R.style.Theme_Translucent_NoTitleBar);
+        final android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setBackground(com.qinghe.music163pro.util.UiKit.dialogCard(this));
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        card.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("这些页面可以长按");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        card.addView(title);
+
+        TextView body = new TextView(this);
+        body.setText("· 收藏 · 单曲：长按任意歌曲进入多选\n"
+                + "　 （删除 / 下一首播放 / 加入本地歌单 / 收藏到歌单）\n"
+                + "· 收藏 · 歌单：长按歌单可删除或取消收藏\n"
+                + "· 播放列表 / 歌单详情：长按歌曲可批量操作");
+        body.setTextColor(0xFFAAAAAA);
+        body.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        android.widget.LinearLayout.LayoutParams bodyLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        bodyLp.topMargin = pad / 2;
+        card.addView(body, bodyLp);
+
+        final TextView countdown = new TextView(this);
+        countdown.setText("5 秒后可关闭");
+        countdown.setTextColor(0xFF888888);
+        countdown.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        countdown.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams cLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        cLp.topMargin = pad / 2;
+        card.addView(countdown, cLp);
+
+        final TextView ok = new TextView(this);
+        ok.setText("知道了");
+        ok.setTextColor(com.qinghe.music163pro.util.ThemeManager.accentColor(this));
+        ok.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        ok.setGravity(android.view.Gravity.CENTER);
+        ok.setPadding(0, pad / 2, 0, pad / 2);
+        ok.setVisibility(android.view.View.GONE);
+        android.widget.LinearLayout.LayoutParams okLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        okLp.topMargin = pad / 2;
+        card.addView(ok, okLp);
+        ok.setOnClickListener(v -> dialog.dismiss());
+
+        android.widget.FrameLayout wrapper = new android.widget.FrameLayout(this);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int cardW = Math.min((int) (screenW * 0.92f), screenW - pad);
+        android.widget.FrameLayout.LayoutParams cardLp =
+                new android.widget.FrameLayout.LayoutParams(
+                        cardW, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardLp.gravity = android.view.Gravity.CENTER;
+        wrapper.addView(card, cardLp);
+        dialog.setContentView(wrapper);
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+
+        final android.os.Handler handler = new android.os.Handler(
+                android.os.Looper.getMainLooper());
+        final int[] remain = {5};
+        final Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                remain[0]--;
+                if (remain[0] > 0) {
+                    countdown.setText(remain[0] + " 秒后可关闭");
+                    handler.postDelayed(this, 1000L);
+                } else {
+                    countdown.setVisibility(android.view.View.GONE);
+                    ok.setVisibility(android.view.View.VISIBLE);
+                    dialog.setCancelable(true);
+                    dialog.setCanceledOnTouchOutside(true);
+                }
+            }
+        };
+        handler.postDelayed(tick, 1000L);
     }
 
     /** ViewPager2 的页面适配器（第 0 页单曲 / 第 1 页歌单；专辑已并入歌单页混排）。 */

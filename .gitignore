@@ -19,3 +19,7 @@ local.properties
 # 它是 debug 密钥（口令公开为 android），不是发布密钥，仅供侧载/自用。
 !keystore/*.keystore
 javac.*.args
+
+# 2026-11-22：发行包随仓库分发（jsDelivr/raw 可直取），APK 本体入库
+!dist/
+!dist/*.apk

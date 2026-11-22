@@ -260,8 +260,9 @@
 
         <!-- Playback controls row -->
         <!-- 高度 44->40dp、上间距 3->2dp：给上方信息区让出空间（高密度下时间标签行曾被压成 0px） -->
+        <!-- 2026-11-22：两行统一为「全宽三等分」——低 dpi 下上下六个按钮必须落在同一组横坐标上 -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:gravity="center"
@@ -269,9 +270,9 @@
 
             <ImageView
                 android:id="@+id/btn_prev"
-                android:layout_width="54dp"
+                android:layout_width="0dp"
                 android:layout_height="40dp"
-                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
                 android:padding="10dp"
                 android:src="@drawable/ic_skip_previous"
                 android:alpha="0.87"
@@ -280,10 +281,9 @@
 
             <ImageView
                 android:id="@+id/btn_play"
-                android:layout_width="54dp"
+                android:layout_width="0dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
                 android:padding="8dp"
                 android:src="@drawable/ic_play_arrow"
                 android:alpha="1.0"
@@ -292,9 +292,9 @@
 
             <ImageView
                 android:id="@+id/btn_next"
-                android:layout_width="54dp"
+                android:layout_width="0dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="4dp"
+                android:layout_weight="1"
                 android:padding="10dp"
                 android:src="@drawable/ic_skip_next"
                 android:alpha="0.87"
@@ -318,19 +318,14 @@
             -->
             <ImageView
                 android:id="@+id/btn_volume"
-                android:layout_width="46dp"
+                android:layout_width="0dp"
                 android:layout_height="34dp"
+                android:layout_weight="1"
                 android:padding="8dp"
                 android:src="@drawable/ic_volume_up"
                 android:alpha="0.6"
                 android:clickable="true"
                 android:focusable="true" />
-
-            <!-- 弹性留白：三个入口均匀分布 -->
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
 
             <!--
               需求方 2026-10-17：**播放选项（⋯）与播放模式的位置互换** ——
@@ -341,17 +336,13 @@
             -->
             <ImageView
                 android:id="@+id/btn_favorite"
-                android:layout_width="46dp"
+                android:layout_width="0dp"
                 android:layout_height="34dp"
+                android:layout_weight="1"
                 android:padding="8dp"
                 android:src="@drawable/ic_more_horiz"
                 android:clickable="true"
                 android:focusable="true" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
 
             <!--
               播放模式切换：单曲循环 / 列表循环 / 随机播放。
@@ -360,8 +351,9 @@
             -->
             <ImageView
                 android:id="@+id/btn_play_mode"
-                android:layout_width="46dp"
+                android:layout_width="0dp"
                 android:layout_height="34dp"
+                android:layout_weight="1"
                 android:padding="8dp"
                 android:src="@drawable/ic_repeat"
                 android:alpha="0.85"

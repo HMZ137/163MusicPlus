@@ -329,8 +329,8 @@ public class LoginActivity extends BaseWatchActivity {
             return;
         }
         com.qinghe.music163pro.util.WatchPopup.confirm(this, "安全提示",
-                "Cookie 等同于账号登录凭证，导出后请妥善保管，"
-                        + "请勿发送给他人或上传至公开位置，泄露可能导致账号被盗用。确认导出？",
+                "Cookie 等同账号登录凭证，导出后请勿分享或上传到公开位置，"
+                        + "泄露可能导致账号被盗。确认导出？",
                 "确认导出", false, this::doExportCookie);
     }
 

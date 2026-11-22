@@ -11,8 +11,8 @@ android {
         applicationId "com.qinghe.music163pro"
         minSdk 23
         targetSdk 27 
-        versionCode 43
-        versionName "20261121"
+        versionCode 44
+        versionName "20261122"
     }
 
     signingConfigs {
@@ -42,6 +42,10 @@ android {
 
     buildTypes {
         debug {
+            // 2026-11-22：debug 版包名加后缀，方便同一台设备同时装发行版与调试版。
+            // 两者数据完全独立（包名不同 → SharedPreferences / 外部目录都分开）。
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
             // 存在统一调试签名就用它，否则回退到系统默认的 debug 签名
             if (signingConfigs.debugLocal.storeFile != null) {
                 signingConfig signingConfigs.debugLocal
@@ -52,6 +56,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (signingConfigs.release.storeFile != null) {
                 signingConfig signingConfigs.release
+            } else if (signingConfigs.debugLocal.storeFile != null) {
+                // 2026-11-22：仓库里没有正式 release.keystore 时回退到自带的统一密钥，
+                // 否则 assembleRelease 只会产出 unsigned 包（装不上、也没法发）。
+                // 正式上架前应放入专用 release.keystore 并配置 KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD。
+                signingConfig signingConfigs.debugLocal
             }
         }
     }
