@@ -1742,8 +1742,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         crownLastEventMs = now;
 
-        // 本机 AXIS_VSCROLL 幅值 1~84（约 10 单位 ≈ 一格），一格 ≈ 3%；灵敏度档位再缩放。
-        float deltaPercent = -delta * 0.003f * crownSensFactor();
+        // 本机 AXIS_VSCROLL 幅值 1~84（约 10 单位 ≈ 一格），一格 ≈ 4.5%；灵敏度档位再缩放。
+        // 2026-11-22：0.003 → 0.0045（需求方实测后要求稍快一档）。
+        float deltaPercent = -delta * 0.0045f * crownSensFactor();
         // 单事件限幅：异常大事件不许一次跳太多
         deltaPercent = Math.max(-15f, Math.min(15f, deltaPercent));
 
