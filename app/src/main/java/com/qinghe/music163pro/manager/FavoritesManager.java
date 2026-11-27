@@ -177,6 +177,48 @@ public class FavoritesManager {
         }
     }
 
+    /**
+     * 用远端详情补全已收藏记录的缺失字段（封面 / 播放链接 / 专辑），并**落盘**。
+     *
+     * <p>为什么必须落盘：补详情带 5 分钟节流，而列表每次进页都是重新从 favorites.json 重建。
+     * 只把封面改在内存对象上的话，左右切页回来时列表又变回「没有 cover 的旧记录」，
+     * 表现就是需求方报的「封面只在第一次进页面时出现，切回来就成兜底图了」。</p>
+     *
+     * @param details 曲目 id → 远端详情；只补空字段，不覆盖本地已有值
+     */
+    public void updateFavoriteDetails(java.util.Map<Long, Song> details) {
+        if (details == null || details.isEmpty()) {
+            return;
+        }
+        List<Song> list = getFavorites();
+        boolean changed = false;
+        for (Song s : list) {
+            Song d = details.get(s.getId());
+            if (d == null) {
+                continue;
+            }
+            if (isEmpty(s.getCoverUrl()) && !isEmpty(d.getCoverUrl())) {
+                s.setCoverUrl(d.getCoverUrl());
+                changed = true;
+            }
+            if (isEmpty(s.getUrl()) && !isEmpty(d.getUrl())) {
+                s.setUrl(d.getUrl());
+                changed = true;
+            }
+            if (isEmpty(s.getAlbum()) && !isEmpty(d.getAlbum())) {
+                s.setAlbum(d.getAlbum());
+                changed = true;
+            }
+        }
+        if (changed) {
+            saveFavorites(list);
+        }
+    }
+
+    private static boolean isEmpty(String value) {
+        return value == null || value.isEmpty();
+    }
+
     public void removeFavorite(Song song) {
         List<Song> list = getFavorites();
         List<Song> updated = new ArrayList<>();

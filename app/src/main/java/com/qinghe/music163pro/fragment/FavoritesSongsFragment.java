@@ -259,6 +259,13 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                     return;
                 }
                 uiPrefs.edit().putLong("detail_fetched_at", System.currentTimeMillis()).apply();
+                // 2026-11-28：详情要写回收藏库（落盘），否则下次进页从 favorites.json 重建时
+                // 封面又变回空 —— 表现就是「封面只有第一次进页面才有」。
+                try {
+                    favoritesManager.updateFavoriteDetails(songMap);
+                } catch (Throwable t) {
+                    com.qinghe.music163pro.util.MusicLog.w("Favorites", "详情落盘失败", t);
+                }
                 // 本地收藏优先：先用本地那条，只有本地没有时才用 API 返回的曲目。
                 // 反过来（先放 API 结果）会把本地收藏顶成"在线版本"，
                 // 表现就是本地歌一闪而过、最后只剩在线收藏。
