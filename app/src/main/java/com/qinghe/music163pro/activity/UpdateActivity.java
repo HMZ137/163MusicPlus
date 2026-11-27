@@ -409,9 +409,30 @@ public class UpdateActivity extends BaseWatchActivity {
         }
     }
 
+    /**
+     * 拉起系统安装器（2026-11-27 修「下载完装不了」）。
+     *
+     * <p>原来的实现只做了 FileProvider 包装，没校验文件、也没区分失败原因，
+     * 结果三种常见故障都只回一句含糊的「安装失败」：</p>
+     * <ol>
+     *   <li>APK 下到 {@code getExternalFilesDir()}，而 file_provider_paths.xml 没声明
+     *       那个 root → {@code getUriForFile()} 抛 IllegalArgumentException，界面拉不起来
+     *       （本次同时补了 xml 里的 external-files-path）；</li>
+     *   <li>下载被中断，文件 0 字节 / 只有半个包 → 安装器提示「解析软件包时出现问题」；</li>
+     *   <li>手表 ROM 没装安装器 Activity → ActivityNotFoundException。</li>
+     * </ol>
+     * <p>现在分别给出可执行的提示（含 APK 路径），而不是一句「安装失败」。</p>
+     */
     private void installApk(String filePath) {
         try {
             File apkFile = new File(filePath);
+            if (!apkFile.exists() || apkFile.length() <= 0) {
+                resetDownloadState();
+                com.qinghe.music163pro.util.UiKit.toastLong(this,
+                        "安装包不完整（" + (apkFile.exists() ? "0 字节" : "文件不存在")
+                                + "），请重新下载");
+                return;
+            }
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
@@ -425,9 +446,20 @@ public class UpdateActivity extends BaseWatchActivity {
                         "application/vnd.android.package-archive");
             }
             startActivity(intent);
-        } catch (Exception e) {
-            com.qinghe.music163pro.util.UiKit.toastLong(this, "安装失败: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            // FileProvider 找不到匹配的 root（路径没在 file_provider_paths.xml 里声明）
             resetDownloadState();
+            com.qinghe.music163pro.util.MusicLog.w("Update", "FileProvider 路径未声明: " + filePath, e);
+            com.qinghe.music163pro.util.UiKit.toastLong(this,
+                    "安装失败：安装包路径未被授权，请把本页截图反馈给开发者");
+        } catch (android.content.ActivityNotFoundException e) {
+            resetDownloadState();
+            com.qinghe.music163pro.util.UiKit.toastLong(this,
+                    "安装失败：系统没有安装器，请用文件管理器打开\n" + filePath);
+        } catch (Exception e) {
+            resetDownloadState();
+            com.qinghe.music163pro.util.UiKit.toastLong(this,
+                    "安装失败: " + (e.getMessage() == null ? e.toString() : e.getMessage()));
         }
     }
 

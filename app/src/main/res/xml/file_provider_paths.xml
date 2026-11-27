@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-11-27：应用内更新「下载完装不上」的根因就在这里。
+  更新包下载到 getExternalFilesDir(null)，即
+  <外部存储>/Android/data/<包名>/files/163MusicPlus_update.apk；
+  而这里原来只声明了 <外部存储>/163Music/，FileProvider.getUriForFile() 找不到匹配的
+  root 会直接抛 IllegalArgumentException("Failed to find configured root…")，
+  安装界面根本拉不起来。下面把应用私有目录一并暴露（只对本应用授权的 Uri 生效）。
+-->
 <paths>
     <external-path name="music163_files" path="163Music/" />
+    <external-files-path name="app_external_files" path="." />
+    <external-cache-path name="app_external_cache" path="." />
+    <files-path name="app_files" path="." />
+    <cache-path name="app_cache" path="." />
 </paths>
