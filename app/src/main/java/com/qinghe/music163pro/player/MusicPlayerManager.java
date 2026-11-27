@@ -1429,13 +1429,13 @@ public class MusicPlayerManager {
         play(url);
     }
 
-    /** 开关选项：是否使用手表解析接口（默认开）。 */
+    /** 设置 → 播放与音质：是否使用手表解析接口（默认开）。 */
     private boolean isWatchParseEnabled() {
         return appContext == null || appContext.getSharedPreferences("music163_settings",
                 Context.MODE_PRIVATE).getBoolean("use_watch_parse", true);
     }
 
-    /** 开关选项：随机播放模式下上下键随机切歌（默认关 = 按列表顺序）。 */
+    /** 设置 → 播放与音质：随机播放模式下上下键随机切歌（默认关 = 按列表顺序）。 */
     private boolean isRandomSkipRandom() {
         return appContext != null && appContext.getSharedPreferences("music163_settings",
                 Context.MODE_PRIVATE).getBoolean("random_skip_random", false);
@@ -1445,7 +1445,7 @@ public class MusicPlayerManager {
 
     private int trialSkipStreak = 0;
 
-    /** 开关选项：仅可试听的歌曲自动跳过（默认关）。 */
+    /** 设置 → 播放与音质：仅可试听的歌曲自动跳过（默认关）。 */
     private boolean isSkipTrialEnabled() {
         return appContext != null && appContext.getSharedPreferences("music163_settings",
                 Context.MODE_PRIVATE).getBoolean("skip_trial_songs", false);

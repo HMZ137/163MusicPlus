@@ -59,7 +59,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
-                    android:text="开关选项"
+                    android:text="设置"
                     android:textColor="@color/text_primary"
                     android:textSize="@dimen/watch_text_body"
                     android:singleLine="true"
