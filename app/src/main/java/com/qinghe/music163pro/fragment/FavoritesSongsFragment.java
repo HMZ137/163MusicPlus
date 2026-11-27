@@ -81,6 +81,9 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                         // 需求 2026-11-21 任务 6：加入「下一首播放」（可叠加）
                         List<MultiSelectController.Action> acts = new java.util.ArrayList<>();
                         acts.add(MultiSelectController.Action.playNext(requireActivity()));
+                        // 需求 2026-11-27：多选加「下载」（在线歌曲批量入库到下载管理）
+                        acts.add(new MultiSelectController.Action("download", "下载",
+                                com.qinghe.music163pro.util.ThemeManager.accentColor(requireContext())));
                         // 任务 3（2026-11-21）：收藏的在线歌曲也能加入本地歌单
                         acts.add(new MultiSelectController.Action("add_to_local_playlist", "加入本地歌单",
                                 com.qinghe.music163pro.util.ThemeManager.accentColor(requireContext())));
@@ -115,6 +118,8 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
                             }
                             com.qinghe.music163pro.util.LocalPlaylistPicker.show(
                                     requireActivity(), targets, null);
+                        } else if ("download".equals(action.id)) {
+                            downloadSelected(positions);
                         }
                     }
                 });
@@ -417,6 +422,64 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
         android.widget.Toast.makeText(requireContext(),
                 added > 0 ? "已加入下一首播放：" + added + " 首" : "所选歌曲已在下一首播放队列中",
                 android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 需求 2026-11-27：多选「下载」—— 把选中的在线歌曲批量加入下载队列。
+     *
+     * <p>跳过两类：本地收藏（负数 id / forceLocalPlayback，本来就是本机文件）、
+     * 已经下载过的（避免重复占空间）。音质走 DownloadManager 的默认档（exhigh），
+     * 与单曲「下载」里默认选项一致；真正的进度在下载管理页看。</p>
+     */
+    private void downloadSelected(List<Integer> positions) {
+        if (positions == null || positions.isEmpty()) {
+            return;
+        }
+        final List<Song> targets = new ArrayList<>();
+        int skipped = 0;
+        for (int position : positions) {
+            if (position < 0 || position >= items.size()) {
+                continue;
+            }
+            Song song = items.get(position);
+            if (song == null) {
+                continue;
+            }
+            if (LocalTracks.isLocalId(song.getId()) || song.isForceLocalPlayback()) {
+                skipped++;
+                continue;
+            }
+            if (com.qinghe.music163pro.manager.DownloadManager.isDownloaded(song)) {
+                skipped++;
+                continue;
+            }
+            targets.add(song);
+        }
+        if (targets.isEmpty()) {
+            toast("没有可下载的歌曲（本地或已下载 " + skipped + " 首）");
+            return;
+        }
+        final String cookie = playerManager == null ? null : playerManager.getCookie();
+        for (Song song : targets) {
+            com.qinghe.music163pro.manager.DownloadManager.downloadSong(song, cookie,
+                    new com.qinghe.music163pro.manager.DownloadManager.DownloadCallback() {
+                        @Override
+                        public void onSuccess(String filePath) {
+                        }
+
+                        @Override
+                        public void onError(String message) {
+                            // 单曲失败只记日志：批量场景下逐条弹 toast 会把屏幕刷满
+                            com.qinghe.music163pro.util.MusicLog.i("FavDownload",
+                                    "下载失败 " + song.getName() + ": " + message);
+                        }
+                    });
+        }
+        if (multiSelect != null) {
+            multiSelect.exitSelectionMode();
+        }
+        toast("已加入下载队列 " + targets.size() + " 首"
+                + (skipped > 0 ? "，跳过 " + skipped + " 首" : ""));
     }
 
     private void confirmDeleteSelected(List<Integer> positions) {
