@@ -14,11 +14,7 @@ import android.text.util.Linkify;
 import androidx.core.content.ContextCompat;
 
 import com.qinghe.music163pro.R;
-import com.qinghe.music163pro.api.ImoowApiHelper;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * About page - shows app name, version, developer, description, update summary.
@@ -26,8 +22,17 @@ import java.util.List;
  */
 public class AboutActivity extends BaseWatchActivity {
 
-    private static final String DEFAULT_OVERVIEW =
-            "加载中...";
+    /**
+     * 软件概述（2026-11-28 需求：简介改成本地内置文案）。
+     *
+     * <p>以前这一段和更新日志都是从在线接口拉的，断网/接口挂了就只剩「加载中…」。
+     * 简介本来就不常变，直接内置；更新日志再单独去更新清单里取。</p>
+     */
+    private static final String OVERVIEW =
+            "163音乐Pro 是基于「163MusicPro」修改的智能手表版网易云音乐客户端。\n"
+            + "目标是把「听歌」这件事在手表小屏上做完整：在线与本地播放、逐行/翻译歌词、"
+            + "下载与导出、局域网传歌、B 站音频、均衡器与表冠音量，都能在表盘上直接操作。\n"
+            + "界面按 320×360 级小屏重排，支持界面缩放与页面字号、主题配色与背景自定义。";
 
     private TextView overviewTextView;
     private LinearLayout updateContainer;
@@ -70,7 +75,8 @@ public class AboutActivity extends BaseWatchActivity {
 
         // Developer
         content.addView(makeSpacer(px(4)));
-        content.addView(makeText("开发者: Qinghe", 0xFFCCCCCC, px(16), false, Gravity.CENTER));
+        content.addView(makeText("开发者: Qinghe（上游）· HMZ137（本修改版）",
+                0xFFCCCCCC, px(16), false, Gravity.CENTER));
         content.addView(makeSpacer(px(4)));
         content.addView(makeText("官网: ", 0xFFCCCCCC, px(16), false, Gravity.CENTER));
         TextView linkTv = makeText("https://163.imoow.com", 0xFF5599CC, px(16), false, Gravity.CENTER);
@@ -85,7 +91,7 @@ public class AboutActivity extends BaseWatchActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("软件概述", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
-        overviewTextView = makeText(DEFAULT_OVERVIEW, 0xFFAAAAAA, px(15), false, Gravity.START);
+        overviewTextView = makeText(OVERVIEW, 0xFFAAAAAA, px(15), false, Gravity.START);
         content.addView(overviewTextView);
 
         // Divider
@@ -100,7 +106,7 @@ public class AboutActivity extends BaseWatchActivity {
                 0xFFAAAAAA, px(14), false, Gravity.START));
         content.addView(makeSpacer(px(6)));
         // Email row
-        content.addView(makeIconTextRow(R.drawable.ic_email, "邮箱：mail@9x.hk",
+        content.addView(makeIconTextRow(R.drawable.ic_email, "邮箱：soupcomein@outlook.com",
                 0xFF5599CC, px(14), true));
         content.addView(makeSpacer(px(4)));
         // QQ row
@@ -114,87 +120,67 @@ public class AboutActivity extends BaseWatchActivity {
         updateContainer = new LinearLayout(this);
         updateContainer.setOrientation(LinearLayout.VERTICAL);
         content.addView(updateContainer);
-        renderAboutContent(DEFAULT_OVERVIEW, getDefaultUpdateLogs());
 
         scrollView.addView(content);
         setContentView(scrollView);
-        loadAboutContent();
+        // 简介已内置，只有「更新日志」需要联网（取更新清单里的 notes）
+        renderUpdateLog(null, null);
+        loadUpdateLog();
     }
 
-    private void loadAboutContent() {
-        ImoowApiHelper.fetchAboutContent(new ImoowApiHelper.AboutCallback() {
-            @Override
-            public void onResult(ImoowApiHelper.AboutContent aboutContent) {
-                String overview = aboutContent.getOverview();
-                List<ImoowApiHelper.UpdateLogItem> updateItems = aboutContent.getUpdateContent();
-                if (overview == null || overview.trim().isEmpty()) {
-                    overview = DEFAULT_OVERVIEW;
-                }
-                if (updateItems == null || updateItems.isEmpty()) {
-                    updateItems = getDefaultUpdateLogs();
-                }
-                renderAboutContent(overview, updateItems);
-            }
-
-            @Override
-            public void onError(String error) {
-                renderAboutContent(DEFAULT_OVERVIEW, getDefaultUpdateLogs());
-            }
-        });
+    /**
+     * 更新日志改用「更新清单」（updates/manifest.json → 兜底 update.json）里的 notes。
+     *
+     * <p>清单是 App 检查更新时本来就要读的那份，改动集中在 notes 一个字段里，
+     * 发版时改一处，检测更新和关于页就同时更新了 —— 不再依赖第三方 about 接口。</p>
+     */
+    private void loadUpdateLog() {
+        new Thread(() -> {
+            final org.json.JSONObject manifest =
+                    com.qinghe.music163pro.util.UpdateChecker.fetchManifest();
+            final String version = manifest == null ? null
+                    : manifest.optString("versionName", "");
+            final String notes = manifest == null ? null : manifest.optString("notes", "");
+            runOnUiThread(() -> renderUpdateLog(version, notes));
+        }, "about-updatelog").start();
     }
 
-    private void renderAboutContent(String overview, List<ImoowApiHelper.UpdateLogItem> updateItems) {
-        overviewTextView.setText(overview);
+    /**
+     * 渲染「最新改动」。notes 的格式是更新清单里那种「1. xxx\n2. xxx」，
+     * 这里拆成逐条圆点；没有网络/没有 notes 时给一句明确的状态，而不是一直转圈。
+     */
+    private void renderUpdateLog(String version, String notes) {
         updateContainer.removeAllViews();
+        updateContainer.addView(makeSpacer(px(8)));
+        updateContainer.addView(makeText(
+                version == null || version.isEmpty() ? "最新改动" : version + " 更新内容",
+                0xFFFFFFFF, px(18), true, Gravity.START));
+        updateContainer.addView(makeSpacer(px(4)));
 
-        if (updateItems == null || updateItems.isEmpty()) {
-            updateContainer.addView(makeSpacer(px(8)));
-            updateContainer.addView(makeText("暂无更新日志", 0xFFAAAAAA, px(15), false, Gravity.START));
-            return;
-        }
-
-        for (int i = 0; i < updateItems.size(); i++) {
-            ImoowApiHelper.UpdateLogItem item = updateItems.get(i);
-            if (i > 0) {
-                updateContainer.addView(makeSpacer(px(8)));
-                updateContainer.addView(makeDivider());
-            }
-            updateContainer.addView(makeSpacer(px(8)));
-            updateContainer.addView(makeText(item.getVersion() + " 更新内容",
-                    0xFFFFFFFF, px(18), true, Gravity.START));
-            updateContainer.addView(makeSpacer(px(4)));
-            updateContainer.addView(makeText(formatUpdateContent(item.getContent()),
-                    0xFFAAAAAA, px(15), false, Gravity.START));
-        }
+        String body = formatNotes(notes);
+        updateContainer.addView(makeText(body, 0xFFAAAAAA, px(15), false, Gravity.START));
     }
 
-    private String formatUpdateContent(List<String> contentItems) {
-        if (contentItems == null || contentItems.isEmpty()) {
-            return "• 暂无详细内容";
+    private String formatNotes(String notes) {
+        if (notes == null || notes.trim().isEmpty()) {
+            return "• 未获取到最新改动（可能是离线，或清单里还没填 notes）";
         }
         StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < contentItems.size(); i++) {
-            String item = contentItems.get(i);
-            if (item == null || item.trim().isEmpty()) {
+        for (String line : notes.split("\\r?\\n")) {
+            String item = line.trim();
+            if (item.isEmpty()) {
                 continue;
             }
+            // 清单里是「1. xxx」这种编号，转成圆点后去掉原编号
+            item = item.replaceFirst("^\\d+[.、)]\\s*", "");
             if (builder.length() > 0) {
                 builder.append('\n');
             }
-            if (item.startsWith("•")) {
-                builder.append(item);
-            } else {
-                builder.append("• ").append(item);
-            }
+            builder.append("• ").append(item);
         }
-        return builder.length() == 0 ? "• 暂无详细内容" : builder.toString();
-    }
-
-    private List<ImoowApiHelper.UpdateLogItem> getDefaultUpdateLogs() {
-        List<ImoowApiHelper.UpdateLogItem> items = new ArrayList<>();
-        items.add(new ImoowApiHelper.UpdateLogItem("加载中...", Arrays.asList(
-                "加载中...")));
-        return items;
+        return builder.length() == 0
+                ? "• 未获取到最新改动（可能是离线，或清单里还没填 notes）"
+                : builder.toString();
     }
 
     private TextView makeText(String text, int color, int sizePx, boolean bold, int gravity) {
