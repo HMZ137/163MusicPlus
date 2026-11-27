@@ -39,6 +39,9 @@ public final class TitleBarCollapse {
 
     private static final String TAG = "TitleBarCollapse";
 
+    /** 设置项：标题栏上滑收起（设置 → 交互与浮层）。 */
+    public static final String PREF_ENABLED = "title_bar_collapse_enabled";
+
     /** 触发一次收起/展开所需的最小竖直位移（设计基准 320 宽下的 px，经 px() 换算）。 */
     private static final int SWIPE_THRESHOLD_BASE = 26;
     /** 收起/展开动画时长。 */
@@ -123,6 +126,11 @@ public final class TitleBarCollapse {
         if (titleBar == null) {
             return;
         }
+        // 2026-11-28：设置里可以关掉「标题栏上滑收起」。
+        // 判断放在手势入口而不是登记时，改完设置不用重进页面就生效。
+        if (!isEnabled(activity)) {
+            return;
+        }
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 DOWN_Y.put(activity, ev.getY());
@@ -152,8 +160,16 @@ public final class TitleBarCollapse {
         }
     }
 
-    /** 页面重新进入时复位为展开（G3 验收：返回再进入时状态复位）。 */
-    public static void reset(Activity activity) {
+    /** 是否启用「上滑收起」（默认开）。 */
+    public static boolean isEnabled(Activity activity) {
+        if (activity == null) {
+            return true;
+        }
+        return activity.getSharedPreferences("music163_settings", Activity.MODE_PRIVATE)
+                .getBoolean(PREF_ENABLED, true);
+    }
+
+    /** 页面重新进入时复位为展开（G3 验收：返回再进入时状态复位）。 */    public static void reset(Activity activity) {
         View titleBar = activity == null ? null : TITLE_BARS.get(activity);
         cancelAutoExpand(activity);
         if (titleBar != null) {

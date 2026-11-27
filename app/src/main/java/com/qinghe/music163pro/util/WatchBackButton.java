@@ -142,6 +142,7 @@ public final class WatchBackButton {
         // G3：把标题栏登记为「可上滑收起 / 下滑展开」。挂在这个统一时机上，
         // 所有走本方法的页面一次性接入；标题仍在滚动容器里的页面会被 skip 并留日志。
         TitleBarCollapse.register(activity, titleBar);
+        TitleBarLongPress.attach(activity, titleBar);
         // 下限留够一行标题的高度，再压就压到字上去了
         int reserved = Math.max(dp(activity, 26),
                 getReservedTopHeight(activity) - Math.max(0, shrinkPx));
@@ -201,6 +202,7 @@ public final class WatchBackButton {
         }
         // G3：与两行版同一时机登记「可上滑收起 / 下滑展开」。
         TitleBarCollapse.register(activity, titleBar);
+        TitleBarLongPress.attach(activity, titleBar);
         ViewGroup.LayoutParams params = titleBar.getLayoutParams();
         if (params != null) {
             // 竖直仍要撑到返回按钮底边，否则紧跟着的信息行 / 列表会被浮动按钮压住
@@ -297,6 +299,7 @@ public final class WatchBackButton {
         }
         // G3：同上，统一时机登记标题栏（上滑收起 / 下滑展开）
         TitleBarCollapse.register(activity, titleBar);
+        TitleBarLongPress.attach(activity, titleBar);
         int reserved = getReservedStartPadding(activity);
         int current = params.height;
         // wrap_content 是 -2、match_parent 是 -1，都不是「实际高度」。

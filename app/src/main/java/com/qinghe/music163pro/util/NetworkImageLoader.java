@@ -223,7 +223,9 @@ public final class NetworkImageLoader {
     public static void attachListViewOptimization(final AbsListView listView,
                                                   final BaseAdapter adapter,
                                                   final CoverUrlProvider provider) {
-        listView.setOnScrollListener(new AbsListView.OnScrollListener() {
+        // 2026-11-28：改走「一装多订阅」的分发器 —— setOnScrollListener 只有一个槽位，
+        // 多选动作栏的「滚动收起」也要用滚动事件，直接 set 会把这里顶掉（封面就不再按需加载）。
+        ListScrollDispatcher.add(listView, new ListScrollDispatcher.Listener() {
             @Override
             public void onScrollStateChanged(AbsListView view, int scrollState) {
                 onListScrollStateChanged(view, adapter, scrollState, provider);

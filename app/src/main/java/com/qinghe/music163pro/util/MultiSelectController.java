@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -114,6 +115,10 @@ public final class MultiSelectController {
     private final AdapterView.OnItemLongClickListener originalLongClickListener;
 
     private LinearLayout actionBar;
+    /** 动作按钮区（不含标题行）。滚动时只收这部分，标题「已选 N 首 / 取消」保留。 */
+    private LinearLayout actionsContainer;
+    /** 设置项：多选动作栏滚动时收起（设置 → 交互与浮层）。 */
+    public static final String PREF_SCROLL_COLLAPSE = "multiselect_bar_scroll_collapse";
     private TextView headerView;
     private boolean selectionMode;
     private boolean enabled = true;
@@ -171,6 +176,29 @@ public final class MultiSelectController {
                         && originalLongClickListener.onItemLongClick(parent, view, position, id);
             }
         });
+
+        // 2026-11-28：滚动列表时把动作按钮区收起来，只看得到「已选 N 首 / 取消」；
+        // 停下来再展开。走分发器而不是 setOnScrollListener，避免顶掉封面按需加载。
+        ListScrollDispatcher.add(listView, new ListScrollDispatcher.Listener() {
+            @Override
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+                if (!selectionMode) {
+                    return;
+                }
+                setActionsCollapsed(scrollState != AbsListView.OnScrollListener.SCROLL_STATE_IDLE);
+            }
+        });
+    }
+
+    /** 收起 / 展开动作按钮区（受设置开关控制）。 */
+    private void setActionsCollapsed(boolean collapsed) {
+        if (actionsContainer == null || actionBar == null
+                || actionBar.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        boolean allowed = activity.getSharedPreferences("music163_settings", Activity.MODE_PRIVATE)
+                .getBoolean(PREF_SCROLL_COLLAPSE, true);
+        actionsContainer.setVisibility(collapsed && allowed ? View.GONE : View.VISIBLE);
     }
 
     /**
@@ -235,6 +263,7 @@ public final class MultiSelectController {
         if (actionBar != null) {
             actionBar.setVisibility(View.GONE);
         }
+        setActionsCollapsed(false);
         notifyRowsChanged();
     }
 
@@ -244,6 +273,7 @@ public final class MultiSelectController {
         selectionMode = true;
         select(position, true);
         ensureActionBar();
+        setActionsCollapsed(false);
         notifyRowsChanged();
     }
 
@@ -304,6 +334,8 @@ public final class MultiSelectController {
         // 三个动作挤在一行时，每个按钮只有约 1/3 屏宽：「加入歌单 / 移出列表」这四个字放不下会被
         // 折成两行，而「收藏」只有一行 —— 三个按钮看起来大小不一（实机截图确认）。两两成行后按钮
         // 宽度翻倍，四个字能单行放下，三个按钮也就自然等大了。
+        actionsContainer = new LinearLayout(activity);
+        actionsContainer.setOrientation(LinearLayout.VERTICAL);
         final int perRow = 2;
         for (int i = 0; i < actions.size(); i += perRow) {
             LinearLayout actionRow = new LinearLayout(activity);
@@ -330,8 +362,9 @@ public final class MultiSelectController {
                 ((LinearLayout.LayoutParams) raw).rightMargin = 0;
                 last.setLayoutParams(raw);
             }
-            bar.addView(actionRow);
+            actionsContainer.addView(actionRow);
         }
+        bar.addView(actionsContainer);
 
         // 参数必须在 addView 时一起传：先 setLayoutParams 再 addView 在部分容器上会被重新生成，
         // 结果就是「gravity=BOTTOM」丢失、动作条跑到屏幕顶部（两行版本实机复现）。

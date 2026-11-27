@@ -263,13 +263,13 @@ public class SettingsPageActivity extends BaseWatchActivity {
                         }));
 
         addSection("播放行为");
-        addSwitchRow("随机切歌", "随机播放模式下用表冠/按键随机切序",
+        addSwitchRow("随机歌序", "随机 / 列表顺序",
                 prefs.getBoolean(PREF_RANDOM_SKIP_RANDOM, false),
                 (btn, on) -> prefs.edit().putBoolean(PREF_RANDOM_SKIP_RANDOM, on).apply());
         addSwitchRow("跳过试听歌曲", "VIP 歌曲只播试听片段时自动跳下一首",
                 prefs.getBoolean(PREF_SKIP_TRIAL_SONGS, false),
                 (btn, on) -> prefs.edit().putBoolean(PREF_SKIP_TRIAL_SONGS, on).apply());
-        addSwitchRow("使用手表解析接口", "关闭后改用手机解析（默认开）",
+        addSwitchRow("手表接口解析", "使用手表接口解析音乐，可免费听部分 xtc 版可听的 VIP 歌曲",
                 prefs.getBoolean(PREF_USE_WATCH_API, true),
                 (btn, on) -> prefs.edit().putBoolean(PREF_USE_WATCH_API, on).apply());
         addSwitchRow("定时结束后退出 App", "倒计时结束时关闭应用",
@@ -302,7 +302,9 @@ public class SettingsPageActivity extends BaseWatchActivity {
         });
         final TextView speedRow = addValueRow("变速模式", speedModeLabel());
         ((LinearLayout) speedRow.getParent()).setOnClickListener(v -> {
-            int next = (prefs.getInt("speed_mode", 0) + 1) % 3;
+            // 2026-11-28：按「仅变音 → 仅变速 → 变音变速」的顺序循环
+            int cur = prefs.getInt("speed_mode", 0);
+            int next = cur == 2 ? 0 : cur == 0 ? 1 : 2;
             prefs.edit().putInt("speed_mode", next).apply();
             speedRow.setText(speedModeLabel());
         });
@@ -326,11 +328,15 @@ public class SettingsPageActivity extends BaseWatchActivity {
         return "本地与在线";
     }
 
+    /**
+     * 变速模式的显示名，与播放器实现一一对应（见 MusicPlayerManager#setSpeedMode）：
+     * 0 = 速度变、音调不变 → 仅变速；1 = 两者都变 → 变音变速；2 = 只改音调 → 仅变音。
+     */
     private String speedModeLabel() {
         switch (prefs.getInt("speed_mode", 0)) {
-            case 1: return "慢速优先";
-            case 2: return "关闭";
-            default: return "自动";
+            case 1: return "变音变速";
+            case 2: return "仅变音";
+            default: return "仅变速";
         }
     }
 
@@ -353,9 +359,27 @@ public class SettingsPageActivity extends BaseWatchActivity {
         addSwitchRow("显示全局返回按钮", "左上角常驻的圆形返回按钮",
                 prefs.getBoolean("show_back_button", true),
                 (btn, on) -> prefs.edit().putBoolean("show_back_button", on).apply());
+        // 2026-11-28：长按标题栏回主界面 / 标题栏上滑收起 / 多选栏滚动收起
+        addSwitchRow("长按标题栏回主界面", "二级页长按标题栏一步回播放页",
+                prefs.getBoolean(com.qinghe.music163pro.util.TitleBarLongPress.PREF_ENABLED, true),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.TitleBarLongPress.PREF_ENABLED, on).apply());
+        addSwitchRow("标题栏上滑收起", "上滑收起标题栏，下滑或 2.5 秒后展开",
+                prefs.getBoolean(com.qinghe.music163pro.util.TitleBarCollapse.PREF_ENABLED, true),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.TitleBarCollapse.PREF_ENABLED, on).apply());
+        addSwitchRow("多选栏滚动收起", "多选时滚动列表只留「已选 N 首」一行",
+                prefs.getBoolean(
+                        com.qinghe.music163pro.util.MultiSelectController.PREF_SCROLL_COLLAPSE, true),
+                (btn, on) -> prefs.edit().putBoolean(
+                        com.qinghe.music163pro.util.MultiSelectController.PREF_SCROLL_COLLAPSE, on)
+                        .apply());
 
         addSection("听歌识曲");
-        final TextView recRow = addValueRow("识曲模式", recognitionModeLabel());
+        // 2026-11-28：补上两种模式的差别说明
+        final TextView recRow = addValueRow("识曲模式",
+                "自动：每 3 秒尝试识别一次；手动：单击结束后才识别",
+                recognitionModeLabel());
         ((LinearLayout) recRow.getParent()).setOnClickListener(v -> {
             int next = prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO) == MODE_MANUAL
                     ? MODE_AUTO : MODE_MANUAL;
@@ -406,33 +430,95 @@ public class SettingsPageActivity extends BaseWatchActivity {
                 ? "手动" : "自动";
     }
 
+    /** 2026-11-28：选项名改为「阻塞 / 每行」（原「分块 / 跟随」）。 */
     private String lyricScrollModeLabel() {
         return prefs.getInt(PREF_LYRIC_SCROLL_MODE, LYRIC_MODE_BLOCK) == LYRIC_MODE_FOLLOW
-                ? "跟随" : "分块";
+                ? "每行" : "阻塞";
     }
 
     // ==================== 数据与工具 ====================
 
     private void buildData() {
         addSection("存储");
-        addRow("清理缓存", "元信息索引 / 本地音乐列表缓存", () ->
-                com.qinghe.music163pro.util.WatchMenuDialog.show(this, "清理缓存",
-                        new String[]{"清理元信息索引", "清理本地音乐列表缓存", "全部清理"},
-                        index -> {
-                            if (index == 0 || index == 2) {
-                                com.qinghe.music163pro.util.LocalMetadataIndex.clear(this);
-                            }
-                            if (index == 1 || index == 2) {
-                                com.qinghe.music163pro.util.LocalMusicCache.invalidate(this);
-                                com.qinghe.music163pro.util.LocalLibraryCache.clear();
-                            }
-                            Toast.makeText(this, "已清理，下次进入本地音乐会重新扫描",
-                                    Toast.LENGTH_SHORT).show();
-                        }));
+        // 2026-11-28：清理缓存行显示实时占用（小字），菜单里多一个「清理整个缓存区」
+        cacheSubView = addRowWithSub("清理缓存", "统计中…", this::showClearCacheMenu);
+        refreshCacheStat();
         addRow("编辑更多页面", "自定义「更多」页显示项", () ->
                 startActivity(new Intent(this, EditMoreActivity.class)));
         addRow("其它工具", "导出音乐 / 小天才模块", () ->
                 startActivity(new Intent(this, SettingsActivity.class)));
+    }
+
+    /** 清理缓存行的小字控件（要在统计完成后原地改字）。 */
+    private TextView cacheSubView;
+    /** 最近一次统计结果的文案（菜单标题里复用，避免再遍历一次磁盘）。 */
+    private String cacheStatText = "";
+
+    /**
+     * 清理缓存菜单。
+     *
+     * <p>原有的三项（元信息索引 / 本地音乐列表缓存 / 全部清理）之外，新增「清理整个缓存区」——
+     * 直接清 app 私有 cacheDir 与历史更新包（见 {@link com.qinghe.music163pro.util.CacheManager}）。
+     * 「全部清理」= 三项一起，因此也包含整区清理。</p>
+     */
+    private void showClearCacheMenu() {
+        com.qinghe.music163pro.util.WatchMenuDialog.show(this, "清理缓存",
+                new String[]{"清理元信息索引", "清理本地音乐列表缓存",
+                        "清理整个缓存区" + (cacheStatText.isEmpty() ? "" : "（" + cacheStatText + "）"),
+                        "全部清理"},
+                index -> {
+                    boolean all = index == 3;
+                    boolean metaIndex = index == 0 || all;
+                    boolean listCache = index == 1 || all;
+                    boolean whole = index == 2 || all;
+                    if (metaIndex) {
+                        com.qinghe.music163pro.util.LocalMetadataIndex.clear(this);
+                    }
+                    if (listCache) {
+                        com.qinghe.music163pro.util.LocalMusicCache.invalidate(this);
+                        com.qinghe.music163pro.util.LocalLibraryCache.clear();
+                    }
+                    if (whole) {
+                        clearWholeCacheArea();
+                    } else {
+                        Toast.makeText(this, "已清理，下次进入本地音乐会重新扫描",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                    refreshCacheStat();
+                });
+    }
+
+    /** 清 app 私有缓存目录 + 历史更新包（含内存封面缓存），后台执行。 */
+    private void clearWholeCacheArea() {
+        new Thread(() -> {
+            final boolean ok = com.qinghe.music163pro.util.CacheManager
+                    .clearAll(getApplicationContext());
+            runOnUiThread(() -> {
+                if (isFinishing()) {
+                    return;
+                }
+                com.qinghe.music163pro.util.UiKit.toast(this,
+                        ok ? "已清理整个缓存区" : "部分缓存文件清理失败，请重试");
+            });
+        }, "clear-cache").start();
+    }
+
+    /** 后台统计缓存占用，回来后写成「占用 12.3 MB · 56 个文件」这种小字。 */
+    private void refreshCacheStat() {
+        final TextView target = cacheSubView;
+        new Thread(() -> {
+            final com.qinghe.music163pro.util.CacheManager.CacheStat stat =
+                    com.qinghe.music163pro.util.CacheManager.getStat(getApplicationContext());
+            final String text = "占用 "
+                    + com.qinghe.music163pro.util.CacheManager.formatSize(stat.getTotalBytes())
+                    + " · " + stat.fileCount + " 个文件";
+            runOnUiThread(() -> {
+                cacheStatText = text;
+                if (!isFinishing() && target != null) {
+                    target.setText(text);
+                }
+            });
+        }, "cache-stat").start();
     }
 
     // ==================== 关于 ====================
@@ -603,6 +689,19 @@ public class SettingsPageActivity extends BaseWatchActivity {
         container.addView(row);
     }
 
+    /**
+     * 和 {@link #addRow} 一样，但把「说明那一行」返回给调用方，方便之后原地改文字
+     * （2026-11-28：清理缓存要显示实时占用）。这类动态说明一律**不折叠**，
+     * 否则它会把整行的点击吃掉 —— 行本身是要点的按钮。
+     */
+    private TextView addRowWithSub(String title, String sub, Runnable action) {
+        LinearLayout row = buildRow(title, sub, false);
+        row.setOnClickListener(v -> action.run());
+        container.addView(row);
+        // buildRow 的两个子 View 依次是标题、说明
+        return row.getChildCount() > 1 ? (TextView) row.getChildAt(1) : null;
+    }
+
     /** 「标题 + 副标题 + MD3 开关」行（需求 2026-11-21：纯开关不再用「开/关」文字指示）。 */
     private void addSwitchRow(String title, String sub, boolean initial,
                               android.widget.CompoundButton.OnCheckedChangeListener l) {
@@ -650,6 +749,14 @@ public class SettingsPageActivity extends BaseWatchActivity {
     }
 
     private TextView addValueRow(String title, String initialValue) {
+        return addValueRow(title, null, initialValue);
+    }
+
+    /**
+     * 带说明的「标题 + 说明 + 右侧数值」行（2026-11-28：识曲模式这类需要解释的取值项）。
+     * sub 传 null 时与 {@link #addValueRow(String, String)} 完全一致。
+     */
+    private TextView addValueRow(String title, String sub, String initialValue) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -663,14 +770,33 @@ public class SettingsPageActivity extends BaseWatchActivity {
         row.setClickable(true);
         row.setFocusable(true);
 
-        TextView t = new TextView(this);
-        t.setText(title);
-        t.setTextColor(getResources().getColor(R.color.text_primary));
-        t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
-        t.setLayoutParams(new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        t.setSingleLine(true);
-        row.addView(t);
+        if (sub == null || sub.isEmpty()) {
+            TextView t = new TextView(this);
+            t.setText(title);
+            t.setTextColor(getResources().getColor(R.color.text_primary));
+            t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+            t.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            t.setSingleLine(true);
+            row.addView(t);
+        } else {
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setOrientation(LinearLayout.VERTICAL);
+            textCol.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            TextView t = new TextView(this);
+            t.setText(title);
+            t.setTextColor(getResources().getColor(R.color.text_primary));
+            t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+            t.setSingleLine(true);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                t.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1,
+                        android.util.TypedValue.COMPLEX_UNIT_SP);
+            }
+            textCol.addView(t);
+            textCol.addView(makeDescriptionText(sub));
+            row.addView(textCol);
+        }
 
         TextView value = new TextView(this);
         value.setText(initialValue);
@@ -684,6 +810,14 @@ public class SettingsPageActivity extends BaseWatchActivity {
     }
 
     private LinearLayout buildRow(String title, String sub) {
+        return buildRow(title, sub, true);
+    }
+
+    /**
+     * @param foldable 说明文字是否允许「一行省略 → 点开」；动态/数值类说明传 false，
+     *                 这样整行都保持可点（点哪儿都触发这一行的动作）。
+     */
+    private LinearLayout buildRow(String title, String sub, boolean foldable) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(dpToPx(16), dpToPx(7), dpToPx(16), dpToPx(7));
@@ -708,7 +842,7 @@ public class SettingsPageActivity extends BaseWatchActivity {
         }
         row.addView(t);
 
-        TextView s = makeDescriptionText(sub);
+        TextView s = makeDescriptionText(sub, foldable);
         row.addView(s);
         return row;
     }
@@ -726,13 +860,17 @@ public class SettingsPageActivity extends BaseWatchActivity {
      * </ul>
      */
     private TextView makeDescriptionText(String sub) {
+        return makeDescriptionText(sub, true);
+    }
+
+    private TextView makeDescriptionText(String sub, boolean foldable) {
         String text = sub == null ? "" : sub;
         TextView s = new TextView(this);
         s.setText(text);
         s.setTextColor(getResources().getColor(R.color.text_secondary));
         s.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
         s.setPadding(0, dpToPx(2), 0, 0);
-        if (text.length() < SHORT_DESC_MAX) {
+        if (!foldable || text.length() < SHORT_DESC_MAX) {
             s.setSingleLine(true);
             s.setEllipsize(android.text.TextUtils.TruncateAt.END);
             return s;
