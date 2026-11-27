@@ -28,7 +28,7 @@ public final class ExportHelper {
         void onFinished(String message);
     }
 
-    /** F6：强制覆盖（一次性行为选项，用后自动复位）。 */
+    /** 强制覆盖（默认跳过）。勾选状态在本次会话内保留，下次打开导出默认还是上次的选择。 */
     private static boolean forceOverwrite = false;
 
     private ExportHelper() {
@@ -49,20 +49,16 @@ public final class ExportHelper {
                 new File(external, "Download/163Music导出").getAbsolutePath(),
                 new File(external, "163Music/导出").getAbsolutePath(),
         };
-        // 条目单行显示：标签改短，保证「目录名 / 强制覆盖开关」在 1 行内不被省略号吃掉
+        // 2026-11-28：菜单里不再放「强制覆盖」——
+        // 那一项点一下会关掉当前浮窗再弹一个新的（只为改个文案），体验很突兀。
+        // 现在覆盖开关改到下一步「导出确认」里的复选框，同一个浮窗内勾选即可。
         final String[] labels = {"Music 文件夹", "Music/163Music", "Download 目录",
-                "163Music/导出",
-                forceOverwrite ? "强制覆盖：已开" : "强制覆盖：已关",
-                "自定义路径…"};
+                "163Music/导出", "自定义路径…"};
         Runnable[] actions = {
                 () -> confirm(activity, callback, targets[0]),
                 () -> confirm(activity, callback, targets[1]),
                 () -> confirm(activity, callback, targets[2]),
                 () -> confirm(activity, callback, targets[3]),
-                () -> {
-                    forceOverwrite = !forceOverwrite;   // 一次性行为选项
-                    chooseTarget(activity, callback);   // 重画菜单以显示新状态
-                },
                 () -> promptCustomTarget(activity, callback)
         };
         WatchMenuDialog.show(activity, "导出到文件夹", labels, which -> {
@@ -86,6 +82,7 @@ public final class ExportHelper {
                 });
     }
 
+    /** 第二步：确认 + 「同名文件覆盖」复选框（同一浮窗内完成，不再刷新新浮窗）。 */
     private static void confirm(final Activity activity, final Callback callback,
                                 final String targetDir) {
         // 浮窗高度有限：全路径会折成 4 行，把底部按钮挤出屏幕，所以统一压成 /sdcard 别名
@@ -94,15 +91,20 @@ public final class ExportHelper {
         if (root != null && !root.isEmpty() && shown != null && shown.startsWith(root)) {
             shown = "/sdcard" + shown.substring(root.length());
         }
-        WatchConfirmDialog.show(activity, "导出确认",
-                "目标：" + shown + "\n"
-                        + (forceOverwrite ? "同名文件：覆盖" : "同名文件：跳过不覆盖"),
-                () -> run(activity, callback, targetDir),
-                WatchConfirmDialog.Options.defaultOptions());
+        final WatchPopup popup = WatchPopup.create(activity)
+                .title("导出确认")
+                .content("目标：" + shown + "\n复制一份到该目录，原下载不受影响。")
+                .checkbox("同名文件：覆盖（不勾选则跳过）", forceOverwrite)
+                .cancelButton();
+        popup.primaryButton("开始导出", text -> {
+            forceOverwrite = popup.isCheckboxChecked();
+            run(activity, callback, targetDir, forceOverwrite);
+        });
+        popup.show();
     }
 
     private static void run(final Activity activity, final Callback callback,
-                            final String targetDir) {
+                            final String targetDir, final boolean force) {
         if (activity == null || activity.isFinishing()) {
             return;
         }
@@ -110,8 +112,6 @@ public final class ExportHelper {
         if (callback != null) {
             callback.onStart();
         }
-        final boolean force = forceOverwrite;
-        forceOverwrite = false;   // 一次性：下次进来回到默认关
         new Thread(() -> ExportManager.exportAll(activity.getApplicationContext(), targetDir, force,
                 new ExportManager.ExportCallback() {
                     @Override
