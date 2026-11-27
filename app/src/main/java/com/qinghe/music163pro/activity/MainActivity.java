@@ -927,8 +927,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Row 1: 收藏 + 下载
         //
         // 本地音乐（下载来的 / 自己拷进来的）用不了云端那一套：没有网易云 id 就查不到音质、
-        // 评论、歌单，下载与设铃声也没有意义。所以按 localOnly 把不可用的项去掉，
-        // 并把「收藏」换成只写本地库、带本地标签的「收藏本地音乐」。
+        // 评论、歌单，下载与设铃声也没有意义。所以按 localOnly 把不可用的项去掉。
+        // 2026-11-27：本地歌曲的「收藏本地音乐」入口已按要求删除（见下方 row1）。
         final boolean localOnly = LocalTracks.isLocalOnly(song);
         // 本地播放模式下整机都不该再出现云端动作 —— 即使当前这首是云歌
         // （比如切模式之前就排在队列里的），下载 / 评论 / 歌单 / 音质 也一样点不通。
@@ -953,16 +953,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // 本地播放模式下，云歌没有「能收藏进去的地方」—— 本地收藏库是按文件路径存键的，
         // 云歌的流地址会过期，存进去就是一条查不回来的死记录。所以这种情况直接不显示收藏，
         // 而不是让它去写一个没有意义的负数 id。
-        if (localOnly || !localMode) {
+        //
+        // 2026-11-27 需求：「收藏本地音乐」这个功能已经砍掉，本地歌曲不再出现收藏项
+        // （本地条目只走本地库，已没有对应的收藏语义）。这里只保留在线歌曲的收藏/取消收藏。
+        if (!localOnly && !localMode) {
             row1.addView(createFuncItem(isFav ? R.drawable.ic_favorite : R.drawable.ic_favorite_border,
-                    localOnly ? (isFav ? "取消收藏" : "收藏本地音乐") : (isFav ? "取消收藏" : "收藏"),
-                    v -> {
-                        if (localOnly) {
-                            onFuncFavoriteLocal(song);
-                        } else {
-                            onFuncFavorite(song);
-                        }
-                    }));
+                    isFav ? "取消收藏" : "收藏",
+                    v -> onFuncFavorite(song)));
         }
         if (!cloudBlocked) {
             row1.addView(createFuncItem(R.drawable.ic_get_app, "下载",
@@ -1363,6 +1360,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.setPadding(0, dp(4), 0, 0);
         row4.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // 2026-11-27 需求：B 站播放选项也加「播放列表」—— 范围/行为与普通播放选项里的
+        // 同名项一致（当前播放队列：点歌切歌、排序、A-Z 跳转），只是不走「视频列表」那条
+        // 会跳进 UP/合集页的路径。
+        row4.addView(createFuncItem(R.drawable.ic_queue_music, "播放列表", v -> {
+            dismissOverlay();
+            showPlaylistOverlay();
+        }));
         row4.addView(createFuncItem(R.drawable.ic_link, "复制链接",
                 v -> copyBilibiliVideoLink(song)));
         contentLayout.addView(row4);
@@ -2600,36 +2604,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /**
-     * 收藏 / 取消收藏一首本地音乐。
+     * 2026-11-27：「收藏本地音乐」已整体下线（需求：该功能已砍）。
      *
-     * <p>本地文件没有网易云 id，云端收藏无从谈起，所以这里**强制只写本地收藏库**，
-     * 并且用「文件路径派生的负数 id」当键 —— 负数 id 本身就是「这是本地收藏」的标签，
-     * 后续在收藏列表里能据此打标，也能据此挡掉「添加到歌单」这类需要网易云 id 的操作。</p>
+     * <p>原实现把本地文件按「路径派生的负数 id」写进本地收藏库，供播放选项菜单里的
+     * 「收藏本地音乐 / 取消收藏」使用。菜单项删除后该方法再无调用点，一并移除，
+     * 避免以后有人照着它又把入口加回去。本地歌曲现在只通过「本地歌单」组织。</p>
      */
-    private void onFuncFavoriteLocal(Song song) {
-        String path = song.getUrl();
-        long localId = LocalTracks.idForPath(path);
-        if (localId == 0) {
-            com.qinghe.music163pro.util.UiKit.toast(this, "无法收藏：拿不到文件路径");
-            dismissOverlay();
-            return;
-        }
-
-        // 保存的条目跟原曲同名同姓，但 id 换成负数、url 指向本地文件，
-        // 这样播放时直接走本地播放，不会再去找网易云要链接。
-        Song entry = new Song(localId, song.getName(), song.getArtist(), song.getAlbum());
-        entry.setUrl(path);
-        entry.setForceLocalPlayback(true);
-
-        if (favoritesManager.isFavorite(localId)) {
-            favoritesManager.removeFavorite(entry);
-            com.qinghe.music163pro.util.UiKit.toast(this, "已取消本地收藏");
-        } else {
-            favoritesManager.addFavorite(entry);
-            com.qinghe.music163pro.util.UiKit.toast(this, "已加入本地收藏");
-        }
-        dismissOverlay();
-    }
 
     private void onFuncFavorite(Song song) {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
