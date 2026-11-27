@@ -2535,7 +2535,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         float markerCenterY = seekLocation[1] - rootLocation[1] + seekHeight / 2f;
         chorusMarkerDot.setX(markerCenterX - chorusMarkerDot.getWidth() / 2f);
         chorusMarkerDot.setY(markerCenterY - chorusMarkerDot.getHeight() / 2f);
-        chorusMarkerDot.setVisibility(View.VISIBLE);
+        // 2026-11-28：高潮点是「播放页进度条上的标记」，挂在 content 根上会跟着歌词页一起露出来。
+        // 这里按当前页决定显隐；切页时 onMainPageSelected 会再刷一次。
+        chorusMarkerDot.setVisibility(isPlayerPageVisible() ? View.VISIBLE : View.GONE);
+    }
+
+    /** 当前是否停在播放页（pager 第 0 页）。pager 还没装好时按「是」处理。 */
+    private boolean isPlayerPageVisible() {
+        return vpMainPages == null || vpMainPages.getCurrentItem() == 0;
     }
 
     private boolean hasChorusRange() {
@@ -3030,6 +3037,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         boolean lyricsPage = position == 1;
         com.qinghe.music163pro.util.MusicLog.i("Vp2", "主界面滑到 page=" + position);
         lyricsOverlayShowing = lyricsPage;
+        // 2026-11-28：高潮点是播放页进度条上的标记，切到歌词页必须收起来，
+        // 回播放页再按「有没有高潮区间」恢复。
+        if (chorusMarkerDot != null) {
+            if (lyricsPage) {
+                chorusMarkerDot.setVisibility(View.GONE);
+            } else if (hasChorusRange()) {
+                updateChorusMarker(playerManager.getDuration());
+            }
+        }
         updatePageIndicator(lyricsPage);
         if (!lyricsPage) {
             // 离开歌词页：停掉同步计时器（歌词数据保留，下次进来直接复用）
