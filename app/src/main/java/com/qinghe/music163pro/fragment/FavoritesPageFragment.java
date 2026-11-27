@@ -190,6 +190,18 @@ public abstract class FavoritesPageFragment<T> extends Fragment {
         }
     }
 
+    /**
+     * 原地增删 items 之后刷新「空态 + 信息行」。
+     *
+     * <p>{@link #notifyItemsChanged()} 只管重画行，不会动空态与数量；
+     * 异步追加上来的数据（例如云端收藏专辑）如果正好是第一条，
+     * 列表会一直停在「暂无…」上 —— 看着像没加载。</p>
+     */
+    protected final void refreshEmptyState() {
+        updateEmptyState();
+        reportSummary();
+    }
+
     /** 删掉一项并刷新（云端取消收藏 / 本地删除歌单等）。 */
     protected final void removeItemAt(int position) {
         if (position < 0 || position >= items.size()) {

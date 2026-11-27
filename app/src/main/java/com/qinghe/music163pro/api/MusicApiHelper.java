@@ -4955,24 +4955,32 @@ public class MusicApiHelper {
                 MusicLog.i(TAG, "sublist resp: "
                         + (response.length() > 400 ? response.substring(0, 400) + "..." : response));
                 JSONObject json = new JSONObject(response);
-                // 2026-11-22：/api/album/sublist 的真实结构是 {code, data:{data:[...], total, hasMore}}——
-                // data 是对象、数组在 data.data 里。之前直接取顶层 "data" 当数组永远为 null，
-                // 收藏专辑页因此一直空白。
+                // 2026-11-27：/api/album/sublist 的数组就在**顶层 data**，同级还有 count / hasMore：
+                //   {"code":200,"count":10,"hasMore":false,"data":[{"id":..,"name":..},…]}
+                // 11-22 那次「改成 data.data」把它改坏了 —— 顶层 data 是数组、data 当对象取自然为 null，
+                // 于是日志里一直是 count=0 / total=10，收藏专辑永远进不了歌单页。
+                // 现在按「顶层 data 数组 → data.data 数组 → albums 数组」的顺序兜底，
+                // 三种结构都能吃下来（换接口版本也不会再静默变空）。
+                JSONArray arr = json.optJSONArray("data");
                 JSONObject dataObj = json.optJSONObject("data");
-                JSONArray arr = null;
-                int totalCount = -1;
-                boolean hasMoreFlag = false;
-                if (dataObj != null) {
+                int totalCount = json.optInt("count", -1);
+                boolean hasMoreFlag = json.optBoolean("hasMore", false);
+                if (arr == null && dataObj != null) {
                     arr = dataObj.optJSONArray("data");
                     if (arr == null) {
                         arr = dataObj.optJSONArray("albums");
                     }
-                    totalCount = dataObj.optInt("total", -1);
-                    hasMoreFlag = dataObj.optBoolean("hasMore", false);
+                    if (totalCount < 0) {
+                        totalCount = dataObj.optInt("total", -1);
+                    }
+                    if (!hasMoreFlag) {
+                        hasMoreFlag = dataObj.optBoolean("hasMore", false);
+                    }
                 }
                 if (arr == null) {
                     arr = json.optJSONArray("albums");
                 }
+                // arr 为 null 只会出现在真的没有任何专辑时；此时按空列表返回，不算失败。
                 List<AlbumBrief> out = new ArrayList<>();
                 if (arr != null) {
                     for (int i = 0; i < arr.length(); i++) {

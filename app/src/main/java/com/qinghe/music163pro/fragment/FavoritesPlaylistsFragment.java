@@ -213,6 +213,8 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
                 if (isViewReady()) {
                     // 歌单拉失败也要把本地收藏专辑显示出来
                     applyItems(com.qinghe.music163pro.util.LocalAlbumFavorites.list(requireContext()));
+                    // 2026-11-27：歌单接口失败不代表专辑接口也失败，云端收藏专辑仍单独试一次
+                    loadCloudAlbums();
                 }
             }
         });
@@ -228,13 +230,18 @@ public class FavoritesPlaylistsFragment extends FavoritesPageFragment<PlaylistIn
                     public void onResult(int total, boolean hasMore,
                                          List<MusicApiHelper.AlbumBrief> albums) {
                         if (!isViewReady() || albums == null || albums.isEmpty()) return;
+                        int added = 0;
                         for (MusicApiHelper.AlbumBrief a : albums) {
                             if (a == null || a.id <= 0) continue;
                             PlaylistInfo info = new PlaylistInfo(-a.id, a.name, a.size, a.artist);
                             info.setCoverUrl(a.picUrl);
                             items.add(info);
+                            added++;
                         }
-                        notifyItemsChanged();
+                        if (added == 0) return;
+                        // 2026-11-27：追加后要连空态一起刷 —— 只 notifyDataSetChanged 的话，
+                        // 「一条歌单都没有、只有收藏专辑」的账号会一直停在「暂无云端歌单」上。
+                        refreshEmptyState();
                     }
 
                     @Override
