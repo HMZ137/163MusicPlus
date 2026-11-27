@@ -220,8 +220,8 @@ public class SettingsPageActivity extends BaseWatchActivity {
 
     private void buildPlayback() {
         addSection("音效");
-        addRow("均衡器",
-                com.qinghe.music163pro.util.EqualizerController.isEnabled(this) ? "已开启" : "已关闭",
+        addRow("音效", "均衡器 " + (com.qinghe.music163pro.util.EqualizerController.isEnabled(this)
+                        ? "已开启" : "已关闭") + " · 低音 / 响度增强",
                 () -> startActivity(new Intent(this, EqualizerActivity.class)));
 
         addSection("表冠");
