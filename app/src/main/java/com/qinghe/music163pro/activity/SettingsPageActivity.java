@@ -100,6 +100,8 @@ public class SettingsPageActivity extends BaseWatchActivity {
     private android.content.SharedPreferences prefs;
     /** 2026-11-22：性能定位 —— 分类页整段构建耗时。 */
     private long buildStartMs;
+    /** 2026-11-27：说明文字短于此字数就按「单行数据」处理（不折叠、不拦点击）。 */
+    private static final int SHORT_DESC_MAX = UiKit.SHORT_DESC_MAX;
 
     // ==================== 外观与显示 ====================
 
@@ -480,7 +482,8 @@ public class SettingsPageActivity extends BaseWatchActivity {
         card.addView(title);
 
         TextView body = new TextView(this);
-        body.setText("设置项下方灰色小字是说明文字，默认折叠；点灰色小字本身即可展开完整说明。");
+        body.setText("较长的说明会折叠成一行，点灰色小字本身即可展开完整说明；"
+                + "短说明（含数值）直接显示一行，不折叠。");
         body.setTextColor(0xFFAAAAAA);
         body.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
         android.widget.LinearLayout.LayoutParams bodyLp = new android.widget.LinearLayout.LayoutParams(
@@ -629,18 +632,7 @@ public class SettingsPageActivity extends BaseWatchActivity {
                     android.util.TypedValue.COMPLEX_UNIT_SP);
         }
         textCol.addView(t);
-        TextView s = new TextView(this);
-        s.setText(sub);
-        s.setTextColor(getResources().getColor(R.color.text_secondary));
-        s.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
-        s.setMaxLines(1);
-        s.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        s.setOnClickListener(v -> {
-            boolean expanded = s.getMaxLines() != Integer.MAX_VALUE;
-            s.setMaxLines(expanded ? Integer.MAX_VALUE : 1);
-            s.setEllipsize(expanded ? null : android.text.TextUtils.TruncateAt.END);
-        });
-        textCol.addView(s);
+        textCol.addView(makeDescriptionText(sub));
         row.addView(textCol);
 
         com.google.android.material.materialswitch.MaterialSwitch sw =
@@ -716,21 +708,46 @@ public class SettingsPageActivity extends BaseWatchActivity {
         }
         row.addView(t);
 
+        TextView s = makeDescriptionText(sub);
+        row.addView(s);
+        return row;
+    }
+
+    /**
+     * 设置项下方的灰色说明文字（2026-11-27 需求）。
+     *
+     * <p>「轻触展开」上线后有明显副作用：说明文字默认是整行宽（LinearLayout 里
+     * match_parent），点行内下半部分全被它吃掉，设置项本体反而不好点。现在按长度分流：</p>
+     * <ul>
+     *   <li><b>短文案</b>（少于 {@link #SHORT_DESC_MAX} 字，含「320 dpi」这类纯数值）：
+     *       单行显示，<b>不折叠、也不设点击监听</b> —— 点击照旧落到整行按钮上；</li>
+     *   <li><b>长文案</b>：保持「一行省略 → 点开完整说明」，但可点区域收窄到
+     *       文字本身的宽度（WRAP_CONTENT），行内其余位置仍然点得动。</li>
+     * </ul>
+     */
+    private TextView makeDescriptionText(String sub) {
+        String text = sub == null ? "" : sub;
         TextView s = new TextView(this);
-        s.setText(sub);
+        s.setText(text);
         s.setTextColor(getResources().getColor(R.color.text_secondary));
         s.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
-        // 2026-11-22：解释性简介默认折叠成一行省略；点简介文字本身展开/收起完整说明
+        s.setPadding(0, dpToPx(2), 0, 0);
+        if (text.length() < SHORT_DESC_MAX) {
+            s.setSingleLine(true);
+            s.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            return s;
+        }
         s.setMaxLines(1);
         s.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        s.setPadding(0, dpToPx(2), 0, 0);
+        // 宽度只包住文字：否则 WRAP 之外的行内区域也会进这个 TextView 的点击区
+        s.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         s.setOnClickListener(v -> {
             boolean expanded = s.getMaxLines() != Integer.MAX_VALUE;
             s.setMaxLines(expanded ? Integer.MAX_VALUE : 1);
             s.setEllipsize(expanded ? null : android.text.TextUtils.TruncateAt.END);
         });
-        row.addView(s);
-        return row;
+        return s;
     }
 
     /** 2026-11-22：行背景缓存 —— 缓存 ConstantState，每行 newDrawable()：

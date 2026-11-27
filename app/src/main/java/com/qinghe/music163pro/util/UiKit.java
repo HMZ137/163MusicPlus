@@ -216,6 +216,15 @@ public final class UiKit {
     public static final String TAG_COLLAPSIBLE_DESC = "collapsible_desc";
 
     /**
+     * 说明文字短于此字数时按「单行数据」处理（2026-11-27 需求）。
+     *
+     * <p>「320 dpi」「5 秒后可关闭」这类短文案本来就一行放得下，折叠/展开对它没有意义；
+     * 更糟的是 TextView 一旦可点，就会把行内下半部分的点击全部吃掉，设置项本体反而点不动。
+     * 所以短文案一律：单行显示、不折叠、<b>不接管点击</b>。</p>
+     */
+    public static final int SHORT_DESC_MAX = 12;
+
+    /**
      * 把一段说明文字做成「过长先省略、点击展开 / 再点收起」。
      *
      * <p>设置项下方的说明常常比一行宽（例如「隐藏本地音乐 / 本地歌单 / 局域网传歌…」）。
@@ -232,6 +241,15 @@ public final class UiKit {
      */
     public static void makeDescriptionCollapsible(final TextView tv) {
         if (tv == null) {
+            return;
+        }
+        // 2026-11-27：短文案不折叠、不接管点击 —— 只保证「一行显示」。
+        CharSequence text = tv.getText();
+        if (text == null || text.length() < SHORT_DESC_MAX) {
+            setDescriptionCollapsed(tv, true);
+            tv.setClickable(false);
+            tv.setFocusable(false);
+            tv.setOnClickListener(null);
             return;
         }
         tv.setClickable(true);
