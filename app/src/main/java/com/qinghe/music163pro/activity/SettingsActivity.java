@@ -11,13 +11,12 @@ import android.widget.Toast;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.CacheManager;
-import com.qinghe.music163pro.util.ExportManager;
 import com.qinghe.music163pro.util.UpdateChecker;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 
 /**
  * Settings activity - flat tile list style matching MoreActivity.
- * Contains: 开关选项, 检测更新, 关于
+ * Contains: 设置（五类分页首页）, 检测更新, 关于
  */
 public class SettingsActivity extends BaseWatchActivity {
 
@@ -27,8 +26,6 @@ public class SettingsActivity extends BaseWatchActivity {
     private TextView tvCacheValue;
     /** 「导出下载的音乐」那一行的进度文案。 */
     private TextView tvExportValue;
-    /** F6：强制覆盖（一次性行为选项，用后自动复位）。 */
-    private boolean exportForceOverwrite = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +59,7 @@ public class SettingsActivity extends BaseWatchActivity {
             btnLocalMusicSettings.setOnClickListener(v ->
                     startActivity(new android.content.Intent(this, LocalMusicSettingsActivity.class)));
         }
-        // 高级歌词翻译：与「开关选项」同级的独立设置页（AI 词性着色 / 翻译）
+        // 高级歌词翻译：与「设置」同级的独立设置页（AI 词性着色 / 翻译）
         findViewById(R.id.btn_settings_advanced_lyrics).setOnClickListener(v ->
                 startActivity(new android.content.Intent(this, LanguageLearningActivity.class)));
         addSectionHeader(findViewById(R.id.btn_settings_check_update), "系统与关于");
@@ -112,122 +109,33 @@ public class SettingsActivity extends BaseWatchActivity {
         View btnExport = findViewById(R.id.btn_settings_export);
         tvExportValue = findViewById(R.id.tv_settings_export_value);
         if (btnExport != null) {
-            btnExport.setOnClickListener(v -> chooseExportTarget());
-        }
-    }
-
-    // ==================== 导出下载的音乐 ====================
-
-    /** 先选目标文件夹：给几个常见位置，也允许自定义完整路径。 */
-    private void chooseExportTarget() {
-        java.io.File external = android.os.Environment.getExternalStorageDirectory();
-        // F6：新增「直接导出到 Music 文件夹」；Environment 的公共 Music 目录（API30 旧存储模型下可直接写）
-        String musicDir = android.os.Environment
-                .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MUSIC)
-                .getAbsolutePath();
-        final String[] targets = {
-                musicDir,
-                new java.io.File(external, "Music/163Music导出").getAbsolutePath(),
-                new java.io.File(external, "Download/163Music导出").getAbsolutePath(),
-                new java.io.File(external, "163Music/导出").getAbsolutePath(),
-        };
-        // 条目单行显示：标签改短，保证「目录名 / 强制覆盖开/关状态」在 1 行内不被省略号吃掉
-        // （完整目标路径由下一步的确认浮窗「导出到：<路径>」给出）。
-        String[] labels = {"Music 文件夹", "Music/163Music", "Download 目录",
-                "163Music/导出",
-                exportForceOverwrite ? "强制覆盖：已开" : "强制覆盖：已关",
-                "自定义路径…"};
-        Runnable[] actions = {
-                () -> confirmExport(targets[0]),
-                () -> confirmExport(targets[1]),
-                () -> confirmExport(targets[2]),
-                () -> confirmExport(targets[3]),
-                () -> {
-                    exportForceOverwrite = !exportForceOverwrite;   // F6：一次性行为选项
-                    chooseExportTarget();                          // 重画菜单以显示新状态
-                },
-                this::promptCustomExportTarget
-        };
-        // 需求方 2026-10-17：按钮太多了、选项被挤出去（6 个竖排按钮超出手表可视区）。
-        // 改为可滚动的统一列表浮窗（WatchMenuDialog）：条目单行、超出可滑，不再把选项挤出屏幕。
-        // 标题同样收短到单行可容（原「（复制一份，原下载不受影响）」会被省略号截断）。
-        com.qinghe.music163pro.util.WatchMenuDialog.show(this, "导出到文件夹",
-                labels, which -> {
-                    if (which >= 0 && which < actions.length && actions[which] != null) {
-                        actions[which].run();
-                    }
-                });
-    }
-
-    private void promptCustomExportTarget() {
-        // P5：统一浮窗（说明在上、输入栏带 ×）
-        String initial = new java.io.File(android.os.Environment.getExternalStorageDirectory(),
-                "163Music/导出").getAbsolutePath();
-        com.qinghe.music163pro.util.WatchPopup.input(this, "目标文件夹",
-                "输入完整路径，例如 /sdcard/Music/我的导出",
-                "/sdcard/…", initial, "确定", path -> {
-                    if (path.isEmpty()) {
-                        com.qinghe.music163pro.util.UiKit.toast(this, "路径不能为空");
-                        return;
-                    }
-                    confirmExport(path);
-                });
-    }
-
-    private void confirmExport(final String targetDir) {
-        // P5 浮窗高度有限：115% 界面缩放下把 /storage/emulated/0/... 全路径折成 4 行，
-        // 会把底部「取消/确定」挤出屏幕。这里统一用 /sdcard 别名 + 压缩成两行。
-        String shown = targetDir;
-        String root = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
-        if (root != null && !root.isEmpty() && shown != null && shown.startsWith(root)) {
-            shown = "/sdcard" + shown.substring(root.length());
-        }
-        WatchConfirmDialog.show(this, "导出确认",
-                "目标：" + shown + "\n"
-                        + (exportForceOverwrite ? "同名文件：覆盖" : "同名文件：跳过不覆盖"),
-                () -> runExport(targetDir), WatchConfirmDialog.Options.defaultOptions());
-    }
-
-    private void runExport(final String targetDir) {
-        com.qinghe.music163pro.util.UiKit.toast(this, "正在导出…");
-        if (tvExportValue != null) {
-            tvExportValue.setText("导出中…");
-        }
-        final boolean force = exportForceOverwrite;
-        exportForceOverwrite = false;   // 一次性：下次进来回到默认关
-        new Thread(() -> ExportManager.exportAll(getApplicationContext(), targetDir, force,
-                new ExportManager.ExportCallback() {
-                    @Override
-                    public void onProgress(int done, int total, String currentName) {
-                        runOnUiThread(() -> {
-                            if (isFinishing() || tvExportValue == null) return;
-                            tvExportValue.setText("导出中 " + done + "/" + total);
-                        });
-                    }
-
-                    @Override
-                    public void onFinished(int copied, int skipped, int failed) {
-                        runOnUiThread(() -> {
-                            if (isFinishing()) return;
-                            if (tvExportValue != null) {
-                                tvExportValue.setText("");
-                            }
-                            String message;
-                            if (failed < 0) {
-                                message = "导出失败：无法创建目标文件夹";
-                            } else {
-                                message = "已导出 " + copied + " 个文件";
-                                if (skipped > 0) {
-                                    message += "，跳过 " + skipped + " 个";
+            // 2026-11-27：导出流程抽到 util/ExportHelper，下载管理页的「导出音乐」共用同一份
+            btnExport.setOnClickListener(v ->
+                    com.qinghe.music163pro.util.ExportHelper.chooseTarget(this,
+                            new com.qinghe.music163pro.util.ExportHelper.Callback() {
+                                @Override
+                                public void onStart() {
+                                    if (tvExportValue != null) {
+                                        tvExportValue.setText("导出中…");
+                                    }
                                 }
-                                if (failed > 0) {
-                                    message += "，失败 " + failed + " 个";
+
+                                @Override
+                                public void onProgress(int done, int total, String currentName) {
+                                    if (isFinishing() || tvExportValue == null) {
+                                        return;
+                                    }
+                                    tvExportValue.setText("导出中 " + done + "/" + total);
                                 }
-                            }
-                            com.qinghe.music163pro.util.UiKit.toastLong(SettingsActivity.this, message);
-                        });
-                    }
-                })).start();
+
+                                @Override
+                                public void onFinished(String message) {
+                                    if (tvExportValue != null) {
+                                        tvExportValue.setText("");
+                                    }
+                                }
+                            }));
+        }
     }
 
     @Override

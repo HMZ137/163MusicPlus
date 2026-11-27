@@ -420,15 +420,22 @@ public class DownloadListActivity extends BaseWatchActivity
             com.qinghe.music163pro.util.UiKit.toast(this, "本地音乐页还没准备好，稍后再试");
             return;
         }
-        // 「下载」页：排序（首字符 A-Z 口径）+ 整理文件名
+        // 「下载」页：排序（首字符 A-Z 口径）+ 整理文件名 + A-Z 跳转 + 导出音乐
         com.qinghe.music163pro.util.WatchMenuDialog.show(this, getString(R.string.downloads),
                 new String[]{"排序（首字符 A-Z，当前：按" + downloadSortLabel() + "）",
-                        "整理文件名（song → 曲名 - 曲师）"},
+                        "整理文件名（song → 曲名 - 曲师）",
+                        "A-Z 字母跳转",
+                        "导出音乐（到 Music / 自定义目录）"},
                 which -> {
                     if (which == 0) {
                         showDownloadSortDialog();
-                    } else {
+                    } else if (which == 1) {
                         confirmTidyFileNames();
+                    } else if (which == 2) {
+                        openLetterPicker();
+                    } else {
+                        // 需求 2026-11-27：复用设置页的「导出音乐」入口
+                        com.qinghe.music163pro.util.ExportHelper.chooseTarget(this, null);
                     }
                 });
     }
@@ -441,6 +448,98 @@ public class DownloadListActivity extends BaseWatchActivity
             }
         }
         return null;
+    }
+
+    // ==================== A-Z 首字母跳转（复用 LetterPickerActivity） ====================
+
+    /** 字母选择页的请求码。 */
+    private static final int REQUEST_LETTER_PICKER = 0x91;
+    private final List<Character> groupLetters = new ArrayList<>();
+    private int[] groupStarts = new int[0];
+    private int[] groupCounts = new int[0];
+
+    /**
+     * 打开字母选择页（2026-11-27 需求）。
+     *
+     * <p>分组按「曲名」口径建（与 {@link #SORT_NAME} 一致）——首字母跳转只有按名字排才有意义，
+     * 所以当前若按曲师/专辑排序，先自动切回按曲名（并持久化，和本地歌单页同一做法）。</p>
+     */
+    private void openLetterPicker() {
+        if (downloadSortMode != SORT_NAME) {
+            downloadSortMode = SORT_NAME;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putInt(PREF_DOWNLOAD_SORT_MODE, downloadSortMode).apply();
+            applyDownloadSort();
+        }
+        if (downloadedSongs.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "还没有可跳转的歌曲");
+            return;
+        }
+        buildLetterGroups();
+        if (groupLetters.isEmpty()) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "还没有可跳转的字母");
+            return;
+        }
+        StringBuilder letters = new StringBuilder(groupLetters.size());
+        for (Character letter : groupLetters) {
+            letters.append(letter.charValue());
+        }
+        Intent intent = new Intent(this, LetterPickerActivity.class);
+        intent.putExtra(LetterPickerActivity.EXTRA_LETTERS, letters.toString());
+        intent.putExtra(LetterPickerActivity.EXTRA_STARTS, groupStarts);
+        intent.putExtra(LetterPickerActivity.EXTRA_COUNTS, groupCounts);
+        intent.putExtra(LetterPickerActivity.EXTRA_CURRENT,
+                lvDownloads == null ? 0 : lvDownloads.getFirstVisiblePosition());
+        startActivityForResult(intent, REQUEST_LETTER_PICKER);
+    }
+
+    /** 按当前显示顺序建立「首字母 → 第一首下标」分组（口径与本地音乐页/歌单页一致）。 */
+    private void buildLetterGroups() {
+        groupLetters.clear();
+        java.util.LinkedHashMap<Character, int[]> groups = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < downloadedSongs.size(); i++) {
+            String label = com.qinghe.music163pro.util.ScriptSort.groupLabel(
+                    displayTitleOf(downloadedSongs.get(i)));
+            char letter = label == null || label.isEmpty() ? '#' : label.charAt(0);
+            int[] slot = groups.get(letter);
+            if (slot == null) {
+                groups.put(letter, new int[]{i, 1});
+            } else {
+                slot[1]++;
+            }
+        }
+        groupStarts = new int[groups.size()];
+        groupCounts = new int[groups.size()];
+        List<Character> keys = new ArrayList<>(groups.keySet());
+        java.util.Collections.sort(keys, (a, b) -> {
+            if (a == '#') {
+                return b == '#' ? 0 : 1;
+            }
+            if (b == '#') {
+                return -1;
+            }
+            return Character.compare(a, b);
+        });
+        int index = 0;
+        for (Character key : keys) {
+            groupLetters.add(key);
+            groupStarts[index] = groups.get(key)[0];
+            groupCounts[index] = groups.get(key)[1];
+            index++;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_LETTER_PICKER || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        int target = data.getIntExtra(LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
+        if (target < 0 || lvDownloads == null) {
+            return;
+        }
+        lvDownloads.setSelection(Math.max(0, Math.min(target, downloadedSongs.size() - 1)));
     }
 
     // ==================== L7：下载列表排序（首字符 A-Z） ====================
