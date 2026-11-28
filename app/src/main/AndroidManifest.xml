@@ -59,6 +59,7 @@
         <activity android:name=".activity.LanTransferActivity" android:exported="false" />
         <activity android:name=".activity.TransFileBrowserActivity" android:exported="false" />
         <activity android:name=".activity.LanSendActivity" android:exported="false" />
+        <activity android:name=".activity.PlayLinkActivity" android:exported="false" />
         <activity android:name=".activity.LetterPickerActivity" android:exported="false" />
         <activity android:name=".activity.PlaybackStatsActivity" android:exported="false" />
         <activity android:name=".activity.SettingsActivity" android:exported="false" />

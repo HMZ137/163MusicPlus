@@ -226,13 +226,10 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
     private void playDirectUrl(String url, Intent sourceIntent) {
         tvStatus.setText("正在播放网络直链…");
         try {
-            MusicPlayerManager playerManager = MusicPlayerManager.getInstance();
-            playerManager.setContext(this);
-            Song song = new Song(0L, "网络直链", "直链播放", "");
-            song.setUrl(url);
-            song.setSource("url");
-            playerManager.setPlaylist(Collections.singletonList(song), 0);
-            playerManager.playCurrent();
+            if (!com.qinghe.music163pro.util.DirectPlayback.play(this, url)) {
+                showError("直链播放失败", sourceIntent);
+                return;
+            }
             openMainActivity();
         } catch (Exception e) {
             showError("直链播放失败: " + e.getMessage(), sourceIntent);

@@ -42,16 +42,21 @@ public final class NeteaseLinkParser {
         }
     }
 
-    /** music.163.com/song?id=123 / #/song?id=123 / /m/song?id=123 */
-    private static final Pattern PATH_ID = Pattern.compile(
-            "music\\.163\\.com/(?:#/|m/)?song[/?].*?[?&]?id=(\\d{1,15})",
+    /** 任意 163 域名链接上的 id 参数：{@code ?id=1} / {@code &id=1} / {@code #/song?id=1} 都吃得下 */
+    private static final Pattern ID_PARAM = Pattern.compile(
+            "(?:music\\.163\\.com|y\\.music\\.163\\.com)[^\\s]*?[?&#]id=(\\d{1,15})",
             Pattern.CASE_INSENSITIVE);
-    /** 任意带 id= 的 163 域名链接 */
-    private static final Pattern ANY_ID = Pattern.compile(
-            "(?:music\\.163\\.com|y\\.music\\.163\\.com)[^\\s]*[?&#]id=(\\d{1,15})",
+    /** 路径形式：{@code /song/123}、{@code /m/song/123}、{@code /#/song/123} */
+    private static final Pattern SONG_PATH = Pattern.compile(
+            "(?:music\\.163\\.com|y\\.music\\.163\\.com)/(?:#/|m/)?(?:song|program)/(\\d{1,15})",
             Pattern.CASE_INSENSITIVE);
     /** 纯数字（可能是 ID） */
     private static final Pattern BARE_ID = Pattern.compile("^\\d{1,12}$");
+    /** 非单曲的 163 链接（歌单 / 专辑 / 歌手 / 榜单）：id 不是歌曲 ID，别硬当歌播 */
+    private static final Pattern NON_SONG_URL = Pattern.compile(
+            "music\\.163\\.com/[^\\s]*(?:playlist|album|artist|toplist|djradio|event)",
+            Pattern.CASE_INSENSITIVE);
+
     /** 163cn.tv/xxxx 短链 */
     private static final Pattern SHORT = Pattern.compile(
             "https?://[a-z0-9.]*163cn\\.tv/[A-Za-z0-9]+", Pattern.CASE_INSENSITIVE);
@@ -96,12 +101,27 @@ public final class NeteaseLinkParser {
             return new Result(Result.Type.DIRECT_AUDIO, 0, url);
         }
 
-        // 5) 网易云链接里的 id 参数
-        Matcher m = PATH_ID.matcher(url);
-        if (!m.find()) {
-            m = ANY_ID.matcher(url);
+        // 4.5) 歌单 / 专辑 / 歌手 / 榜单：id 不是歌曲 ID，直接判为不可播，避免播错歌
+        if (NON_SONG_URL.matcher(url).find()) {
+            return new Result(Result.Type.UNKNOWN, 0, url);
         }
-        if (m.find()) {
+
+        // 5) 网易云链接里的 id 参数
+        //
+        // 2026-11-28 修：以前写法是
+        //     Matcher m = PATH_ID.matcher(url);
+        //     if (!m.find()) m = ANY_ID.matcher(url);
+        //     if (m.find()) ...
+        // 同一个 Matcher 连调两次 find()，第二次会从上一个匹配之后继续找 ——
+        // 只有一处 id 时第二次必然返回 false，于是「带 ?id= 的链接」一律解析失败，
+        // 用户必须手动把「网址?id=」删掉、只留数字才能用。这里改成一次性取匹配结果。
+        Matcher m = ID_PARAM.matcher(url);
+        boolean hit = m.find();
+        if (!hit) {
+            m = SONG_PATH.matcher(url);
+            hit = m.find();
+        }
+        if (hit) {
             try {
                 return new Result(Result.Type.SONG_ID, Long.parseLong(m.group(1)), null);
             } catch (NumberFormatException ignored) {

@@ -1011,6 +1011,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row2.addView(timerItem);
         row2.addView(createFuncItem(R.drawable.ic_repeat, "A/B 播放",
                 v -> onFuncAbPlay()));
+        // 2026-11-28：打开链接（直链 / 网易云歌曲链接 / 短链），也给搜索框兜底
+        row2.addView(createFuncItem(R.drawable.ic_search, "打开链接",
+                v -> startActivity(new android.content.Intent(this, PlayLinkActivity.class))));
 
         // Find the label view in timerItem (second child) for live updates
         final TextView timerLabelView = (TextView) timerItem.getChildAt(1);

@@ -268,6 +268,17 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
             resolveShortLinkThenSearch(linkHit.url);
             return;
         }
+        // 2026-11-28：音频直链（.mp3/.flac…）直接播，不再当关键词搜（搜文本必然搜不到）
+        if (linkHit.type == com.qinghe.music163pro.util.NeteaseLinkParser.Result.Type.DIRECT_AUDIO) {
+            if (com.qinghe.music163pro.util.DirectPlayback.play(this, linkHit.url)) {
+                startActivity(new android.content.Intent(this,
+                        com.qinghe.music163pro.activity.MainActivity.class));
+                finish();
+            } else {
+                com.qinghe.music163pro.util.UiKit.toast(this, "直链播放失败");
+            }
+            return;
+        }
 
         currentKeyword = keyword;
         addToSearchHistory(keyword);
