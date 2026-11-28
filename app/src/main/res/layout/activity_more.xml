@@ -235,6 +235,33 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/btn_menu_open_link"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_card_tile_ripple">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_search"
+                    android:alpha="0.7" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="打开链接"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/watch_text_item" android:singleLine="true"
+     android:ellipsize="end"
+     />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/btn_menu_song_recognition"
                 android:layout_width="match_parent"
                 android:layout_height="54dp"

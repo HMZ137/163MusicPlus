@@ -107,6 +107,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final String QUALITY_TIER_UNAVAILABLE = "暂无";
     private static final String QUALITY_TIER_DOWNLOADED = "已下载";
 
+    // ===== 更新策略（2026-11-28）=====
+    /** 自动安装：检测到新版后自动下载并拉起安装器。 */
+    static final String UPDATE_POLICY_AUTO = "auto";
+    /** 仅提示（默认）：只弹提示，不自动下载安装。 */
+    static final String UPDATE_POLICY_NOTIFY = "notify";
+    /** 手动：不自动检查，只在设置页点「检测更新」时检查。 */
+    static final String UPDATE_POLICY_MANUAL = "manual";
+    static final String KEY_UPDATE_POLICY = "update_policy";
+
     private TextView tvSongName;
     private TextView tvArtist;
     private ImageView btnPlay;
@@ -133,6 +142,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // Functions overlay
     private FrameLayout overlayContainer;
+    /**
+     * A/B 播放浮层（2026-11-28 修「打开 A/B 后播放选项关不掉」）。
+     *
+     * <p>历史上 A/B 浮层把全局 {@link #overlayContainer} 覆盖成自己，关掉 A/B 时又把它
+     * 置 null，导致底下仍在显示的「更多功能」菜单的 X 按钮再点 dismissOverlay() 时
+     * 因引用为 null 而什么都不做 —— 菜单就永久关不掉了。现在 A/B 用自己独立的字段，
+     * 与 {@link #overlayContainer} 完全解耦：关 A/B 只摘 A/B，关菜单只摘菜单，互不干扰。</p>
+     */
+    private FrameLayout abOverlay;
     private Handler overlayTimerHandler;
     private Runnable overlayTimerRunnable;
 
@@ -796,6 +814,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void checkUpdateIfNeeded() {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        // 手动模式：完全不自动检查，只在设置页点「检测更新」时才查。
+        if (UPDATE_POLICY_MANUAL.equals(prefs.getString(KEY_UPDATE_POLICY, UPDATE_POLICY_NOTIFY))) {
+            return;
+        }
         String today = new java.text.SimpleDateFormat("yyyyMMdd",
                 java.util.Locale.getDefault()).format(new java.util.Date());
         String lastCheck = prefs.getString("last_update_check_date", "");
@@ -804,23 +826,27 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         UpdateChecker.checkVersionInfo(this, new UpdateChecker.VersionCheckCallback() {
             @Override
             public void onResult(UpdateChecker.VersionInfo versionInfo) {
-                // 需求方 2026-11-15：版本号已对齐 20261115，防止每次打开都提示更新。
-                // 服务端按 versionCode 判 is_latest 可能仍偏旧；远端版本名与本地一致时
-                // 视为同一版本，不再弹提示（手动检查不受影响）。
-                String remoteName = versionInfo.getVersionName();
-                String localName = "";
-                try {
-                    localName = getPackageManager()
-                            .getPackageInfo(getPackageName(), 0).versionName;
-                } catch (Exception ignored) {
+                // 2026-11-28 修「1128 却提示 1122 是新版」：
+                // UpdateChecker.isLatest() 已改为按版本名日期码比较（量纲一致），
+                // 这里直接采信即可，不再自己用 versionName 字符串相等去打补丁。
+                if (versionInfo.isLatest()) {
+                    return;
                 }
-                boolean sameVersion = localName != null && localName.equals(remoteName);
-                if (!versionInfo.isLatest() && !sameVersion) {
-                    // 只提示，不再自动跳到更新页、更不下载安装 ——
-                    // 装官方新版会覆盖掉本修改版累积的所有改动。
+                // 按更新策略处理：手动模式不自动提示；否则按用户选择的策略走。
+                String policy = prefs.getString(KEY_UPDATE_POLICY, UPDATE_POLICY_NOTIFY);
+                if (UPDATE_POLICY_MANUAL.equals(policy)) {
+                    return;
+                }
+                String msg = "发现新版本 " + versionInfo.getVersionName();
+                if (UPDATE_POLICY_AUTO.equals(policy)) {
+                    // 自动安装：下载完成后拉起系统安装器（下载在后台线程，回调切主线程）。
+                    msg += "，正在下载安装…";
+                    Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show();
+                    autoDownloadAndInstall(versionInfo);
+                } else {
+                    // 仅提示（默认）：装官方新版会覆盖本修改版的改动，不自动下载。
                     Toast.makeText(MainActivity.this,
-                            "发现新版本 " + versionInfo.getVersionName()
-                                    + "（当前为修改版，不自动更新）",
+                            msg + "（当前为修改版，可在设置里改为自动安装）",
                             Toast.LENGTH_LONG).show();
                 }
             }
@@ -828,6 +854,52 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             @Override
             public void onError(String error) {
                 // Silently ignore auto-check errors
+            }
+        });
+    }
+
+    /**
+     * 更新策略=自动安装：拿到下载源后下载 APK 并拉起系统安装器。
+     *
+     * <p>下载源走 {@link UpdateChecker#fetchSources}（清单里的 mirrors + apkUrl，
+     * 已按国内加速源优先排序），取第一个可用源；下载到本 App 私有目录，完成后用
+     * {@link com.qinghe.music163pro.util.ApkInstallHelper} 授权并拉起安装界面。</p>
+     */
+    private void autoDownloadAndInstall(UpdateChecker.VersionInfo info) {
+        UpdateChecker.fetchSources(new UpdateChecker.SourcesCallback() {
+            @Override
+            public void onResult(java.util.List<String> urls) {
+                if (urls == null || urls.isEmpty()) {
+                    com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "自动更新失败：没有下载源");
+                    return;
+                }
+                final String url = urls.get(0);
+                final java.io.File target = new java.io.File(getExternalFilesDir(null), "163MusicPlus_auto.apk");
+                com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "正在下载新版安装包…");
+                UpdateChecker.downloadUpdate(url, target.getAbsolutePath(),
+                        new UpdateChecker.DownloadCallback() {
+                            @Override
+                            public void onProgress(int percent) {
+                                // 静默下载，不打扰播放；进度留给更新页展示
+                            }
+
+                            @Override
+                            public void onComplete(String filePath) {
+                                com.qinghe.music163pro.util.ApkInstallHelper.install(
+                                        MainActivity.this, new java.io.File(filePath));
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                com.qinghe.music163pro.util.UiKit.toastLong(MainActivity.this,
+                                        "自动更新下载失败：" + error + "，请在设置里手动更新");
+                            }
+                        });
+            }
+
+            @Override
+            public void onError(String error) {
+                com.qinghe.music163pro.util.UiKit.toast(MainActivity.this, "自动更新失败：" + error);
             }
         });
     }
@@ -1011,9 +1083,6 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row2.addView(timerItem);
         row2.addView(createFuncItem(R.drawable.ic_repeat, "A/B 播放",
                 v -> onFuncAbPlay()));
-        // 2026-11-28：打开链接（直链 / 网易云歌曲链接 / 短链），也给搜索框兜底
-        row2.addView(createFuncItem(R.drawable.ic_search, "打开链接",
-                v -> startActivity(new android.content.Intent(this, PlayLinkActivity.class))));
 
         // Find the label view in timerItem (second child) for live updates
         final TextView timerLabelView = (TextView) timerItem.getChildAt(1);
@@ -1566,9 +1635,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 return true;
             }
         });
+        // 2026-11-28 修「X 关不掉」：原来这里无条件 return true，把整层触摸都吞掉，
+        // 导致标题栏 X 按钮（以及其它子控件）的 onClick 永远收不到事件，只能靠
+        // onSingleTapUp 兜底「点哪儿都关」。改成把事件还给孩子：gestureDetector 照常
+        // 处理（滑动手势关闭仍有效），但返回 false 让子 View 正常收到点击。
         container.setOnTouchListener((v, event) -> {
             gestureDetector.onTouchEvent(event);
-            return true;
+            return false;
         });
     }
 
@@ -1615,11 +1688,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             overlayTimerHandler = null;
             overlayTimerRunnable = null;
         }
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
+                .findViewById(android.R.id.content);
         if (overlayContainer != null) {
-            FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
-                    .findViewById(android.R.id.content);
             rootView.removeView(overlayContainer);
             overlayContainer = null;
+        }
+        // A/B 浮层独立跟踪：任何 dismiss 路径都一并清掉，避免它残留在已关闭的菜单之上。
+        if (abOverlay != null) {
+            rootView.removeView(abOverlay);
+            abOverlay = null;
         }
     }
 
@@ -5723,66 +5801,102 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
                 .findViewById(android.R.id.content);
+
+        // 不做全屏浮层：一个居中的小卡片，点卡片外区域关闭。
         final FrameLayout overlay = new FrameLayout(this);
         overlay.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlay.setBackgroundColor(0xCC000000);
-        addSwipeToDismiss(overlay);
+        overlay.setBackgroundColor(0x66000000);
 
-        LinearLayout panel = new LinearLayout(this);
+        final LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setGravity(Gravity.CENTER);
-        panel.setPadding(dp(20), dp(18), dp(20), dp(18));
+        panel.setPadding(dp(14), dp(10), dp(14), dp(10));
+        panel.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xF2202024));
         FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         panelParams.gravity = Gravity.CENTER;
-        panelParams.leftMargin = dp(14);
-        panelParams.rightMargin = dp(14);
+        panelParams.leftMargin = dp(22);
+        panelParams.rightMargin = dp(22);
         panel.setLayoutParams(panelParams);
-        panel.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xF2202024));
 
+        // 关闭动作：只摘掉 A/B 自己（用独立字段 abOverlay 跟踪），绝不碰 overlayContainer。
+        // 「更多功能」菜单由它自己的 X / dismissOverlay() 关闭，两者互不干扰 ——
+        // 这就是「打开 A/B 后播放选项关不掉」的真正修复点。
+        final Runnable closeSelf = () -> {
+            if (overlay.getParent() != null) {
+                ((ViewGroup) overlay.getParent()).removeView(overlay);
+            }
+            if (abOverlay == overlay) {
+                abOverlay = null;
+            }
+        };
+
+        // 标题行：左侧标题 + 右侧 X（自己造一个，X 用 OnTouchListener 按下即关）
+        FrameLayout titleBar = new FrameLayout(this);
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        barLp.bottomMargin = dp(6);
+        titleBar.setLayoutParams(barLp);
         TextView title = new TextView(this);
         title.setText("A/B 播放");
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(15);
+        title.setTextSize(14);
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, dp(10));
-        panel.addView(title);
+        title.setPadding(dp(40), 0, dp(40), 0);
+        FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.gravity = Gravity.CENTER;
+        title.setLayoutParams(titleParams);
+        titleBar.addView(title);
+        ImageView btnClose = new ImageView(this);
+        btnClose.setImageResource(R.drawable.ic_close);
+        btnClose.setColorFilter(0xFFFFFFFF);
+        btnClose.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        FrameLayout.LayoutParams closeLp = new FrameLayout.LayoutParams(dp(40), dp(40));
+        closeLp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        btnClose.setLayoutParams(closeLp);
+        btnClose.setOnClickListener(v -> closeSelf.run());
+        titleBar.addView(btnClose);
+        panel.addView(titleBar);
+
+        TextView durHint = new TextView(this);
+        durHint.setText("整曲 " + clockOf(duration));
+        durHint.setTextColor(0xFF8A8A8A);
+        durHint.setTextSize(10);
+        durHint.setGravity(Gravity.CENTER);
+        durHint.setPadding(0, 0, 0, dp(6));
+        panel.addView(durHint);
 
         final TextView info = new TextView(this);
         info.setTextColor(0xFFB3B3B3);
         info.setTextSize(11);
         info.setGravity(Gravity.CENTER);
-        info.setPadding(0, 0, 0, dp(10));
+        info.setPadding(0, 0, 0, dp(8));
         panel.addView(info);
 
         final Runnable refreshInfo = () -> {
             String a = abStartMs < 0 ? "—" : clockOf(abStartMs);
             String b = abEndMs < 0 ? "—" : clockOf(abEndMs);
-            info.setText("A：" + a + "   B：" + b
+            info.setText("A：" + a + "    B：" + b
                     + (abActive ? "\n正在循环 A→B" : "\n设好 A/B 后点「开始循环」"));
         };
         refreshInfo.run();
 
-        panel.addView(abButton("设 A 为当前位置", () -> {
-            abStartMs = playerManager.getCurrentPosition();
+        panel.addView(abTimeRow("A", duration, value -> {
+            abStartMs = value;
             if (abEndMs >= 0 && abEndMs <= abStartMs) {
                 abEndMs = -1;
             }
             refreshInfo.run();
         }));
-        panel.addView(abButton("设 B 为当前位置", () -> {
-            int pos = playerManager.getCurrentPosition();
-            if (abStartMs >= 0 && pos <= abStartMs) {
-                com.qinghe.music163pro.util.UiKit.toast(this, "B 点要在 A 点之后");
-                return;
-            }
-            abEndMs = pos;
+        panel.addView(abTimeRow("B", duration, value -> {
+            abEndMs = value;
             refreshInfo.run();
         }));
+
         panel.addView(abButton("开始循环", () -> {
             if (abStartMs < 0 || abEndMs <= abStartMs) {
-                com.qinghe.music163pro.util.UiKit.toast(this, "请先设好 A 点和 B 点");
+                com.qinghe.music163pro.util.UiKit.toast(this, "B 点要大于 A 点");
                 return;
             }
             startAbLoop();
@@ -5793,21 +5907,135 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             stopAbLoop();
             abStartMs = -1;
             abEndMs = -1;
+            etAbA.setText("");
+            etAbB.setText("");
             refreshInfo.run();
             com.qinghe.music163pro.util.UiKit.toast(this, "已停止 A/B 播放");
         }));
-        panel.addView(abButton("关闭", () -> {
-            if (overlay.getParent() != null) {
-                ((ViewGroup) overlay.getParent()).removeView(overlay);
-            }
-            if (overlayContainer == overlay) {
-                overlayContainer = null;
-            }
-        }));
+
+        // 点卡片外空白处关闭
+        overlay.setOnClickListener(v -> closeSelf.run());
+        panel.setClickable(true);
+        panel.setOnClickListener(v -> { /* 挡住冒泡，点卡片内不关 */ });
 
         overlay.addView(panel);
         rootView.addView(overlay);
-        overlayContainer = overlay;
+        abOverlay = overlay;
+    }
+
+    private EditText etAbA;
+    private EditText etAbB;
+
+    /**
+     * 一行「A / B 时间」：左侧标签 + 中间输入框（mm:ss）+ 右侧「取当前点」。
+     *
+     * <p>输入格式 {@code m:ss} 或纯秒数；填完立即生效并回填成规范时间。</p>
+     */
+    private View abTimeRow(String tag, int duration, java.util.function.IntConsumer onSet) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, 0, 0, dp(6));
+
+        TextView label = new TextView(this);
+        label.setText(tag);
+        label.setTextColor(0xFFFFFFFF);
+        label.setTextSize(14);
+        label.setGravity(Gravity.CENTER);
+        label.setPadding(0, 0, dp(6), 0);
+        row.addView(label);
+
+        EditText et = new EditText(this);
+        et.setHint("m:ss");
+        et.setTextColor(0xFFFFFFFF);
+        et.setHintTextColor(0xFF666666);
+        et.setTextSize(12);
+        et.setInputType(InputType.TYPE_CLASS_TEXT);
+        et.setSingleLine(true);
+        et.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xFF2D2D2D));
+        et.setPadding(dp(8), dp(6), dp(8), dp(6));
+        LinearLayout.LayoutParams etLp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        etLp.rightMargin = dp(6);
+        et.setLayoutParams(etLp);
+        row.addView(et);
+        if ("A".equals(tag)) {
+            etAbA = et;
+        } else {
+            etAbB = et;
+        }
+        // 回显已设的值
+        int cur = "A".equals(tag) ? abStartMs : abEndMs;
+        if (cur >= 0) {
+            et.setText(clockOf(cur));
+        }
+
+        TextView now = new TextView(this);
+        now.setText("取当前点");
+        now.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
+        now.setTextSize(11);
+        now.setGravity(Gravity.CENTER);
+        now.setPadding(dp(8), dp(6), dp(8), dp(6));
+        now.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xFF2D2D2D));
+        now.setClickable(true);
+        now.setFocusable(true);
+        final EditText etFinal = et;
+        now.setOnClickListener(v -> {
+            int pos = playerManager.getCurrentPosition();
+            etFinal.setText(clockOf(pos));
+            onSet.accept(pos);
+        });
+        row.addView(now);
+
+        // 失焦时解析输入
+        et.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                return;
+            }
+            int parsed = parseClock(et.getText().toString(), duration);
+            if (parsed < 0) {
+                UiKit.toast(this, "时间格式不对（如 1:23）");
+                et.setText("");
+                return;
+            }
+            et.setText(clockOf(parsed));
+            onSet.accept(parsed);
+        });
+        return row;
+    }
+
+    /** 解析 m:ss / mm:ss / 纯秒数；越界或非法返回 -1。 */
+    private int parseClock(String raw, int durationMs) {
+        if (raw == null) {
+            return -1;
+        }
+        String s = raw.trim();
+        if (s.isEmpty()) {
+            return -1;
+        }
+        try {
+            int ms;
+            if (s.contains(":")) {
+                String[] parts = s.split(":", -1);
+                if (parts.length != 2) {
+                    return -1;
+                }
+                int m = Integer.parseInt(parts[0].trim());
+                int sec = Integer.parseInt(parts[1].trim());
+                if (sec < 0 || sec > 59 || m < 0) {
+                    return -1;
+                }
+                ms = (m * 60 + sec) * 1000;
+            } else {
+                ms = Integer.parseInt(s) * 1000;
+            }
+            if (ms < 0 || ms > durationMs) {
+                return -1;
+            }
+            return ms;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private String clockOf(int ms) {
@@ -5821,7 +6049,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 com.qinghe.music163pro.util.UiKit.m3Button(this, label, false);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = dp(6);
+        lp.bottomMargin = dp(4);
         btn.setLayoutParams(lp);
         btn.setOnClickListener(v -> action.run());
         return btn;

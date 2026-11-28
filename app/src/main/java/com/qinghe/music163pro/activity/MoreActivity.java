@@ -48,6 +48,8 @@ public class MoreActivity extends BaseWatchActivity {
     private View btnHistory;
     private View btnLogin;
     private View btnSettings;
+    /** 2026-11-28：打开链接入口，默认隐藏，可在「编辑更多页面」里开启。 */
+    private View btnOpenLink;
     private GestureDetector gestureDetector;
     private SharedPreferences prefs;
 
@@ -75,6 +77,7 @@ public class MoreActivity extends BaseWatchActivity {
         btnMusicCloud = findViewById(R.id.btn_menu_music_cloud);
         btnSearch = findViewById(R.id.btn_menu_search);
         btnSongRecognition = findViewById(R.id.btn_menu_song_recognition);
+        btnOpenLink = findViewById(R.id.btn_menu_open_link);
         btnDownloads = findViewById(R.id.btn_menu_downloads);
         btnBilibili = findViewById(R.id.btn_menu_bilibili);
         btnRingtones = findViewById(R.id.btn_menu_ringtones);
@@ -111,6 +114,11 @@ public class MoreActivity extends BaseWatchActivity {
 
         btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(this, SearchActivity.class)));
+
+        if (btnOpenLink != null) {
+            btnOpenLink.setOnClickListener(v ->
+                    startActivity(new Intent(this, PlayLinkActivity.class)));
+        }
 
         btnSongRecognition.setOnClickListener(v ->
                 startActivity(new Intent(this, SongRecognitionActivity.class)));
@@ -226,6 +234,8 @@ public class MoreActivity extends BaseWatchActivity {
         applyVisibility(btnProfile, MoreMenuPreferences.KEY_PROFILE, true);
         applyVisibility(btnPersonalFM, MoreMenuPreferences.KEY_PERSONAL_FM, false);
         applyVisibility(btnLogin, MoreMenuPreferences.KEY_LOGIN, false);
+        // 打开链接：默认隐藏（KEY_OPEN_LINK 在 MoreMenuPreferences 里默认关闭）
+        applyVisibility(btnOpenLink, MoreMenuPreferences.KEY_OPEN_LINK, false);
         applyMenuOrder();
     }
 
@@ -254,6 +264,7 @@ public class MoreActivity extends BaseWatchActivity {
         viewByKey.put(MoreMenuPreferences.KEY_PROFILE, btnProfile);
         viewByKey.put(MoreMenuPreferences.KEY_PERSONAL_FM, btnPersonalFM);
         viewByKey.put(MoreMenuPreferences.KEY_LOGIN, btnLogin);
+        viewByKey.put(MoreMenuPreferences.KEY_OPEN_LINK, btnOpenLink);
 
         java.util.List<String> order = MoreMenuPreferences.getOrder(prefs);
         parent.removeAllViews();

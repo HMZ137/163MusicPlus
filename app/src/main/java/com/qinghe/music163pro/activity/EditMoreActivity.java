@@ -52,6 +52,7 @@ public class EditMoreActivity extends BaseWatchActivity {
         itemLabels.put(MoreMenuPreferences.KEY_PERSONAL_FM, "私人漫游");
         itemLabels.put(MoreMenuPreferences.KEY_LOGIN, "登录");
         itemLabels.put(MoreMenuPreferences.KEY_BILIBILI, "听bilibili");
+        itemLabels.put(MoreMenuPreferences.KEY_OPEN_LINK, "打开链接");
 
         prefs = MoreMenuPreferences.getPrefs(this);
 

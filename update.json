@@ -1,10 +1,10 @@
 {
-  "versionCode": 45,
+  "versionCode": 46,
   "versionName": "20261128",
-  "apkUrl": "https://github.com/HMZ137/163MusicPlus/releases/download/20261128/163MusicPlus-20261128-v45.apk",
+  "apkUrl": "https://github.com/HMZ137/163MusicPlus/releases/download/20261128/163MusicPlus-20261128-v46.apk",
   "mirrors": [
-    "https://gh-proxy.com/https://github.com/HMZ137/163MusicPlus/releases/download/20261128/163MusicPlus-20261128-v45.apk"
+    "https://gh-proxy.com/https://github.com/HMZ137/163MusicPlus/releases/download/20261128/163MusicPlus-20261128-v46.apk"
   ],
-  "notes": "1. 应用统一更名为 163MusicPlus\n2. 新增「表冠音量条」开关：默认横向音量条，可切到右侧竖向细条；两种都平滑过渡\n3. 新增网易云链接 / 歌曲 ID / 网络直链解析与播放，搜索支持 ID 置顶\n4. 收藏单曲页接入字母索引；西里尔与假名按读音并入 A-Z\n5. 多选菜单改为图标 + 小字说明，提高辨识度\n6. 进度条改用 Material Slider，修复播放闪退与副歌标记错位\n7. 版本号更新为 20261128",
+  "notes": "1. 修复打开 A/B 播放浮层后播放选项菜单关不掉的问题\n2. 修复版本判断：本地 1128 不再被提示有 1122 新版（改按版本日期码比较）\n3. 设置新增更新方式：自动安装 / 仅提示 / 手动\n4. 搜索页改为轻量浮窗提示「可以解析网易云链接」，5 秒后可关闭\n5. 「打开链接」入口移到更多页并默认隐藏，可在「编辑更多页面」里开启\n6. 局域网传歌 / B 站登录 Cookie 校验 / APK 检测安装等一批体验修复",
   "force": false
 }

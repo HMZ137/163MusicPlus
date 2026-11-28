@@ -2,9 +2,14 @@ package com.qinghe.music163pro.activity;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -131,6 +136,86 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
         updateInfoRow(currentTab);
 
         loadDefaultKeyword();
+        showPasteLinkDialog();
+    }
+
+    /**
+     * 进搜索页时弹一个「浮窗提示」：一句话告诉用户「这里可以解析网易云链接」（2026-11-28）。
+     *
+     * <p>需求方明确要的是**提示气泡**，不是带输入框/按钮的卡片 —— 只显示一行文字 +
+     * 一个关闭 X，浮在搜索框下方，不遮全屏、不拦截背景操作。X 在 5 秒后才可点，
+     * 逼用户至少看一眼这个入口（与设置页首次提示同一套交互）。</p>
+     */
+    private void showPasteLinkDialog() {
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
+                .findViewById(android.R.id.content);
+
+        final LinearLayout bubble = new LinearLayout(this);
+        bubble.setOrientation(LinearLayout.HORIZONTAL);
+        bubble.setGravity(Gravity.CENTER_VERTICAL);
+        bubble.setPadding(dpToPx(10), dpToPx(6), dpToPx(4), dpToPx(6));
+        bubble.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xF2302A38));
+        bubble.setElevation(dpToPx(6));
+
+        // 浮在搜索框正下方、水平居中，不遮整屏
+        FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        bp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        bp.topMargin = dpToPx(46);
+        bubble.setLayoutParams(bp);
+
+        TextView text = new TextView(this);
+        text.setText("可以解析网易云链接");
+        text.setTextColor(0xFFFFFFFF);
+        text.setTextSize(12);
+        text.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tp.setMarginEnd(dpToPx(4));
+        text.setLayoutParams(tp);
+        bubble.addView(text);
+
+        // 关闭 X：5 秒后才可点（禁用期间半透明）
+        final ImageView btnClose = new ImageView(this);
+        btnClose.setImageResource(R.drawable.ic_close);
+        btnClose.setColorFilter(0xFFAAAAAA);
+        btnClose.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dpToPx(30), dpToPx(30));
+        btnClose.setLayoutParams(cp);
+        btnClose.setAlpha(0.35f);
+        btnClose.setEnabled(false);
+        final Runnable[] countdownRef = new Runnable[1];
+        final Runnable closeSelf = () -> {
+            if (bubble.getParent() != null) {
+                ((ViewGroup) bubble.getParent()).removeView(bubble);
+            }
+            if (countdownRef[0] != null) {
+                bubble.removeCallbacks(countdownRef[0]);
+            }
+        };
+        btnClose.setOnClickListener(v -> closeSelf.run());
+        bubble.addView(btnClose);
+
+        // 点气泡本身不关闭；点搜索页其它地方也不受影响（气泡不是全屏遮罩）
+        bubble.setClickable(true);
+
+        final int[] remain = {5};
+        countdownRef[0] = new Runnable() {
+            @Override
+            public void run() {
+                remain[0]--;
+                if (remain[0] <= 0) {
+                    btnClose.setEnabled(true);
+                    btnClose.setAlpha(1f);
+                    btnClose.setColorFilter(0xFFFFFFFF);
+                    return;
+                }
+                bubble.postDelayed(this, 1000);
+            }
+        };
+        bubble.postDelayed(countdownRef[0], 1000);
+
+        rootView.addView(bubble);
     }
 
     /** S1：ViewPager2 的页面适配器（第 0/1/2 页 = 单曲 / 歌单 / MV）。 */

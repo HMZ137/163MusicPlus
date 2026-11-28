@@ -49,12 +49,15 @@ public final class UpdateChecker {
         private final int versionCode;
         private final String notes;
         private final int localVersionCode;
+        private final String localVersionName;
 
-        public VersionInfo(String versionName, int versionCode, String notes, int localVersionCode) {
+        public VersionInfo(String versionName, int versionCode, String notes,
+                           int localVersionCode, String localVersionName) {
             this.versionName = versionName;
             this.versionCode = versionCode;
             this.notes = notes;
             this.localVersionCode = localVersionCode;
+            this.localVersionName = localVersionName;
         }
 
         public String getVersionName() {
@@ -70,16 +73,50 @@ public final class UpdateChecker {
         }
 
         /**
-         * 当前安装版本是否已是最新。
+         * 当前安装版本是否已是最新（2026-11-28 修「1128 却提示 1122 是新版」）。
          *
-         * <p>优先按 versionCode 比较；清单没填版本码时保守判定为「最新」，
-         * 避免把「检查不出结果」误报成有新版本。</p>
+         * <p>根因：本地 {@code versionCode} 是构建序号（如 45），而远端清单历史上填过
+         * 日期码（如 1122 / 20261122），两套数字量纲完全不同，直接用 {@code >=} 比必然
+         * 误判 —— 45 >= 1122 为 false，于是把更旧的 1122 当成新版本弹提示。
+         * 本项目的版本名统一是 8 位日期码（{@code 20261128}），量纲一致，改用它比较。</p>
+         *
+         * <p>只提取版本名里的连续数字段（兼容 {@code 20261128-debug} 这类后缀），
+         * 至少 6 位才认为是有效日期码；版本名比不出时回退到 versionCode（同一量纲才可比），
+         * 都没有则保守判定为「最新」，避免把「检查不出结果」误报成有新版本。</p>
          */
         public boolean isLatest() {
+            long remoteDate = dateCode(versionName);
+            long localDate = dateCode(localVersionName);
+            if (remoteDate > 0 && localDate > 0) {
+                return localDate >= remoteDate;
+            }
             if (versionCode > 0 && localVersionCode > 0) {
                 return localVersionCode >= versionCode;
             }
             return true;
+        }
+
+        /** 从版本名里提取连续数字段作为日期码，如 {@code 20261128-debug} → 20261128。 */
+        private static long dateCode(String name) {
+            if (name == null) {
+                return 0;
+            }
+            StringBuilder digits = new StringBuilder();
+            for (int i = 0; i < name.length(); i++) {
+                char c = name.charAt(i);
+                if (c >= '0' && c <= '9') {
+                    digits.append(c);
+                }
+            }
+            // 少于 6 位不像日期码（例如 "45"），不采信
+            if (digits.length() < 6) {
+                return 0;
+            }
+            try {
+                return Long.parseLong(digits.toString());
+            } catch (NumberFormatException e) {
+                return 0;
+            }
         }
     }
 
@@ -224,15 +261,18 @@ public final class UpdateChecker {
                     return;
                 }
                 int localCode = 0;
+                String localName = "";
                 try {
-                    localCode = context.getPackageManager()
-                            .getPackageInfo(context.getPackageName(), 0).versionCode;
+                    android.content.pm.PackageInfo pi = context.getPackageManager()
+                            .getPackageInfo(context.getPackageName(), 0);
+                    localCode = pi.versionCode;
+                    localName = pi.versionName;
                 } catch (Throwable ignored) {
                 }
                 callback.onResult(new VersionInfo(name,
                         obj.optInt("versionCode", 0),
                         obj.optString("notes", ""),
-                        localCode));
+                        localCode, localName));
             });
         }, "update-check").start();
     }

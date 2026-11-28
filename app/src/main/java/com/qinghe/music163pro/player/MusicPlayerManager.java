@@ -1228,6 +1228,20 @@ public class MusicPlayerManager {
         notifySongChanged(song);
         savePlaybackState();
 
+        // 2026-11-28：网络直链（http(s)）直接播，不走网易云取链。
+        // 之前缺这条分支，直链被当成 id=0 的在线歌去问接口 → MediaPlayer
+        // 「Failed to init from data source」，服务器连请求都收不到。
+        String directUrl = song.getUrl();
+        if (directUrl != null) {
+            String lowerUrl = directUrl.toLowerCase(java.util.Locale.ROOT);
+            if (lowerUrl.startsWith("http://") || lowerUrl.startsWith("https://")) {
+                // 流播在这代 ROM 上会被 Stagefright 反复 reset，改成下载后本地播
+                com.qinghe.music163pro.util.DirectPlayback.play(
+                        appContext, directUrl.replace(" ", "%20"));
+                return;
+            }
+        }
+
         if (song.isForceLocalPlayback()) {
             // 下载列表给出的 url 就是音频文件的绝对路径，优先直接用它：
             // 当目录名与「曲名 - 曲师」对不上时（手动拷进来的音乐、缺 info.json 的下载），

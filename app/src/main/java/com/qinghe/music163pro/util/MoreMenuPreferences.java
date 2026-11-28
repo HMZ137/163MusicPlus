@@ -30,6 +30,12 @@ public final class MoreMenuPreferences {
     public static final String KEY_PERSONAL_FM = "more_show_personal_fm";
     public static final String KEY_LOGIN = "more_show_login";
     public static final String KEY_BILIBILI = "more_show_bilibili";
+    /** 2026-11-28：打开链接页入口，默认隐藏（高级功能，需在「编辑更多页面」里开启）。 */
+    public static final String KEY_OPEN_LINK = "more_show_open_link";
+
+    /** 默认关闭的项（默认隐藏）。 */
+    private static final List<String> DEFAULT_OFF_KEYS = Collections.unmodifiableList(
+            Collections.singletonList(KEY_OPEN_LINK));
 
     private static final List<String> ALL_KEYS = Collections.unmodifiableList(Arrays.asList(
             KEY_FAVORITES,
@@ -46,7 +52,8 @@ public final class MoreMenuPreferences {
             KEY_PROFILE,
             KEY_PERSONAL_FM,
             KEY_LOGIN,
-            KEY_BILIBILI
+            KEY_BILIBILI,
+            KEY_OPEN_LINK
     ));
 
     private MoreMenuPreferences() {
@@ -57,7 +64,8 @@ public final class MoreMenuPreferences {
     }
 
     public static boolean isEnabled(SharedPreferences prefs, String key) {
-        return prefs == null || prefs.getBoolean(key, true);
+        boolean defaultOn = !DEFAULT_OFF_KEYS.contains(key);
+        return prefs == null || prefs.getBoolean(key, defaultOn);
     }
 
     public static void setEnabled(SharedPreferences prefs, String key, boolean enabled) {

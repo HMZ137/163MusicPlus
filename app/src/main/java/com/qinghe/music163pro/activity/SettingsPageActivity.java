@@ -89,6 +89,8 @@ public class SettingsPageActivity extends BaseWatchActivity {
     private static final String PREF_USE_WATCH_API = "use_watch_parse";
     private static final String PREF_SKIP_TRIAL_SONGS = "skip_trial_songs";
     private static final String PREF_RANDOM_SKIP_RANDOM = "random_skip_random";
+    /** 2026-11-28：更新策略键，与 MainActivity 的 KEY_UPDATE_POLICY 同值。 */
+    private static final String PREF_UPDATE_POLICY = "update_policy";
     private static final int MODE_MANUAL = 0;
     private static final int MODE_AUTO = 1;
     private static final int LYRIC_MODE_FOLLOW = 0;
@@ -102,6 +104,9 @@ public class SettingsPageActivity extends BaseWatchActivity {
     private long buildStartMs;
     /** 2026-11-27：说明文字短于此字数就按「单行数据」处理（不折叠、不拦点击）。 */
     private static final int SHORT_DESC_MAX = UiKit.SHORT_DESC_MAX;
+
+    /** 「更新方式」行的说明文字，选中后原地刷新。 */
+    private TextView updatePolicyRow;
 
     // ==================== 外观与显示 ====================
 
@@ -531,12 +536,61 @@ public class SettingsPageActivity extends BaseWatchActivity {
         addSection("应用");
         addRow("检测更新", "检查是否有新版本", () ->
                 startActivity(new Intent(this, UpdateActivity.class)));
+        // 2026-11-28：更新方式三选一（自动安装 / 仅提示 / 手动），默认「仅提示」。
+        TextView tvUpdatePolicy = addRowWithSub("更新方式", updatePolicyLabel(), () ->
+                showUpdatePolicyPicker());
+        updatePolicyRow = tvUpdatePolicy;
         addRow("帮助", "使用说明", () ->
                 startActivity(new Intent(this, HelpActivity.class)));
         addRow("关于", "版本信息与作者", () ->
                 startActivity(new Intent(this, AboutActivity.class)));
         addRow("开源信息", "第三方库许可", () ->
                 startActivity(new Intent(this, OpenSourceActivity.class)));
+    }
+
+    /** 读当前更新策略对应的说明文字。 */
+    private String updatePolicyLabel() {
+        String p = prefs.getString(PREF_UPDATE_POLICY, MainActivity.UPDATE_POLICY_NOTIFY);
+        if (MainActivity.UPDATE_POLICY_AUTO.equals(p)) {
+            return "自动安装 · 发现新版自动下载安装";
+        }
+        if (MainActivity.UPDATE_POLICY_MANUAL.equals(p)) {
+            return "手动 · 仅在本页点检测时检查";
+        }
+        return "仅提示 · 不自动下载安装";
+    }
+
+    /** 弹三选一：自动安装 / 仅提示 / 手动。 */
+    private void showUpdatePolicyPicker() {
+        final String[] values = {
+                MainActivity.UPDATE_POLICY_AUTO,
+                MainActivity.UPDATE_POLICY_NOTIFY,
+                MainActivity.UPDATE_POLICY_MANUAL
+        };
+        final String[] labels = {"自动安装", "仅提示（默认）", "手动"};
+        final String current = prefs.getString(PREF_UPDATE_POLICY,
+                MainActivity.UPDATE_POLICY_NOTIFY);
+        Runnable[] actions = new Runnable[values.length];
+        for (int i = 0; i < values.length; i++) {
+            final String v = values[i];
+            actions[i] = () -> {
+                prefs.edit().putString(PREF_UPDATE_POLICY, v).apply();
+                if (updatePolicyRow != null) {
+                    updatePolicyRow.setText(updatePolicyLabel());
+                }
+                com.qinghe.music163pro.util.UiKit.toast(this,
+                        "更新方式：" + labels[indexOf(values, v)]);
+            };
+        }
+        com.qinghe.music163pro.util.WatchPopup.actions(this, "更新方式",
+                "当前：" + updatePolicyLabel(), labels, actions);
+    }
+
+    private static int indexOf(String[] arr, String v) {
+        for (int i = 0; i < arr.length; i++) {
+            if (arr[i].equals(v)) return i;
+        }
+        return 0;
     }
 
     /** 首次进入设置时弹一次「简介可展开」的提示；5 秒倒计时内不可关闭。 */
