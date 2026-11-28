@@ -1228,18 +1228,20 @@ public class MusicPlayerManager {
         notifySongChanged(song);
         savePlaybackState();
 
-        // 2026-11-28：网络直链（http(s)）直接播，不走网易云取链。
-        // 之前缺这条分支，直链被当成 id=0 的在线歌去问接口 → MediaPlayer
-        // 「Failed to init from data source」，服务器连请求都收不到。
-        String directUrl = song.getUrl();
-        if (directUrl != null) {
-            String lowerUrl = directUrl.toLowerCase(java.util.Locale.ROOT);
-            if (lowerUrl.startsWith("http://") || lowerUrl.startsWith("https://")) {
-                // 流播在这代 ROM 上会被 Stagefright 反复 reset，改成下载后本地播
-                com.qinghe.music163pro.util.DirectPlayback.play(
-                        appContext, directUrl.replace(" ", "%20"));
-                return;
-            }
+        // 2026-11-28 修「本地收藏走了直链解析」：
+        // 这里曾经有一段「只要 url 是 http(s) 就走 DirectPlayback 下载」的分支。
+        // 那段是给早期「把网络直链直接塞进播放列表」用的，但直链入口早已改成
+        // DirectPlayback.play()（下载到缓存后当本地文件播），根本不经过这里；
+        // 反而把收藏 / 历史 / 歌单里读出来的网易云**签名直链**（收藏时存下的临时 url）
+        // 一并当成用户直链下载，绕开了正常的网易云接口取链 —— 签名链过期 / 防盗链就播不了。
+        // 现在统一交给下面的 getSongUrlInfo() 按 id 重新取链；用户主动输入的音频直链
+        // 由 SearchActivity / PlayLinkActivity / OpenShareLinkActivity 直接调 DirectPlayback，
+        // 与本方法无关。若这里残留 http url，直接清掉，避免误用过期地址。
+        String leftoverUrl = song.getUrl();
+        if (leftoverUrl != null && (leftoverUrl.toLowerCase(java.util.Locale.ROOT)
+                .startsWith("http://") || leftoverUrl.toLowerCase(java.util.Locale.ROOT)
+                .startsWith("https://"))) {
+            song.setUrl(null);
         }
 
         if (song.isForceLocalPlayback()) {

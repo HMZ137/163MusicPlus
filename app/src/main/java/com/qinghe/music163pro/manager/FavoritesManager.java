@@ -6,6 +6,7 @@ import android.os.Environment;
 import android.util.Log;
 
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.LocalTracks;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -201,7 +202,7 @@ public class FavoritesManager {
                 s.setCoverUrl(d.getCoverUrl());
                 changed = true;
             }
-            if (isEmpty(s.getUrl()) && !isEmpty(d.getUrl())) {
+            if (isEmpty(s.getUrl()) && LocalTracks.isLocalPath(d.getUrl())) {
                 s.setUrl(d.getUrl());
                 changed = true;
             }
@@ -335,8 +336,14 @@ public class FavoritesManager {
                         obj.optString("artist", ""),
                         obj.optString("album", "")
                 );
+                // 2026-11-28 修「收藏走了直链解析」：只恢复本地路径 url。
+                // 网易云的签名直链是限时的（收藏时把正在播的歌整个存下来会带上它），
+                // 恢复出来既过期又没有意义，还会让播放链路误当成用户直链 —— 交给
+                // PlayCurrent 按歌曲 id 走网易云接口重新取链。
                 String url = obj.has("url") && !obj.isNull("url") ? obj.getString("url") : null;
-                song.setUrl(url);
+                if (LocalTracks.isLocalPath(url)) {
+                    song.setUrl(url);
+                }
                 // 2026-11-22：恢复封面 URL（旧记录没有 cover 字段则为空，补详情时会刷新）
                 if (obj.has("cover") && !obj.isNull("cover")) {
                     song.setCoverUrl(obj.getString("cover"));
@@ -384,7 +391,9 @@ public class FavoritesManager {
             if (s.getCoverUrl() != null) {
                 obj.put("cover", s.getCoverUrl());
             }
-            if (s.getUrl() != null) {
+            // 只存本地路径 url；网易云签名直链是限时的，存下来只会过期，
+            // 且会让恢复出来的歌被当成直链播放（见 getFavorites 的说明）。
+            if (LocalTracks.isLocalPath(s.getUrl())) {
                 obj.put("url", s.getUrl());
             }
             arr.put(obj);
@@ -449,7 +458,10 @@ public class FavoritesManager {
                         obj.optString("album", "")
                 );
                 String url = obj.has("url") && !obj.isNull("url") ? obj.getString("url") : null;
-                song.setUrl(url);
+                // 与 getFavorites 一致：只恢复本地路径，不复活过期的网易云直链
+                if (LocalTracks.isLocalPath(url)) {
+                    song.setUrl(url);
+                }
                 list.add(song);
             }
         } catch (Exception e) {
