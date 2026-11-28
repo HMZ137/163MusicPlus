@@ -81,6 +81,8 @@ public final class WatchPopup {
     private String description;
     private String content;
     private boolean withInput;
+    /** 正文用小号字（常规的 60%）：长说明在小屏上会把按钮挤出屏幕时用。 */
+    private boolean smallContent;
     private String inputHint = "";
     private String inputInitial = "";
     private boolean withCheckbox;
@@ -116,6 +118,12 @@ public final class WatchPopup {
     /** 正文（确认框的提示文案）；与 input 可同时使用（说明在上、输入栏在下）。 */
     public WatchPopup content(String content) {
         this.content = content;
+        return this;
+    }
+
+    /** 正文用小号字（60%），长段说明配它用。 */
+    public WatchPopup smallContent() {
+        this.smallContent = true;
         return this;
     }
 
@@ -194,7 +202,7 @@ public final class WatchPopup {
 
         final LinearLayout card = new LinearLayout(activity);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(UiKit.dialogCard(activity));   // 14dp 大圆角
+        card.setBackground(UiKit.dialogCard(activity));   // M3E：24dp 大圆角
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -329,7 +337,7 @@ public final class WatchPopup {
         input.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.textBodyPx(activity));
         // 参考图（浮窗2）：输入区只有一条下划线，没有圆角色块
         input.setPadding(dp(2), dp(8), dp(2), dp(8));
-        input.setBackgroundResource(R.drawable.bg_input_underline);
+        input.setBackgroundResource(R.drawable.bg_search_box);   // M3E：填充式输入框
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         row.addView(input, inputParams);
@@ -377,7 +385,8 @@ public final class WatchPopup {
         button.setTextSize(TypedValue.COMPLEX_UNIT_PX, UiKit.sp(activity, 12f));
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(14), dp(8), dp(14), dp(8));
-        button.setBackgroundResource(R.drawable.bg_selectable_rounded);
+        // M3E：弹窗按钮统一胶囊形（tonal 底，两态都带圆角）
+        button.setBackgroundResource(R.drawable.bg_btn_dialog);
         button.setClickable(true);
         button.setFocusable(true);
         LinearLayout.LayoutParams lp;

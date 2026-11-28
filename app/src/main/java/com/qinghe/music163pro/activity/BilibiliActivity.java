@@ -98,9 +98,16 @@ public class BilibiliActivity extends BaseWatchActivity {
 
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
+        // 2026-11-28：标题栏高度用统一入口撑到浮动返回按钮的占位，
+        // 否则列表第一行会被按钮压住（手算 max() 会算矮）
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         insetTitleBar(bar);
+        // 2026-11-28：标题栏直接给固定高度 —— 浮动返回按钮实测占 y=8~88，
+        // 用 applyTitleBarTopInset 会被「可收起标题栏」逻辑再压回一行高。
+        ViewGroup.LayoutParams barLp = bar.getLayoutParams();
+        barLp.height = px(80);
+        bar.setLayoutParams(barLp);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         // 2026-11-21：返回入口改由全局浮动按钮承担，这里不再画标题栏箭头（避免两个返回入口）
@@ -108,17 +115,14 @@ public class BilibiliActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         title.setLayoutParams(titleParams);
-        title.setGravity(Gravity.START);
+        title.setGravity(Gravity.CENTER);
         title.setText("听bilibili");
         title.setTextColor(getResources().getColor(R.color.text_primary));
-        title.setTextSize(14);
+        title.setTextSize(16);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         bar.addView(title);
 
-        // 右侧占位，让标题保持在视觉中间
-        ImageView placeholder = new ImageView(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(30), px(30)));
-        bar.addView(placeholder);
+        // 2026-11-28：去掉右侧占位 —— 标题已按整屏居中，占位反而把标题推左
         return bar;
     }
 
@@ -180,39 +184,39 @@ public class BilibiliActivity extends BaseWatchActivity {
     private LinearLayout loginRow;
 
     private LinearLayout createMenuItem(int iconRes, String label, Runnable onClick) {
+        // 2026-11-28：尺寸与「更多」页的行对齐（54dp 高 / 16dp 内边距 / 17sp 文字 / 涟漪底）
         LinearLayout row = new LinearLayout(this);
-        // 2026-11-21：高度自适应（原来固定 52dp，「已登录：昵称」这类长文案会被裁掉一半）
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                ViewGroup.LayoutParams.MATCH_PARENT, px(54));
         params.topMargin = px(6);
         row.setLayoutParams(params);
-        row.setMinimumHeight(px(52));
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(px(14), 0, px(14), 0);
+        row.setPadding(px(16), 0, px(16), 0);
         row.setClickable(true);
         row.setFocusable(true);
-        row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), getResources().getColor(R.color.surface_elevated)));
+        // 与「更多」同一个底：常态深色 + 按下淡紫，都带 18dp 圆角
+        row.setBackgroundResource(R.drawable.bg_card_tile_ripple);
         row.setOnClickListener(v -> onClick.run());
 
         ImageView icon = new ImageView(this);
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                px(22), px(22));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(px(22), px(22));
         icon.setLayoutParams(iconParams);
         icon.setImageResource(iconRes);
         icon.setAlpha(0.7f);
         row.addView(icon);
 
         TextView tv = new TextView(this);
-        // 标题占满剩余宽度，最多两行，超出才省略 —— 昵称长也不会被裁
+        // 单行（与「更多」一致），过长结尾省略；昵称长也不会把行撑高
         LinearLayout.LayoutParams tvParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        tvParams.setMarginStart(px(10));
+        tvParams.setMarginStart(px(12));
         tv.setLayoutParams(tvParams);
         tv.setText(label);
         tv.setTextColor(getResources().getColor(R.color.text_primary));
-        tv.setTextSize(14);
-        tv.setMaxLines(2);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_text_item));
+        tv.setSingleLine(true);
         tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
         row.addView(tv);
 

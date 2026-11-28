@@ -328,10 +328,16 @@ public class LoginActivity extends BaseWatchActivity {
                     "还没有 Cookie 可导出，请先扫码登录或粘贴后保存");
             return;
         }
-        com.qinghe.music163pro.util.WatchPopup.confirm(this, "安全提示",
-                "Cookie 等同账号登录凭证，导出后请勿分享或上传到公开位置，"
-                        + "泄露可能导致账号被盗。确认导出？",
-                "确认导出", false, this::doExportCookie);
+        // 2026-11-28：文案压缩 + 字号 60%，避免小屏上正文把按钮挤出去
+        com.qinghe.music163pro.util.WatchPopup popup =
+                com.qinghe.music163pro.util.WatchPopup.create(this)
+                        .title("安全提示")
+                        .content("Cookie 等同账号凭证，导出后请勿外传。确认导出？")
+                        .smallContent()
+                        .cancelButton();
+        popup.button("确认导出", com.qinghe.music163pro.util.WatchPopup.STYLE_PRIMARY,
+                this::doExportCookie);
+        popup.show();
     }
 
     /** 真正的导出动作（安全确认之后才执行）。 */

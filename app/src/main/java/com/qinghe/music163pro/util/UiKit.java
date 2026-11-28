@@ -34,6 +34,14 @@ import android.widget.TextView;
 public final class UiKit {
 
     public static final int COLOR_PAGE = 0xFF121212;
+    // ===== M3 语义色 token（2026-11-28）=====
+    /** 纯黑表面（Wear M3E 规范）。 */
+    public static final int COLOR_BG_SURFACE = 0xFF000000;
+    /** 次要文字（muted）。 */
+    public static final int COLOR_TEXT_MUTED = 0xFFA49FB0;
+    /** surface container high。 */
+    public static final int COLOR_SURFACE_HIGH = 0xFF26272D;
+
     public static final int COLOR_CARD = 0xFF1E1F24;
     /**
      * 主题强调色（P1-10）。
@@ -55,11 +63,11 @@ public final class UiKit {
     /** 标签行高度（与「收藏」页一致）。 */
     public static final int DP_TAB_ROW_HEIGHT = 32;
 
-    public static final int DP_CARD_RADIUS = 10;
-    public static final int DP_ROW_RADIUS = 14;
-    public static final int DP_DIALOG_RADIUS = 14;
+    public static final int DP_CARD_RADIUS = 18;   // M3E：卡片圆角放大一档
+    public static final int DP_ROW_RADIUS = 18;
+    public static final int DP_DIALOG_RADIUS = 24;   // M3E：弹窗/浮层用 corner_xl
     /** 按钮统一圆角（全 App 唯一值）：与卡片同值，保持观感一致。 */
-    public static final int DP_BUTTON_RADIUS = 14;
+    public static final int DP_BUTTON_RADIUS = 999;  // M3E：按钮走 full（胶囊）
     public static final int DP_BUTTON_HEIGHT = 44;
 
     // ==================== G2 字号与尺寸令牌（技术文档 [1-5]） ====================
@@ -184,7 +192,21 @@ public final class UiKit {
         showToast(c, c.getResources().getText(resId), android.widget.Toast.LENGTH_LONG);
     }
 
+    /**
+     * 小号 Toast：字号是常规的 60%（2026-11-28 需求）。
+     *
+     * <p>「导出 Cookie」这类操作会带一长串补充说明，常规字号在小屏手表上会把
+     * 底部按钮挤出去，所以单独给一个小号版本。</p>
+     */
+    public static void toastSmall(Context c, CharSequence text) {
+        showToast(c, text, android.widget.Toast.LENGTH_SHORT, 0.6f);
+    }
+
     private static void showToast(Context c, CharSequence text, int duration) {
+        showToast(c, text, duration, 1f);
+    }
+
+    private static void showToast(Context c, CharSequence text, int duration, float scale) {
         if (c == null || text == null || text.length() == 0) {
             return;
         }
@@ -195,7 +217,7 @@ public final class UiKit {
         TextView tv = new TextView(app);
         tv.setText(text);
         tv.setTextColor(0xFFFFFFFF);
-        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12 * scale);
         tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(3);
         tv.setPadding(dp(app, 12), dp(app, 8), dp(app, 12), dp(app, 8));
@@ -208,6 +230,70 @@ public final class UiKit {
         t.setDuration(duration);
         t.show();
         appToast = t;
+    }
+
+    // ==================== M3E 组件封装（2026-11-28） ====================
+
+    /**
+     * M3 卡片：大圆角 + surface container 底 + 无描边无阴影。
+     *
+     * <p>页面里别再自己 {@code GradientDrawable} 画卡片，统一用这个，
+     * 以后换圆角/换色只改一处。</p>
+     */
+    public static com.google.android.material.card.MaterialCardView m3Card(Context c) {
+        com.google.android.material.card.MaterialCardView card =
+                new com.google.android.material.card.MaterialCardView(c);
+        card.setCardBackgroundColor(COLOR_CARD);
+        card.setRadius(dp(c, DP_CARD_RADIUS));
+        card.setCardElevation(0f);
+        card.setStrokeWidth(0);
+        card.setUseCompatPadding(false);
+        card.setPreventCornerOverlap(false);
+        return card;
+    }
+
+    /**
+     * M3 按钮：胶囊形。
+     *
+     * @param filled true = 主操作（主色实心，深色文字）；false = 次要操作（tonal）
+     */
+    public static com.google.android.material.button.MaterialButton m3Button(
+            Context c, CharSequence text, boolean filled) {
+        com.google.android.material.button.MaterialButton btn =
+                new com.google.android.material.button.MaterialButton(c);
+        btn.setText(text);
+        btn.setAllCaps(false);
+        btn.setCornerRadius(dp(c, DP_BUTTON_RADIUS));
+        btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        btn.setInsetTop(0);
+        btn.setInsetBottom(0);
+        btn.setMinHeight(dp(c, 44));
+        if (filled) {
+            btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accentColor(c)));
+            btn.setTextColor(0xFF1B1226);
+        } else {
+            btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF26272D));
+            btn.setTextColor(0xFFF2EEF8);
+        }
+        return btn;
+    }
+
+    /** M3 选择型 Chip（单选/多选标签），选中用主色 tonal。 */
+    public static com.google.android.material.button.MaterialButton m3Chip(
+            Context c, CharSequence text, boolean selected) {
+        com.google.android.material.button.MaterialButton chip =
+                new com.google.android.material.button.MaterialButton(c);
+        chip.setText(text);
+        chip.setAllCaps(false);
+        chip.setCornerRadius(dp(c, DP_BUTTON_RADIUS));
+        chip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        chip.setMinHeight(dp(c, 34));
+        chip.setInsetTop(0);
+        chip.setInsetBottom(0);
+        chip.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                selected ? 0xFF3B2F4D : 0xFF232329));
+        chip.setTextColor(selected ? ThemeManager.accentColor(c) : 0xFFA49FB0);
+        return chip;
     }
 
     // ==================== 说明文字：过长先省略 → 点击展开 ====================

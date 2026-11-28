@@ -133,7 +133,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         btnCookieLogin.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         ((LinearLayout.LayoutParams) btnCookieLogin.getLayoutParams()).topMargin = px(6);
-        btnCookieLogin.setOnClickListener(v -> loginWithCookie());
+        btnCookieLogin.setOnClickListener(v -> loginWithCookie(btnCookieLogin));
         cookieCard.addView(btnCookieLogin);
 
         scrollView.addView(container);
@@ -262,12 +262,17 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
     };
 
     /**
-     * 2026-11-21：用粘贴的 Cookie 登录。
+     * 2026-11-28：用粘贴的 Cookie 登录，<b>必须先验证</b>。
+     *
+     * <p>以前只检查字符串里有没有 {@code SESSDATA=}，乱填一个也能「登录成功」，
+     * 结果后面所有需要登录的接口都 401。现在先做本地格式检查，再调
+     * {@code /x/web-interface/nav} 让 B 站确认（返回 {@code isLogin=true} 才算登录成功），
+     * 校验通过才落盘。</p>
      *
      * <p>支持两种输入：纯 Cookie 串（{@code SESSDATA=...; bili_jct=...}），
      * 或浏览器插件导出的 JSON（{@code {"cookies":"...","refresh_token":""}}）。</p>
      */
-    private void loginWithCookie() {
+    private void loginWithCookie(MaterialButton button) {
         String raw = etCookie.getText() == null ? "" : etCookie.getText().toString().trim();
         if (raw.isEmpty()) {
             com.qinghe.music163pro.util.UiKit.toast(this, "请先粘贴 Cookie");
@@ -284,14 +289,72 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
             } catch (Throwable ignored) {
             }
         }
-        if (!cookie.contains("SESSDATA=")) {
+        String sessData = extractCookieValue(cookie, "SESSDATA");
+        if (sessData.isEmpty()) {
             com.qinghe.music163pro.util.UiKit.toast(this, "Cookie 里缺少 SESSDATA，无法登录");
             return;
         }
-        saveBilibiliCookie(cookie);
-        tvStatus.setText("Cookie 已保存，登录成功");
-        com.qinghe.music163pro.util.UiKit.toast(this, "登录成功");
-        finish();
+        // 本地先挡掉明显不是 SESSDATA 的东西（真实值是一长串 URL 编码字符，至少 20 位）
+        if (sessData.length() < 20 || sessData.contains(" ") || sessData.contains("...")) {
+            tvStatus.setText("Cookie 格式不对：SESSDATA 看起来是占位符或已截断");
+            com.qinghe.music163pro.util.UiKit.toast(this, "SESSDATA 不完整，请从浏览器里完整复制");
+            return;
+        }
+
+        final String finalCookie = cookie;
+        if (button != null) {
+            button.setEnabled(false);
+        }
+        tvStatus.setText("正在向B站验证 Cookie…");
+        BilibiliApiHelper.getNavInfo(finalCookie, new BilibiliApiHelper.NavCallback() {
+            @Override
+            public void onResult(boolean loggedIn, String uname) {
+                if (button != null) {
+                    button.setEnabled(true);
+                }
+                if (!loggedIn) {
+                    // 不落盘：无效 Cookie 存下来只会让后续每个接口都失败，且用户以为已登录
+                    tvStatus.setText("Cookie 无效或已过期（B站返回未登录），请重新复制");
+                    com.qinghe.music163pro.util.UiKit.toastLong(BilibiliLoginActivity.this,
+                            "Cookie 无效或已过期，登录未生效");
+                    return;
+                }
+                saveBilibiliCookie(finalCookie);
+                String who = uname == null || uname.isEmpty() ? "" : "：" + uname;
+                tvStatus.setText("登录成功" + who);
+                com.qinghe.music163pro.util.UiKit.toastLong(BilibiliLoginActivity.this,
+                        "B站登录成功" + who);
+                finish();
+            }
+
+            @Override
+            public void onError(String message) {
+                if (button != null) {
+                    button.setEnabled(true);
+                }
+                tvStatus.setText("校验失败：" + message + "（检查网络后重试）");
+                com.qinghe.music163pro.util.UiKit.toastLong(BilibiliLoginActivity.this,
+                        "无法连接B站校验 Cookie，请检查网络后重试");
+            }
+        });
+    }
+
+    /** 从 Cookie 串里取某个键的值（不区分大小写，值到 ; 或串尾为止）。 */
+    private static String extractCookieValue(String cookie, String key) {
+        if (cookie == null || cookie.isEmpty()) {
+            return "";
+        }
+        for (String part : cookie.split(";")) {
+            String item = part.trim();
+            int eq = item.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+            if (item.substring(0, eq).trim().equalsIgnoreCase(key)) {
+                return item.substring(eq + 1).trim();
+            }
+        }
+        return "";
     }
 
     private void saveBilibiliCookie(String cookie) {
@@ -302,9 +365,16 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
 
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
+        // 2026-11-28：标题栏高度用统一入口撑到浮动返回按钮的占位，
+        // 否则列表第一行会被按钮压住（手算 max() 会算矮）
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         insetTitleBar(bar);
+        // 2026-11-28：标题栏直接给固定高度 —— 浮动返回按钮实测占 y=8~88，
+        // 用 applyTitleBarTopInset 会被「可收起标题栏」逻辑再压回一行高。
+        ViewGroup.LayoutParams barLp = bar.getLayoutParams();
+        barLp.height = px(80);
+        bar.setLayoutParams(barLp);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
@@ -319,10 +389,10 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         title.setLayoutParams(titleParams);
-        title.setGravity(Gravity.START);
+        title.setGravity(Gravity.CENTER);
         title.setText("B站扫码登录");
         title.setTextColor(getResources().getColor(R.color.text_primary));
-        title.setTextSize(14);
+        title.setTextSize(16);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         bar.addView(title);
 

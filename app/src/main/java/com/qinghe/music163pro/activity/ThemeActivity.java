@@ -42,6 +42,7 @@ public class ThemeActivity extends BaseWatchActivity {
         title.setPadding(0, dpToPx(4), 0, dpToPx(8));
         root.addView(title, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
 
         int current = ThemeManager.getIndex(this);
         for (int i = 0; i < ThemeManager.NAMES.length; i++) {

@@ -59,7 +59,7 @@ public class ProfileActivity extends BaseWatchActivity {
         if (cookie == null) cookie = "";
 
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF121212);
+        scrollView.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scrollView.setFillViewport(true);
         contentLayout = new LinearLayout(this);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -236,13 +236,14 @@ public class ProfileActivity extends BaseWatchActivity {
 
         addSectionTitle("账号等级");
 
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF1E1E1E);
-        bg.setCornerRadius(px(12));
-        card.setBackground(bg);
-        card.setPadding(px(12), px(10), px(12), px(12));
+        // 2026-11-28 M3E：手搓 12dp 深灰卡 → Material 卡片（18dp + surface container）
+        com.google.android.material.card.MaterialCardView card =
+                com.qinghe.music163pro.util.UiKit.m3Card(this);
+        card.setPreventCornerOverlap(false);
+        LinearLayout cardInner = new LinearLayout(this);
+        cardInner.setOrientation(LinearLayout.VERTICAL);
+        cardInner.setPadding(px(12), px(10), px(12), px(12));
+        card.addView(cardInner);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.bottomMargin = px(4);
@@ -262,13 +263,13 @@ public class ProfileActivity extends BaseWatchActivity {
 
         TextView tvPlay = new TextView(this);
         tvPlay.setText(nextPlay > 0 ? "听歌 " + nowPlay + " / " + nextPlay : "听歌 " + nowPlay);
-        tvPlay.setTextColor(0xFFAAAAAA);
+        tvPlay.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED);
         tvPlay.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
         tvPlay.setGravity(Gravity.END);
         tvPlay.setLayoutParams(new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(tvPlay);
-        card.addView(row);
+        cardInner.addView(row);
 
         // 进度条：用权重切成 (已达成 | 剩余) 两段，不必等测量就能按比例显示
         double ratio = progress;
@@ -297,15 +298,15 @@ public class ProfileActivity extends BaseWatchActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, done));
         bar.addView(new View(this), new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.MATCH_PARENT, left));
-        card.addView(bar);
+        cardInner.addView(bar);
 
         // 第三段：登录天数 / 权益说明
         if (nextLogin > 0) {
             TextView tvLogin = new TextView(this);
             tvLogin.setText("登录 " + nowLogin + " / " + nextLogin + " 天");
-            tvLogin.setTextColor(0xFFAAAAAA);
+            tvLogin.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED);
             tvLogin.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(12));
-            card.addView(tvLogin);
+            cardInner.addView(tvLogin);
         }
         if (!info.isEmpty()) {
             TextView tvInfo = new TextView(this);
@@ -313,7 +314,7 @@ public class ProfileActivity extends BaseWatchActivity {
             tvInfo.setTextColor(0xFF888888);
             tvInfo.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
             tvInfo.setPadding(0, px(4), 0, 0);
-            card.addView(tvInfo);
+            cardInner.addView(tvInfo);
         }
 
         contentLayout.addView(card);

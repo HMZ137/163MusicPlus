@@ -122,11 +122,25 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
 
     /** 标题栏右上角「更多」：按「只留 返回/标题/菜单」的口径收一个入口，当前只有「刷新收藏」。 */
     private void showFavoritesMenu() {
+        // 2026-11-28：「单曲」页多一项按字母跳转（歌单/专辑页条目少，不需要）
+        final boolean songsTab = currentPage() instanceof FavoritesSongsFragment;
+        final java.util.List<String> actions = new java.util.ArrayList<>();
+        actions.add("刷新收藏");
+        if (songsTab) {
+            actions.add("按字母跳转");
+        }
         WatchMenuDialog.show(this, getString(R.string.favorites),
-                new String[]{"刷新收藏"}, which -> {
+                actions.toArray(new String[0]), which -> {
+                    if (which == 0) {
+                        FavoritesPageFragment<?> page = currentPage();
+                        if (page != null) {
+                            page.refresh();
+                        }
+                        return;
+                    }
                     FavoritesPageFragment<?> page = currentPage();
-                    if (page != null) {
-                        page.refresh();
+                    if (page instanceof FavoritesSongsFragment) {
+                        ((FavoritesSongsFragment) page).openLetterPicker();
                     }
                 });
     }
@@ -197,7 +211,7 @@ public class FavoritesListActivity extends BaseWatchActivity implements Favorite
                 + "　 （删除 / 下一首播放 / 加入本地歌单 / 收藏到歌单）\n"
                 + "· 收藏 · 歌单：长按歌单可删除或取消收藏\n"
                 + "· 播放列表 / 歌单详情：长按歌曲可批量操作");
-        body.setTextColor(0xFFAAAAAA);
+        body.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED);
         body.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
         android.widget.LinearLayout.LayoutParams bodyLp =
                 new android.widget.LinearLayout.LayoutParams(

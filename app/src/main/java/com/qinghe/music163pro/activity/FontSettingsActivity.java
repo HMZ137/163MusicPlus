@@ -42,7 +42,8 @@ public class FontSettingsActivity extends BaseWatchActivity {
         title.setTextSize(15);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 0, 0, dpToPx(10));
-        root.addView(title);
+        root.addView(title);        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
+
 
         tvState = buildButton("当前：系统默认", null);
         root.addView(tvState);

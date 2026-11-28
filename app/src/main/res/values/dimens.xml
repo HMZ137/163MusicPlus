@@ -3,7 +3,7 @@
     <!-- 子页面顶栏标题统一字号：圆角小屏原 14sp 偏小，统一放大到 16sp。
          注意：这是**历史遗留的单点令牌**，G2 的新阶梯是下面的 watch_text_title；
          逐页替换完成后本项应改为引用 watch_text_title（见技术文档 [1-5] / [1-9]）。 -->
-    <dimen name="watch_title_text_size">16sp</dimen>
+    <dimen name="watch_title_text_size">@dimen/m3_type_title</dimen>
 
     <!-- ══════════════════════════════════════════════════════════════════
          G2 字号阶梯（sp）—— 全 App 唯一字号来源（技术文档 [1-5]）

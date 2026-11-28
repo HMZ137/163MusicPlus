@@ -167,10 +167,10 @@ public class BilibiliCloudFavoritesActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         title.setLayoutParams(titleParams);
-        title.setGravity(Gravity.START);
+        title.setGravity(Gravity.CENTER);
         title.setText(titleText);
         title.setTextColor(getResources().getColor(R.color.text_primary));
-        title.setTextSize(14);
+        title.setTextSize(16);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         bar.addView(title);
 

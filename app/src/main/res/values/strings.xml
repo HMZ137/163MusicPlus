@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">163音乐Plus</string>
+    <string name="app_name">163MusicPlus</string>
     <string name="vip_badge">VIP</string>
-    <string name="search_hint">搜索歌曲 / 歌单 / MV</string>
+    <string name="search_hint">搜索歌曲，或粘贴链接/ID/直链</string>
     <string name="search">搜索</string>
     <string name="favorites">收藏</string>
     <string name="settings">设置</string>
@@ -97,7 +97,7 @@
     <string name="local_music_more">更多</string>
     <string name="letter_picker_title">选择字母</string>
     <!-- 带组数的标题。不写成字符串拼接：拼接无法被翻译，lint 也会报 SetTextI18n -->
-    <string name="letter_picker_title_groups">选择字母 · %1$d组</string>
+    <string name="letter_picker_title_groups">选择字母</string>
     <string name="letter_picker_empty">还没有本地音乐</string>
     <!-- 字母选择页里格子上的副标题，例如「12 首」 -->
     <string name="letter_picker_count">%1$d首</string>
@@ -124,4 +124,5 @@
     <string name="settings_loudness_balance_desc">按曲目响度自动增减，范围 ±6dB</string>
     <string name="settings_loudness">响度分析（限音器）</string>
     <string name="settings_loudness_desc">后台分析并按曲目平衡音量，可中断</string>
+    <string name="search_hint_tip">贴链接</string>
 </resources>

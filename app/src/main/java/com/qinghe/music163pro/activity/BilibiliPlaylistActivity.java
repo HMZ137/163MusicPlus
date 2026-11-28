@@ -114,9 +114,16 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
 
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
+        // 2026-11-28：标题栏高度用统一入口撑到浮动返回按钮的占位，
+        // 否则列表第一行会被按钮压住（手算 max() 会算矮）
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         insetTitleBar(bar);
+        // 2026-11-28：标题栏直接给固定高度 —— 浮动返回按钮实测占 y=8~88，
+        // 用 applyTitleBarTopInset 会被「可收起标题栏」逻辑再压回一行高。
+        ViewGroup.LayoutParams barLp = bar.getLayoutParams();
+        barLp.height = px(80);
+        bar.setLayoutParams(barLp);
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
@@ -131,10 +138,10 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         title.setLayoutParams(titleParams);
-        title.setGravity(Gravity.START);
+        title.setGravity(Gravity.CENTER);
         title.setText(TextUtils.isEmpty(videoTitle) ? "BV视频列表" : videoTitle);
         title.setTextColor(getResources().getColor(R.color.text_primary));
-        title.setTextSize(14);
+        title.setTextSize(16);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
@@ -209,7 +216,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             String prefix = i == currentIndex ? "▶ " : (page.page + ". ");
             title.setText(prefix + (TextUtils.isEmpty(page.part) ? page.videoTitle : page.part));
             title.setTextColor(getResources().getColor(R.color.text_primary));
-            title.setTextSize(14);
+            title.setTextSize(16);
             title.setSingleLine(true);
             title.setEllipsize(TextUtils.TruncateAt.END);
             item.addView(title);

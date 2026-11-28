@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M3E（Material 3 Expressive）设计 token · 2026-11-28
+  规则：页面与 drawable 只允许引用这里的形状/字号/间距，不再各写数值。
+  取值参考 Wear M3E：更大的圆角、胶囊按钮、紧凑但可读的字号阶。
+-->
+<resources>
+    <!-- ===== 形状 ===== -->
+    <dimen name="m3_corner_s">12dp</dimen>      <!-- 小容器：chip / 标签 -->
+    <dimen name="m3_corner_m">16dp</dimen>      <!-- 输入框 / 小卡片 -->
+    <dimen name="m3_corner_l">18dp</dimen>      <!-- 标准卡片 -->
+    <dimen name="m3_corner_xl">24dp</dimen>     <!-- 弹窗 / 大容器 -->
+    <dimen name="m3_corner_full">999dp</dimen>  <!-- 按钮（胶囊） -->
+
+    <!-- ===== 字号（Wear 类型阶） ===== -->
+    <dimen name="m3_type_display">22sp</dimen>
+    <dimen name="m3_type_title">16sp</dimen>
+    <dimen name="m3_type_body">14sp</dimen>
+    <dimen name="m3_type_label">12sp</dimen>
+    <dimen name="m3_type_caption">10sp</dimen>
+
+    <!-- ===== 间距 ===== -->
+    <dimen name="m3_space_xs">4dp</dimen>
+    <dimen name="m3_space_s">8dp</dimen>
+    <dimen name="m3_space_m">12dp</dimen>
+    <dimen name="m3_space_l">16dp</dimen>
+</resources>

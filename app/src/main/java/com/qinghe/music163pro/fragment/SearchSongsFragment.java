@@ -132,7 +132,12 @@ public class SearchSongsFragment extends SearchListFragment<SearchSongsFragment.
         // 单曲与声音并行请求，都回来后交替拼成一页（单曲在前，声音穿插在后）
         final List<Song> songs = new ArrayList<>();
         final List<SoundInfo> sounds = new ArrayList<>();
-        final int[] pending = {2};
+        // 2026-11-28：搜索词是「网易云链接 / 纯 ID」时，先按 ID 取那首歌，插到结果第一位
+        final com.qinghe.music163pro.util.NeteaseLinkParser.Result linkHit =
+                com.qinghe.music163pro.util.NeteaseLinkParser.parse(keyword());
+        final boolean pinById = offset == 0
+                && linkHit.type == com.qinghe.music163pro.util.NeteaseLinkParser.Result.Type.SONG_ID;
+        final int[] pending = {pinById ? 3 : 2};
         final boolean[] error = {false};
         final String[] lastError = {null};
 
@@ -156,6 +161,32 @@ public class SearchSongsFragment extends SearchListFragment<SearchSongsFragment.
             }
             callback.onResult(merged);
         };
+
+        if (pinById) {
+            MusicApiHelper.getSongById(linkHit.songId, cookie(),
+                    new MusicApiHelper.SearchCallback() {
+                        @Override
+                        public void onResult(List<Song> result) {
+                            if (!result.isEmpty()) {
+                                Song pinned = result.get(0);
+                                // 搜索接口可能也返回这首，去掉重复再插到最前
+                                for (int i = songs.size() - 1; i >= 0; i--) {
+                                    if (songs.get(i).getId() == pinned.getId()) {
+                                        songs.remove(i);
+                                    }
+                                }
+                                songs.add(0, pinned);
+                            }
+                            finish.run();
+                        }
+
+                        @Override
+                        public void onError(String message) {
+                            // 按 ID 取不到不算整页失败，继续展示普通搜索结果
+                            finish.run();
+                        }
+                    });
+        }
 
         MusicApiHelper.searchSongs(keyword(), offset, cookie(),
                 new MusicApiHelper.SearchCallback() {

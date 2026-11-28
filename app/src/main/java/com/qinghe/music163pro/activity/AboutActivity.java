@@ -29,7 +29,7 @@ public class AboutActivity extends BaseWatchActivity {
      * 简介本来就不常变，直接内置；更新日志再单独去更新清单里取。</p>
      */
     private static final String OVERVIEW =
-            "163音乐Pro 是基于「163MusicPro」修改的智能手表版网易云音乐客户端。\n"
+            "163MusicPlus 是基于「163MusicPro」修改的智能手表版网易云音乐客户端。\n"
             + "目标是把「听歌」这件事在手表小屏上做完整：在线与本地播放、逐行/翻译歌词、"
             + "下载与导出、局域网传歌、B 站音频、均衡器与表冠音量，都能在表盘上直接操作。\n"
             + "界面按 320×360 级小屏重排，支持界面缩放与页面字号、主题配色与背景自定义。";
@@ -49,7 +49,7 @@ public class AboutActivity extends BaseWatchActivity {
 
         // Build UI programmatically for DPI adaptation
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF121212);
+        scrollView.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scrollView.setFillViewport(true);
 
         LinearLayout content = new LinearLayout(this);
@@ -61,27 +61,40 @@ public class AboutActivity extends BaseWatchActivity {
         content.addView(theTitle);
         com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, theTitle);
 
+        // 2026-11-28 M3E：应用信息块放进一张 Material 卡片
+        com.google.android.material.card.MaterialCardView infoCard =
+                com.qinghe.music163pro.util.UiKit.m3Card(this);
+        LinearLayout.LayoutParams infoCardLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        infoCardLp.topMargin = px(10);
+        infoCard.setLayoutParams(infoCardLp);
+        LinearLayout infoCol = new LinearLayout(this);
+        infoCol.setOrientation(LinearLayout.VERTICAL);
+        infoCol.setPadding(px(12), px(12), px(12), px(12));
+        infoCard.addView(infoCol);
+        content.addView(infoCard);
+
         // App name
-        content.addView(makeSpacer(px(10)));
-        content.addView(makeText("163音乐Pro", 0xFFFFFFFF, px(20), true, Gravity.CENTER));
+        infoCol.addView(makeSpacer(px(2)));
+        infoCol.addView(makeText("163MusicPlus", 0xFFFFFFFF, px(20), true, Gravity.CENTER));
 
         // Version
-        content.addView(makeSpacer(px(4)));
+        infoCol.addView(makeSpacer(px(4)));
         String versionName = "unknown";
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
-        content.addView(makeText("版本: " + versionName, 0xFFCCCCCC, px(16), false, Gravity.CENTER));
+        infoCol.addView(makeText("版本: " + versionName, com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(16), false, Gravity.CENTER));
 
         // Developer
-        content.addView(makeSpacer(px(4)));
+        infoCol.addView(makeSpacer(px(4)));
         content.addView(makeText("开发者: Qinghe（上游）· HMZ137（本修改版）",
-                0xFFCCCCCC, px(16), false, Gravity.CENTER));
-        content.addView(makeSpacer(px(4)));
-        content.addView(makeText("官网: ", 0xFFCCCCCC, px(16), false, Gravity.CENTER));
+                com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(16), false, Gravity.CENTER));
+        infoCol.addView(makeSpacer(px(4)));
+        content.addView(makeText("官网: ", com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(16), false, Gravity.CENTER));
         TextView linkTv = makeText("https://163.imoow.com", 0xFF5599CC, px(16), false, Gravity.CENTER);
         Linkify.addLinks(linkTv, Linkify.WEB_URLS);
-        content.addView(linkTv);
+        infoCol.addView(linkTv);
 
         // Divider
         content.addView(makeSpacer(px(8)));
@@ -91,7 +104,7 @@ public class AboutActivity extends BaseWatchActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeText("软件概述", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
-        overviewTextView = makeText(OVERVIEW, 0xFFAAAAAA, px(15), false, Gravity.START);
+        overviewTextView = makeText(OVERVIEW, com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(15), false, Gravity.START);
         content.addView(overviewTextView);
 
         // Divider
@@ -103,7 +116,7 @@ public class AboutActivity extends BaseWatchActivity {
         content.addView(makeText("问题反馈", 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
         content.addView(makeText("遇到问题或有建议，欢迎通过以下方式反馈：",
-                0xFFAAAAAA, px(14), false, Gravity.START));
+                com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(14), false, Gravity.START));
         content.addView(makeSpacer(px(6)));
         // Email row
         content.addView(makeIconTextRow(R.drawable.ic_email, "邮箱：soupcomein@outlook.com",
@@ -158,7 +171,7 @@ public class AboutActivity extends BaseWatchActivity {
         updateContainer.addView(makeSpacer(px(4)));
 
         String body = formatNotes(notes);
-        updateContainer.addView(makeText(body, 0xFFAAAAAA, px(15), false, Gravity.START));
+        updateContainer.addView(makeText(body, com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(15), false, Gravity.START));
     }
 
     private String formatNotes(String notes) {

@@ -66,6 +66,8 @@ public final class LanTransferServer {
     private Thread acceptThread;
     private volatile boolean running;
     private volatile int port = DEFAULT_PORT;
+    /** 局域网发现应答器（收到 UDP DISCOVER 就回自己的信息）。 */
+    private final LanDiscovery.Responder discovery = new LanDiscovery.Responder();
     private volatile int uploadedCount;
     private volatile String lastFileName;
     private final File saveDir;
@@ -136,6 +138,52 @@ public final class LanTransferServer {
     }
     /** 已接收文件列表，供「收件箱」面板展示与回下载。单线程处理连接，synchronized 仅作保险。 */
     private final List<ReceivedFile> received = Collections.synchronizedList(new ArrayList<>());
+
+    // ==================== APK 安装队列（2026-11-28） ====================
+    //
+    // 发送端传过来的 APK 落在 /sdcard/TransFiles，系统不会替我们装。
+    // 这里排队交给 UI：每收一个 apk 就入队 + 通知监听者，UI 弹「是否安装」，
+    // 装完（或用户跳过）再来取下一个 —— 支持一次传多个 APK 连续安装。
+
+    /** 收到 APK 的回调（在 UI 线程回调）。 */
+    public interface ApkReceivedListener {
+        void onApkReceived(File apk);
+    }
+
+    private static final List<File> PENDING_APKS =
+            Collections.synchronizedList(new ArrayList<File>());
+    private static volatile ApkReceivedListener sApkListener;
+    private static final android.os.Handler MAIN =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+
+    /** 注册 APK 到达回调（Activity 在 onStart / onStop 里成对设置，避免泄漏）。 */
+    public static void setApkReceivedListener(ApkReceivedListener listener) {
+        sApkListener = listener;
+    }
+
+    /** 取走队首的待安装 APK；没有则返回 null。 */
+    public static File pollPendingApk() {
+        synchronized (PENDING_APKS) {
+            return PENDING_APKS.isEmpty() ? null : PENDING_APKS.remove(0);
+        }
+    }
+
+    public static int pendingApkCount() {
+        synchronized (PENDING_APKS) {
+            return PENDING_APKS.size();
+        }
+    }
+
+    private static void enqueueApk(File apk) {
+        if (apk == null) {
+            return;
+        }
+        PENDING_APKS.add(apk);
+        final ApkReceivedListener listener = sApkListener;
+        if (listener != null) {
+            MAIN.post(() -> listener.onApkReceived(apk));
+        }
+    }
     private final java.util.concurrent.atomic.AtomicInteger rxSeq =
             new java.util.concurrent.atomic.AtomicInteger(0);
 
@@ -200,12 +248,34 @@ public final class LanTransferServer {
         return saveDir;
     }
 
+    /** 是否为安装包（接收端要单独提示安装）。 */
+    private static boolean isApkFile(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).endsWith(".apk");
+    }
+
     public boolean isRunning() {
         return running;
     }
 
     public int getPort() {
         return port;
+    }
+
+    /**
+     * 把手表本地的文件登记成「网页端可下载」（2026-11-28）。
+     *
+     * <p>手表没法主动推给浏览器，所以「发给网页端」= 登记进收件箱，
+     * 网页的「已接收」里立刻出现，点下载即可取走。</p>
+     */
+    public boolean publishToWeb(File file, String from) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        String rxId = "rx" + rxSeq.incrementAndGet();
+        received.add(new ReceivedFile(rxId, file.getName(), file.length(),
+                System.currentTimeMillis(), from == null ? "本机" : from,
+                file.getAbsolutePath()));
+        return true;
     }
 
     public int getUploadedCount() {
@@ -310,6 +380,12 @@ public final class LanTransferServer {
                 acceptThread = new Thread(this::acceptLoop, "LanTransfer-accept");
                 acceptThread.setDaemon(true);
                 acceptThread.start();
+                // 2026-11-28：同时开 UDP 发现，其它手表/网页才能「扫描」到自己
+                try {
+                    discovery.start(candidate);
+                } catch (Throwable t) {
+                    Log.w(TAG, "发现应答器启动失败（不影响传文件）: " + t);
+                }
                 return true;
             } catch (Exception e) {
                 // 端口占用，试下一个
@@ -321,6 +397,10 @@ public final class LanTransferServer {
 
     public synchronized void stop() {
         running = false;
+        try {
+            discovery.stop();
+        } catch (Throwable ignored) {
+        }
         try {
             if (serverSocket != null) {
                 serverSocket.close();
@@ -447,6 +527,14 @@ public final class LanTransferServer {
                 handleEvents(out);
             } else if ("GET".equalsIgnoreCase(method) && "/api/inbox".equals(path)) {
                 handleInboxList(out);
+            } else if ("OPTIONS".equalsIgnoreCase(method)) {
+                writeResponse(out, 204, "No Content", "text/plain; charset=utf-8", new byte[0]);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/devices".equals(path)) {
+                handleDevices(socket, out);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/files".equals(path)) {
+                handleFileList(out, query);
+            } else if ("GET".equalsIgnoreCase(method) && "/api/file".equals(path)) {
+                handleFileDownload(out, query);
             } else if ("GET".equalsIgnoreCase(method) && "/api/lan-bg".equals(path)) {
                 // 需求 2026-11-21 任务 1：网页背景图（独立存储 LanPageBackground，与播放页背景无关）
                 handleLanBackground(out);
@@ -464,6 +552,96 @@ public final class LanTransferServer {
             closeQuietly(out);
             closeQuietly(in);
         }
+    }
+
+
+    // ==================== 组网：设备发现 / 文件列表（2026-11-28） ====================
+
+    /**
+     * GET /api/devices —— 代网页做一次 UDP 扫描，返回同网内其它接收端。
+     *
+     * <p>网页本身发不了 UDP 广播，所以由手表代扫后再以 JSON 返回。</p>
+     */
+    private void handleDevices(Socket socket, OutputStream out) throws Exception {
+        String selfIp = socket != null && socket.getLocalAddress() != null
+                ? socket.getLocalAddress().getHostAddress() : null;
+        List<LanDiscovery.Peer> peers = LanDiscovery.scan(getPort(), selfIp);
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"ok\":true,\"self\":{\"name\":\"")
+                .append(jsonEscape(LanDiscovery.selfName()))
+                .append("\",\"ip\":\"").append(jsonEscape(selfIp == null ? "" : selfIp))
+                .append("\",\"port\":").append(getPort()).append("},\"devices\":[");
+        for (int i = 0; i < peers.size(); i++) {
+            LanDiscovery.Peer p = peers.get(i);
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append("{\"name\":\"").append(jsonEscape(p.name))
+                    .append("\",\"ip\":\"").append(jsonEscape(p.ip))
+                    .append("\",\"port\":").append(p.port).append('}');
+        }
+        sb.append("]}");
+        writeResponse(out, 200, "OK", "application/json; charset=utf-8",
+                sb.toString().getBytes("UTF-8"));
+    }
+
+    /**
+     * GET /api/files?dir=music|trans —— 列出可下载的文件（网页端「接收」用）。
+     *
+     * <p>网页不能被动监听端口，所以「网页接收」= 从手表拉：这里给出文件清单，
+     * 点击后走 /api/file 下载。这样不需要第二套服务，也不需要先开接收开关。</p>
+     */
+    private void handleFileList(OutputStream out, String query) throws Exception {
+        File dir = "trans".equalsIgnoreCase(queryValue(query, "dir"))
+                ? defaultTransFilesDir() : saveDir;
+        StringBuilder sb = new StringBuilder("{\"ok\":true,\"dir\":\"")
+                .append(dir == null ? "" : jsonEscape(dir.getName())).append("\",\"files\":[");
+        File[] files = dir == null ? null : dir.listFiles();
+        boolean first = true;
+        if (files != null) {
+            java.util.Arrays.sort(files,
+                    (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+            for (File f : files) {
+                if (!f.isFile() || f.getName().startsWith(".")) {
+                    continue;
+                }
+                if (!first) {
+                    sb.append(',');
+                }
+                first = false;
+                sb.append("{\"name\":\"").append(jsonEscape(f.getName()))
+                        .append("\",\"size\":").append(f.length())
+                        .append(",\"time\":").append(f.lastModified()).append('}');
+            }
+        }
+        sb.append("]}");
+        writeResponse(out, 200, "OK", "application/json; charset=utf-8",
+                sb.toString().getBytes("UTF-8"));
+    }
+
+    /** GET /api/file?dir=music|trans&name=xxx —— 下载单个文件。 */
+    private void handleFileDownload(OutputStream out, String query) throws Exception {
+        File dir = "trans".equalsIgnoreCase(queryValue(query, "dir"))
+                ? defaultTransFilesDir() : saveDir;
+        String raw = queryValue(query, "name");
+        String safe = sanitizeFileName(raw);
+        if (dir == null || safe == null || safe.isEmpty()) {
+            writeResponse(out, 400, "Bad Request", "application/json; charset=utf-8",
+                    "{\"ok\":false,\"error\":\"bad name\"}".getBytes("UTF-8"));
+            return;
+        }
+        File file = new File(dir, safe);
+        // 防目录穿越：解析后必须仍在该目录下
+        if (!file.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator)
+                || !file.isFile()) {
+            writeResponse(out, 404, "Not Found", "application/json; charset=utf-8",
+                    "{\"ok\":false,\"error\":\"not found\"}".getBytes("UTF-8"));
+            return;
+        }
+        String ascii = safe.replaceAll("[^\\x20-\\x7e]", "_");
+        String encoded = java.net.URLEncoder.encode(safe, "UTF-8").replace("+", "%20");
+        String disposition = "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" + encoded;
+        streamFile(out, file, mimeOf(safe), disposition);
     }
 
     private void handleUpload(Socket socket, InputStream in, OutputStream out, String query, int contentLength)
@@ -494,15 +672,25 @@ public final class LanTransferServer {
             fos = new FileOutputStream(target);
             byte[] buf = new byte[BUFFER_SIZE];
             long remaining = contentLength;
-            while (remaining > 0) {
-                int toRead = (int) Math.min(buf.length, remaining);
-                int n = in.read(buf, 0, toRead);
-                if (n < 0) {
-                    break;
+            if (remaining > 0) {
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buf.length, remaining);
+                    int n = in.read(buf, 0, toRead);
+                    if (n < 0) {
+                        break;
+                    }
+                    fos.write(buf, 0, n);
+                    written += n;
+                    remaining -= n;
                 }
-                fos.write(buf, 0, n);
-                written += n;
-                remaining -= n;
+            } else {
+                // 2026-11-28：没有 Content-Length（chunked，来自系统选择器拿不到大小的文件）
+                // 时一直读到流结束，否则会存成 0 字节
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    fos.write(buf, 0, n);
+                    written += n;
+                }
             }
             ok = true;
         } finally {
@@ -545,6 +733,12 @@ public final class LanTransferServer {
         String rxId = "rx" + rxSeq.incrementAndGet();
         received.add(new ReceivedFile(rxId, safeName, written, System.currentTimeMillis(), from,
                 target.getAbsolutePath()));
+
+        // 2026-11-28：APK 单独入队，交给 UI 弹「是否安装」（系统不允许后台静默装）
+        if (isApkFile(safeName)) {
+            Log.i(TAG, "收到 APK，等待用户确认安装: " + target.getAbsolutePath());
+            enqueueApk(target);
+        }
 
         String json = "{\"ok\":true,\"name\":\"" + jsonEscape(safeName) + "\",\"size\":" + written + "}";
         writeResponse(out, 200, "OK", "application/json; charset=utf-8", json.getBytes("UTF-8"));
@@ -915,6 +1109,8 @@ public final class LanTransferServer {
                 + "\"memTotalMb\":" + memTotalMb + ","
                 + "\"memMaxMb\":" + memMaxMb + ","
                 + "\"cpuPercent\":" + cpuPercent + ","
+                // 2026-11-28：网页监控的「更新于」靠这个时间戳，没有它就只能显示静态文案
+                + "\"ts\":" + System.currentTimeMillis() + ","
                 + "\"ts\":" + System.currentTimeMillis()
                 + "}";
     }
@@ -1077,6 +1273,13 @@ public final class LanTransferServer {
         h.append("Content-Type: ").append(contentType).append("\r\n");
         h.append("Content-Length: ").append(body.length).append("\r\n");
         h.append("Connection: close\r\n");
+        // 2026-11-28：页面/接口一律不缓存 —— 否则手机上会一直跑旧版 HTML（改了也看不到）
+        h.append("Cache-Control: no-store, no-cache, must-revalidate\r\n");
+        h.append("Pragma: no-cache\r\n");
+        // 2026-11-28 组网：网页要跨设备读 /api/devices、/api/status，必须允许跨域
+        h.append("Access-Control-Allow-Origin: *\r\n");
+        h.append("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n");
+        h.append("Access-Control-Allow-Headers: Content-Type\r\n");
         h.append("\r\n");
         out.write(h.toString().getBytes("ISO-8859-1"));
         out.write(body);
@@ -1212,7 +1415,7 @@ public final class LanTransferServer {
     private static final String FALLBACK_HTML = ""
             + "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
             + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            + "<title>163音乐Pro · 传歌到手表</title>"
+            + "<title>163MusicPlus · 传歌到手表</title>"
             + "<style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,"
             + "sans-serif;background:#121212;color:#eee;margin:0;padding:24px;line-height:1.6}"
             + "h1{font-size:20px;margin:0 0 4px}.sub{color:#9a9a9a;font-size:13px;"

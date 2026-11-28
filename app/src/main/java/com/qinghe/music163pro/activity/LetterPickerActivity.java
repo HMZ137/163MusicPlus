@@ -83,7 +83,7 @@ public class LetterPickerActivity extends BaseWatchActivity {
 
         if (tvTitle != null) {
             // 用带占位符的资源，不拼字符串 —— 拼接既不能被翻译，lint 也会报 SetTextI18n
-            tvTitle.setText(getString(R.string.letter_picker_title_groups, groups.size()));
+            tvTitle.setText(getString(R.string.letter_picker_title_groups));   // 组数不塞标题：会和返回按钮撞
             // 标题行的高度直接对齐浮动返回按钮的占位：标题落在按钮右侧、竖直居中，
             // 网格也就自然从按钮下方开始，不必再给网格加一段 padding。
             // （一开始是给网格加 paddingTop，但取的是 getReservedStartPadding() —— 那是

@@ -187,14 +187,16 @@ public class CookieLoginActivity extends BaseWatchActivity {
         }
 
         updateBackupHint();
+        // 2026-11-28：提示压缩到最短，并用 60% 字号的小号 toast，
+        // 否则小屏手表上会被这串说明挤出屏幕
         StringBuilder message = new StringBuilder();
         message.append(overwriting ? "已更新备份" : "已导出到 SD 卡");
         if (usedDraft) {
-            message.append("（用的是输入框里未保存的内容）");
+            message.append("· 用的是未保存内容");
         } else if (!typed.isEmpty() && !typed.equals(saved)) {
-            message.append("；输入框的改动尚未保存，导出的是已保存的 Cookie");
+            message.append("· 导出的是已保存版本");
         }
-        com.qinghe.music163pro.util.UiKit.toast(this, message.toString());
+        com.qinghe.music163pro.util.UiKit.toastSmall(this, message.toString());
     }
 
     /** 从备份文件读回 Cookie，填进输入框并直接生效（覆盖已有登录态前先确认）。 */

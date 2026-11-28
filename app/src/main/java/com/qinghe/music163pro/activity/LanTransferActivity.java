@@ -49,7 +49,7 @@ public class LanTransferActivity extends BaseWatchActivity {
         LocalLibraryCache.init(this);
 
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF121212);
+        scroll.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scroll.setFillViewport(true);
 
         LinearLayout root = new LinearLayout(this);
@@ -67,7 +67,8 @@ public class LanTransferActivity extends BaseWatchActivity {
         TextView title = new TextView(this);
         title.setText("局域网传歌");
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_title_text_size));
         title.setGravity(Gravity.CENTER);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         android.widget.RelativeLayout.LayoutParams titleParams =
@@ -82,7 +83,7 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         WatchBackButton.alignTitleStart(this, title);
         root.addView(titleBar);
 
-        tvStatus = bodyText(0xFFCCCCCC, 13);
+        tvStatus = bodyText(com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, 13);
         root.addView(tvStatus);
 
         // ── 地址卡片：大号地址 + 点击复制（信息分区，借鉴 ZeroMusic 的 Server 页） ──
@@ -126,24 +127,23 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
 
         root.addView(makeSpacer(px(8)));
 
-        btnToggle = new TextView(this);
-        btnToggle.setTextColor(0xFF1D1D1D);
-        btnToggle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
-        btnToggle.setGravity(Gravity.CENTER);
-        btnToggle.setPadding(px(10), px(10), px(10), px(10));
-        android.graphics.drawable.GradientDrawable bg =
-                new android.graphics.drawable.GradientDrawable();
-        bg.setColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
-        bg.setCornerRadius(UiKit.dp(this, UiKit.DP_BUTTON_RADIUS));
-        btnToggle.setBackground(bg);
-        btnToggle.setClickable(true);
-        btnToggle.setFocusable(true);
+        // 2026-11-28 M3E：主按钮改用 MaterialButton（胶囊 + 主色 + 涟漪），不再手搓 GradientDrawable
+        btnToggle = UiKit.m3Button(this, "开始", true);
+        btnToggle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
         btnToggle.setOnClickListener(v -> toggle());
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         btnLp.setMargins(0, px(6), 0, px(6));
         btnToggle.setLayoutParams(btnLp);
         root.addView(btnToggle);
+
+        // 2026-11-28：传完的文件（尤其 APK）在手表上没法打开，给一个极简浏览器入口
+        TextView btnBrowse = new TextView(this);
+        // 2026-11-28：按钮风格统一走「设置页那种行」：左标题 + 灰色小字说明 + 右侧箭头
+        addActionRow(root, "浏览 TransFiles", "传过来的文件都在这里",
+                () -> startActivity(new android.content.Intent(this, TransFileBrowserActivity.class)));
+        addActionRow(root, "发送文件到其它设备", "扫描同一 Wi-Fi 的手表，用系统选择器挑文件",
+                () -> startActivity(new android.content.Intent(this, LanSendActivity.class)));
 
         root.addView(bodyText(0xFF757575, 10), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -191,6 +191,8 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         super.onResume();
         refreshing = true;
         mainHandler.post(new RefreshTick(this));
+        // 兜底：安装器返回、或页面切回来时把队列里剩下的接着问（支持连续装多个）
+        promptPendingApk();
     }
 
     @Override
@@ -269,6 +271,57 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
                 Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
+    /**
+     * 设置页风格的动作行：整行卡片 + 左标题 + 右小字 + 箭头。
+     * 局域网传歌页的两个二级入口用它，和「设置」保持同一套观感。
+     */
+    private void addActionRow(LinearLayout root, String title, String sub, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(px(16), px(9), px(16), px(9));
+        row.setMinimumHeight(px(48));
+        row.setBackgroundResource(R.drawable.bg_card_tile);
+        row.setClickable(true);
+        row.setFocusable(true);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = px(6);
+        row.setLayoutParams(lp);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView t = new TextView(this);
+        t.setText(title);
+        t.setTextColor(getResources().getColor(R.color.text_primary));
+        t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        t.setSingleLine(true);
+        textCol.addView(t);
+
+        TextView subView = new TextView(this);
+        subView.setText(sub);
+        subView.setTextColor(getResources().getColor(R.color.text_secondary));
+        subView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
+        subView.setSingleLine(true);
+        subView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        subView.setPadding(0, px(2), 0, 0);
+        textCol.addView(subView);
+        row.addView(textCol);
+
+        TextView arrow = new TextView(this);
+        arrow.setText("›");
+        arrow.setTextColor(0xFF6B6577);
+        arrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        arrow.setPadding(px(6), 0, 0, 0);
+        row.addView(arrow);
+
+        row.setOnClickListener(v -> action.run());
+        root.addView(row);
+    }
+
     private void refresh() {
         LanTransferServer server = LanTransferService.getServer();
         boolean on = server != null && server.isRunning();
@@ -291,5 +344,56 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
             tvCount.setText("点击下面的按钮开始");
             btnToggle.setText("开始");
         }
+    }
+
+    // ==================== 收到 APK：提示安装（2026-11-28） ====================
+
+    /** 正在弹「是否安装」，避免监听回调与 onResume 兜底同时弹两个框。 */
+    private boolean apkPromptShowing;
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // 只在本页可见时接 APK 回调；离开页面就取消，避免持有已销毁的 Activity
+        com.qinghe.music163pro.util.LanTransferServer.setApkReceivedListener(
+                apk -> promptPendingApk());
+    }
+
+    @Override
+    protected void onStop() {
+        com.qinghe.music163pro.util.LanTransferServer.setApkReceivedListener(null);
+        super.onStop();
+    }
+
+    /**
+     * 从队列里取一个 APK 问用户是否安装。
+     *
+     * <p>装完回到本页会再走一次 onResume → 继续问下一个，直到队列空。</p>
+     */
+    private void promptPendingApk() {
+        if (apkPromptShowing || isFinishing()) {
+            return;
+        }
+        final java.io.File apk = com.qinghe.music163pro.util.LanTransferServer.pollPendingApk();
+        if (apk == null) {
+            return;
+        }
+        apkPromptShowing = true;
+        int remain = com.qinghe.music163pro.util.LanTransferServer.pendingApkCount();
+        final com.qinghe.music163pro.util.WatchPopup popup =
+                com.qinghe.music163pro.util.WatchPopup.create(this)
+                        .title("检测到安装包")
+                        .content("收到「" + apk.getName() + "」，是否立即安装？"
+                                + (remain > 0 ? "\n装完还有 " + remain + " 个待安装" : ""));
+        popup.button("跳过", com.qinghe.music163pro.util.WatchPopup.STYLE_SECONDARY, () -> {
+            apkPromptShowing = false;
+            promptPendingApk();     // 跳过这个，接着问下一个
+        });
+        popup.button("安装", com.qinghe.music163pro.util.WatchPopup.STYLE_PRIMARY, () -> {
+            apkPromptShowing = false;
+            com.qinghe.music163pro.util.ApkInstallHelper.install(this, apk);
+            // 装完从安装器返回会走 onResume，继续问队列里剩下的
+        });
+        popup.show();
     }
 }

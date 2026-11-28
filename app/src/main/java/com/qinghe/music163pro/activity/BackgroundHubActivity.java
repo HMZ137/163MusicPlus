@@ -35,7 +35,8 @@ public class BackgroundHubActivity extends BaseWatchActivity {
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
         title.setGravity(android.view.Gravity.CENTER);
         title.setPadding(0, dpToPx(4), 0, dpToPx(10));
-        root.addView(title);
+        root.addView(title);        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
+
 
         root.addView(entry("播放页 / 歌词页背景", "封面 / 自定义图 / 流体 / 模糊",
                 v -> startActivity(new android.content.Intent(this, BackgroundSettingsActivity.class))));

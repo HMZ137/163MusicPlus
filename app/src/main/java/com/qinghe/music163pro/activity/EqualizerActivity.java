@@ -51,7 +51,8 @@ public class EqualizerActivity extends BaseWatchActivity {
         TextView title = new TextView(this);
         title.setText("音效");
         title.setTextColor(getResources().getColor(R.color.text_primary));
-        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_title_text_size));
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, dpToPx(4), 0, dpToPx(8));
         root.addView(title, new LinearLayout.LayoutParams(

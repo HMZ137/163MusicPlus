@@ -576,33 +576,17 @@ public class LocalMusicFragment extends Fragment {
 
     /** 纯函数版分组构建（不读写实例字段）。 */
     private static Groups computeGroups(List<Song> songs, int mode) {
+        // 2026-11-28：分组算法抽到 util/LetterGroups，收藏单曲页复用同一份，避免两套逻辑
+        List<String> keys = new ArrayList<>(songs.size());
+        for (Song song : songs) {
+            keys.add(keyOf(song, mode));
+        }
+        com.qinghe.music163pro.util.LetterGroups shared =
+                com.qinghe.music163pro.util.LetterGroups.fromNames(keys);
         Groups out = new Groups();
-        Map<String, Integer> firstIndex = new LinkedHashMap<>();
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        Map<String, Character> labels = new LinkedHashMap<>();
-        for (int i = 0; i < songs.size(); i++) {
-            String sk = keyOf(songs.get(i), mode);
-            String key = String.valueOf(ScriptSort.groupLabel(sk).charAt(0));
-            if (!firstIndex.containsKey(key)) {
-                firstIndex.put(key, i);
-                labels.put(key, ScriptSort.groupLabel(sk).charAt(0));
-            }
-            Integer count = counts.get(key);
-            counts.put(key, count == null ? 1 : count + 1);
-        }
-        out.starts = new int[firstIndex.size()];
-        out.counts = new int[firstIndex.size()];
-        List<String> keys = new ArrayList<>(firstIndex.keySet());
-        Collections.sort(keys);
-        int index = 0;
-        for (String key : keys) {
-            Character label = labels.get(key);
-            out.letters.add(label == null ? PinyinUtils.OTHER : label);
-            out.starts[index] = firstIndex.get(key);
-            Integer count = counts.get(key);
-            out.counts[index] = count == null ? 0 : count;
-            index++;
-        }
+        out.letters.addAll(shared.letters);
+        out.starts = shared.starts;
+        out.counts = shared.counts;
         return out;
     }
 

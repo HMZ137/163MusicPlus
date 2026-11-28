@@ -81,10 +81,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final String HEART_OUTLINE = "\u2661";
     private static final String HEART_FILLED = "\u2665";
     private static final int STORAGE_PERMISSION_REQUEST = 100;
-    private static final int VOLUME_INDICATOR_SIDE_MARGIN_DP = 20;
+    private static final int VOLUME_INDICATOR_SIDE_MARGIN_DP = 10;   // 2026-11-28：留白收窄，条更宽
     private static final int VOLUME_INDICATOR_MIN_WIDTH_DP = 132;
     private static final int VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP = 152;
-    private static final int VOLUME_INDICATOR_MAX_WIDTH_DP = 208;
+    private static final int VOLUME_INDICATOR_MAX_WIDTH_DP = 244;
     private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
     /** M1：音量浮层自动收起延时（浮层升级为可交互后，比原来的 1500ms 放宽）。 */
     private static final long VOLUME_DISMISS_DELAY_MS = 2500L;
@@ -99,6 +99,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
     private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
     private static final int SAFE_VOLUME_PERCENT = 60;
+    /** 2026-11-28：音量条的显示配色阈值（与安全确认框的 60% 是两回事）。 */
+    private static final int VOLUME_WARN_PERCENT = 65;
+    private static final int VOLUME_DANGER_PERCENT = 80;
     private static final int LYRIC_MODE_FOLLOW = 0;
     private static final int LYRIC_MODE_BLOCK = 1;
     private static final String QUALITY_TIER_UNAVAILABLE = "暂无";
@@ -108,7 +111,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private TextView tvArtist;
     private ImageView btnPlay;
     private ImageView btnFuncMore;
-    private SeekBar seekBar;
+    private com.google.android.material.slider.Slider seekBar;   // M3E：Material Slider（0..1000）
     private View chorusMarkerDot;
     private TextView tvCurrentTime;
     private TextView tvTotalTime;
@@ -143,7 +146,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private boolean animateVolumeUpdate;
     /** M1：底部「播放模式」按钮（图标随当前模式变化）。 */
     private ImageView btnPlayMode;
-    private ProgressBar volumeProgressBar;
+    private com.google.android.material.slider.Slider volumeProgressBar;   // M3E：音量条已换 Slider
     private TextView volumePercentView;
     private final Handler volumeHandler = new Handler();
 
@@ -351,6 +354,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private String aiLyricSongKey;
     private TextView btnRomanizationToggle; // 「音」toggle button in lyrics overlay
     private final java.util.Map<Long, String> romanizationMap = new java.util.HashMap<>(); // timeMs -> romanized text
+    // ===== A/B 播放（2026-11-28）=====
+    /** A 点 / B 点（毫秒）；-1 表示未设置。 */
+    private int abStartMs = -1;
+    private int abEndMs = -1;
+    /** 是否正在 A-B 循环。 */
+    private boolean abActive = false;
+    private Handler abHandler;
+    private Runnable abLoopRunnable;
+
     private long currentChorusSongId = -1L;
     private long currentChorusStartMs = -1L;
     private long currentChorusEndMs = -1L;
@@ -532,40 +544,52 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return false;   // 不消费，继续交给 SeekBar 自己处理
         });
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                if (fromUser) {
-                    int duration = playerManager.getDuration();
-                    if (duration > 0) {
-                        int targetMs = (int) ((long) progress * duration / 1000);
-                        // 需求方 2026-10-17：拖动时左侧「已播时长」要跟着拖到的位置走
-                        tvCurrentTime.setText(formatTime(targetMs));
-                        syncTimeLabelWidth(duration);
-                        updateSeekDeltaHint(targetMs);
-                    }
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {
-                isUserSeeking = true;
-                seekDragStartMs = playerManager.getCurrentPosition();
-                showSeekDeltaHint(seekDragStartMs);
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {
-                int duration = playerManager.getDuration();
-                if (duration > 0) {
-                    int seekPos = (int) ((long) bar.getProgress() * duration / 1000);
-                    playerManager.seekTo(seekPos);
-                }
-                isUserSeeking = false;
-                // 「不松手不消失」：松手才收起提示
-                hideSeekDeltaHint();
+        // 2026-11-28 M3E：Slider 只有「值变化 / 触摸开始 / 触摸结束」三个回调，
+        // 分别对应原来的 onProgressChanged / onStartTrackingTouch / onStopTrackingTouch
+        // 2026-11-28：从歌词页切回来时，进度条可能还没完成布局就调了 positionChorusMarker，
+        // 那时 width=0 会把标记隐藏/算到最左。这里在每次布局变化后重算一次。
+        seekBar.addOnLayoutChangeListener((v, left, top, right, bottom,
+                                          oldLeft, oldTop, oldRight, oldBottom) -> {
+            int duration = playerManager.getDuration();
+            if (duration > 0) {
+                positionChorusMarker(duration);
             }
         });
+
+        seekBar.addOnChangeListener((slider, value, fromUser) -> {
+            if (!fromUser) {
+                return;
+            }
+            int duration = playerManager.getDuration();
+            if (duration > 0) {
+                int targetMs = (int) ((long) value * duration / 1000);
+                // 需求方 2026-10-17：拖动时左侧「已播时长」要跟着拖到的位置走
+                tvCurrentTime.setText(formatTime(targetMs));
+                syncTimeLabelWidth(duration);
+                updateSeekDeltaHint(targetMs);
+            }
+        });
+        seekBar.addOnSliderTouchListener(
+                new com.google.android.material.slider.Slider.OnSliderTouchListener() {
+                    @Override
+                    public void onStartTrackingTouch(com.google.android.material.slider.Slider slider) {
+                        isUserSeeking = true;
+                        seekDragStartMs = playerManager.getCurrentPosition();
+                        showSeekDeltaHint(seekDragStartMs);
+                    }
+
+                    @Override
+                    public void onStopTrackingTouch(com.google.android.material.slider.Slider slider) {
+                        int duration = playerManager.getDuration();
+                        if (duration > 0) {
+                            int seekPos = (int) ((long) slider.getValue() * duration / 1000);
+                            playerManager.seekTo(seekPos);
+                        }
+                        isUserSeeking = false;
+                        // 「不松手不消失」：松手才收起提示
+                        hideSeekDeltaHint();
+                    }
+                });
 
         btnMore.setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, MoreActivity.class)));
@@ -985,6 +1009,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 playerManager.isSleepTimerActive() ? "定时..." : "定时关闭",
                 v -> onFuncSleepTimer());
         row2.addView(timerItem);
+        row2.addView(createFuncItem(R.drawable.ic_repeat, "A/B 播放",
+                v -> onFuncAbPlay()));
 
         // Find the label view in timerItem (second child) for live updates
         final TextView timerLabelView = (TextView) timerItem.getChildAt(1);
@@ -1296,6 +1322,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 playerManager.isSleepTimerActive() ? "定时..." : "定时关闭",
                 v -> onFuncSleepTimer());
         row2.addView(timerItem);
+        row2.addView(createFuncItem(R.drawable.ic_repeat, "A/B 播放",
+                v -> onFuncAbPlay()));
 
         final TextView timerLabelView = (TextView) timerItem.getChildAt(1);
         if (playerManager.isSleepTimerActive()) {
@@ -1762,11 +1790,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         crownVolumePercent = target;
 
-        // ① UI 立即同步 —— 跟手的关键，这条链路上不许有 delay / 动画
-        showCrownVolumeBar(Math.round(target));
+        // ① UI：按设置选择「横向浮层 / 右侧竖向细条」，两者都走平滑过渡
+        int level = Math.max(0, Math.min(max, Math.round(target * max / 100f)));
+        showCrownVolumeFeedback(Math.round(target), level, max);
 
         // ② 系统音量：档位真的变了才写（天然节流），复用带安全确认的写入路径
-        int level = Math.max(0, Math.min(max, Math.round(target * max / 100f)));
         if (level != crownStreamCurrent()) {
             applyUserVolume(level, max);
         }
@@ -1819,6 +1847,24 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
      * 显示右侧音量细条：首次创建后淡入（DecelerateInterpolator(2f)、300ms），
      * 每次调用重置 2 秒隐藏计时；停手 2 秒后淡出（AccelerateInterpolator、300ms）。
      */
+    /**
+     * 表冠调音量时的视觉反馈（2026-11-28 新增）。
+     *
+     * <p>设置项「表冠音量条」：<b>默认横向浮层</b>（和点主界面音量按钮一样），
+     * 打开后改用右侧竖向细条。两条路径都用平滑过渡 —— 横向走 ValueAnimator，
+     * 竖向由 VolumeBarView 内部逐帧逼近，都不是一格一跳。</p>
+     */
+    private void showCrownVolumeFeedback(int percent, int level, int max) {
+        if (com.qinghe.music163pro.util.CrownVolumePrefs.useVerticalBar(this)) {
+            showCrownVolumeBar(percent);
+            return;
+        }
+        // 先把浮层按「当前系统音量」建出来，再动画推到目标值 ——
+        // 否则浮层一出现就已经是新值，看不到过渡。
+        showVolumeIndicator();
+        updateVolumeIndicator(max > 0, level, max, percent, true);
+    }
+
     private void showCrownVolumeBar(int percent) {
         if (crownVolumeOverlay == null) {
             android.widget.FrameLayout overlay = new android.widget.FrameLayout(this);
@@ -1907,7 +1953,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             // 2026-11-21：到上限时不再「完全不响应」——仍然把细条显示到上限位置，
             // 给用户明确的视觉反馈，只是不真的上调音量。
             int capPercent = max > 0 ? Math.round(crownCap * 100f / max) : maxPercent;
-            showCrownVolumeBar(capPercent);
+            showCrownVolumeFeedback(capPercent, crownCap, max);
             MusicLog.i("Crown", "已到表冠音量上限 " + maxPercent + "%（" + crownCap
                     + "），显示细条但不调音量");
             return true;
@@ -1921,7 +1967,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // 2026-11-21：表冠改用右侧竖直细条（参考零度音乐 ZeroVerticalProgressBar），
         // 不再弹横向浮层；细条淡入 300ms、逐帧跟手、停手 2 秒后淡出。
         int percent = max > 0 ? Math.round(target * 100f / max) : 0;
-        showCrownVolumeBar(percent);
+        showCrownVolumeFeedback(percent, target, max);
         if (target != cur) {
             // 2026-11-21：UI 已经即时跟手，系统音量写入做 70ms 合并 ——
             // 节拍收紧到 120ms 后连续转会产生较密的 setStreamVolume 调用，合并后只写最后一格。
@@ -2044,7 +2090,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         TextView body = new TextView(this);
         body.setText("多数页面支持左右滑动切换分类标签，主界面则切换播放页与歌词页。此提示仅出现一次。");
-        body.setTextColor(0xFFAAAAAA);
+        body.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED);
         body.setTextSize(13);
         android.widget.LinearLayout.LayoutParams bodyLp =
                 new android.widget.LinearLayout.LayoutParams(
@@ -2055,7 +2101,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         final TextView countdown = new TextView(this);
         countdown.setText("5 秒后可关闭");
-        countdown.setTextColor(0xFF888888);
+        countdown.setTextColor(0xFFA49FB0);
         countdown.setTextSize(12);
         countdown.setGravity(android.view.Gravity.CENTER);
         android.widget.LinearLayout.LayoutParams cLp =
@@ -2153,48 +2199,61 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_volume_indicator));
         card.setElevation(dp(6));
-        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+        card.setPadding(dp(8), dp(2), dp(8), dp(2));   // 2026-11-28：卡片高度收到与内容同高
         card.setClickable(false);
         card.setFocusable(false);
 
-        // M1：由「只读进度条」升级为**可拖拽 / 可点击**的 SeekBar（拖动即改音量）。
-        SeekBar progressBar = new SeekBar(this);
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
-                0, dp(32), 1f);
-        progressBar.setLayoutParams(progressParams);
-        // M1b：按 音量条示例.png —— 胶囊条（白填充 / 灰底）+ 橙色告警阈值竖线；
-        // 不画 thumb（参考图只有胶囊与数值），但 SeekBar 仍负责拖动 / 点击交互。
-        progressBar.setProgressDrawable(new com.qinghe.music163pro.util.VolumeCapsuleDrawable(
-                SAFE_VOLUME_PERCENT, dp(2)));
-        progressBar.setThumb(new android.graphics.drawable.ColorDrawable(0x00000000));
-        progressBar.setThumbOffset(0);
-        progressBar.setPadding(dp(2), 0, dp(2), 0);
-        progressBar.setMax(hasVolumeInfo ? Math.max(max, 1) : 1);
-        progressBar.setProgress(hasVolumeInfo ? current : 0);
+        // 2026-11-28 M3E：音量条改用 Material Slider（原来手搓 SeekBar + 自定义 ProgressDrawable）。
+        // 「橙色安全阈值线」保留 —— 用一根 2dp 的竖线叠在滑块轨道上，语义不变。
+        final com.google.android.material.slider.Slider volumeSlider =
+                new com.google.android.material.slider.Slider(this);
+        volumeSlider.setValueFrom(0f);
+        volumeSlider.setValueTo(hasVolumeInfo ? Math.max(max, 1) : 1f);
+        volumeSlider.setStepSize(0f);   // 连续值：stepSize>0 会画刻度点
+        volumeSlider.setValue(hasVolumeInfo ? Math.min(current, Math.max(max, 1)) : 0f);
+        volumeSlider.setThumbRadius(dp(5));
+        volumeSlider.setTrackHeight(dp(6));
+        volumeSlider.setHaloRadius(dp(12));
+        volumeSlider.setLabelBehavior(com.google.android.material.slider.LabelFormatter.LABEL_GONE);
+        volumeSlider.setTickVisible(false);
+        // 1.11 里 tickVisible 在某些构造路径下仍会画刻度点（实测两颗青色小点），
+        // 直接把刻度颜色设成全透明，彻底不显示。
+        volumeSlider.setTickActiveTintList(
+                android.content.res.ColorStateList.valueOf(0x00000000));
+        volumeSlider.setTickInactiveTintList(
+                android.content.res.ColorStateList.valueOf(0x00000000));
+        volumeSlider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
+        volumeSlider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(0xFF3A3B44));
+        volumeSlider.setThumbTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
+        // 纯 M3 Slider：不再叠加橙色阈值线（需求方 2026-11-28 确认可不保留）
+        LinearLayout.LayoutParams volumeParams = new LinearLayout.LayoutParams(0, dp(24), 1f);
+        // 2026-11-28：Slider 的 onMeasure 不理会精确高度（实测恒为 ~64dp），
+        // 外面套一个定高容器并裁剪，卡片才能真正压到 24dp 高。
+        android.widget.FrameLayout sliderClip = new android.widget.FrameLayout(this);
+        sliderClip.setLayoutParams(volumeParams);
+        sliderClip.setClipChildren(true);
+        sliderClip.addView(volumeSlider, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT, dp(64),
+                Gravity.CENTER_VERTICAL));
+
         // 2026-11-21：新的一次按下视为新意图，解除「确认框期间冻结」
-        progressBar.setOnTouchListener((v, event) -> {
-            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
-                volumeConfirmPending = false;
-            }
-            return false;
-        });
-        progressBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (fromUser) {
-                    applyUserVolume(value, bar.getMax());
-                }
-            }
+        volumeSlider.addOnSliderTouchListener(
+                new com.google.android.material.slider.Slider.OnSliderTouchListener() {
+                    @Override
+                    public void onStartTrackingTouch(com.google.android.material.slider.Slider slider) {
+                        volumeConfirmPending = false;
+                        // 手指按着时不允许自动收起
+                        volumeHandler.removeCallbacksAndMessages(null);
+                    }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {
-                // 手指按着时不允许自动收起
-                volumeHandler.removeCallbacksAndMessages(null);
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {
-                scheduleVolumeDismiss();
+                    @Override
+                    public void onStopTrackingTouch(com.google.android.material.slider.Slider slider) {
+                        scheduleVolumeDismiss();
+                    }
+                });
+        volumeSlider.addOnChangeListener((slider, value, fromUser) -> {
+            if (fromUser) {
+                applyUserVolume((int) value, (int) slider.getValueTo());
             }
         });
 
@@ -2203,24 +2262,23 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         LinearLayout.LayoutParams percentParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         // 2026-11-21：6dp 是「不贴住圆头」的最小安全距离，其余空间全部让给音量条。
-        percentParams.leftMargin = dp(4);
+        percentParams.leftMargin = dp(2);
         percentView.setLayoutParams(percentParams);
-        percentView.setTextColor(hasVolumeInfo && percent >= SAFE_VOLUME_PERCENT
-                ? 0xFFFFA726 : 0xFFFFFFFF);
-        percentView.setTextSize(20);
+        percentView.setTextColor(hasVolumeInfo ? volumeDisplayColor(percent) : 0xFFFFFFFF);
+        percentView.setTextSize(14);
         percentView.setTypeface(percentView.getTypeface(), android.graphics.Typeface.BOLD);
         // 2026-11-21：数字区固定 34dp（单行 + 强制最大宽度），字号自适应 12~20sp：
         // 0/56 用大字号，100 自动缩到能塞下 —— 这样位数变化不再挤音量条，
         // 同时把省下的宽度全部让给条（用户要求「尽全力保证条宽」）。
         percentView.setSingleLine(true);
-        percentView.setMinWidth(dp(34));
-        percentView.setMaxWidth(dp(34));
+        percentView.setMinWidth(dp(24));
+        percentView.setMaxWidth(dp(24));
         androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
                 percentView, 12, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         percentView.setGravity(android.view.Gravity.CENTER);
         percentView.setText(hasVolumeInfo ? String.valueOf(percent) : "--");
 
-        card.addView(progressBar);
+        card.addView(sliderClip);
         card.addView(percentView);
 
         // 悬浮居中：原来贴顶（TOP + 10dp）在圆角表上看着像「粘在边框上」，
@@ -2244,8 +2302,31 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 "音量浮层已加入 content: w=" + popupWidth + " hasInfo=" + hasVolumeInfo);
 
         volumeIndicator = card;
-        volumeProgressBar = progressBar;
+        volumeProgressBar = volumeSlider;
         volumePercentView = percentView;
+    }
+
+    /** 音量配色：>80 红，>65 黄，其余白（2026-11-28 需求）。 */
+    private int volumeDisplayColor(int percent) {
+        if (percent > VOLUME_DANGER_PERCENT) {
+            return 0xFFFF5252;
+        }
+        if (percent > VOLUME_WARN_PERCENT) {
+            return 0xFFFFA726;
+        }
+        return 0xFFFFFFFF;
+    }
+
+    /** 把配色同时应用到数字与音量条（填充色 + 圆头）。 */
+    private void applyVolumeColor(int percent) {
+        int color = volumeDisplayColor(percent);
+        if (volumePercentView != null) {
+            volumePercentView.setTextColor(color);
+        }
+        if (volumeProgressBar != null) {
+            volumeProgressBar.setTrackActiveTintList(
+                    android.content.res.ColorStateList.valueOf(color));
+        }
     }
 
     private void updateVolumeIndicator(boolean hasVolumeInfo, int current, int max, int percent) {
@@ -2263,7 +2344,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (volumeProgressBar == null || volumePercentView == null) {
             return;
         }
-        volumeProgressBar.setMax(hasVolumeInfo ? max : 1);
+        volumeProgressBar.setValueTo(hasVolumeInfo ? Math.max(max, 1) : 1f);
         final int targetProgress = hasVolumeInfo ? current : 0;
         final int safeMax = hasVolumeInfo ? Math.max(max, 1) : 1;
         if (volumeAnimator != null) {
@@ -2271,12 +2352,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             volumeAnimator = null;
         }
         if (!animate || targetProgress == volumeDisplayedProgress) {
-            volumeProgressBar.setProgress(targetProgress);
+            volumeProgressBar.setValue(clampVolumeValue(targetProgress, safeMax));
             volumeDisplayedProgress = targetProgress;
             int shownPercent = hasVolumeInfo ? Math.round(targetProgress * 100f / safeMax) : percent;
             volumePercentView.setText(hasVolumeInfo ? String.valueOf(shownPercent) : "--");
-            volumePercentView.setTextColor(hasVolumeInfo && shownPercent >= SAFE_VOLUME_PERCENT
-                    ? 0xFFFFA726 : 0xFFFFFFFF);
+            if (hasVolumeInfo) {
+                applyVolumeColor(shownPercent);
+            }
             return;
         }
         long duration = VOLUME_STEP_ANIM_MS;
@@ -2289,13 +2371,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             int shown = (int) a.getAnimatedValue();
             volumeDisplayedProgress = shown;
             if (volumeProgressBar != null) {
-                volumeProgressBar.setProgress(shown);
+                volumeProgressBar.setValue(clampVolumeValue(shown, safeMax));
             }
             if (volumePercentView != null) {
                 int p = hasVolumeInfo ? Math.round(shown * 100f / safeMax) : 0;
                 volumePercentView.setText(hasVolumeInfo ? String.valueOf(p) : "--");
-                volumePercentView.setTextColor(hasVolumeInfo && p >= SAFE_VOLUME_PERCENT
-                        ? 0xFFFFA726 : 0xFFFFFFFF);
+                if (hasVolumeInfo) {
+                    applyVolumeColor(p);
+                }
             }
         });
         volumeAnimator = animator;
@@ -2529,8 +2612,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         seekBar.getLocationInWindow(seekLocation);
 
         float fraction = Math.min(1f, Math.max(0f, (float) currentChorusStartMs / (float) durationMs));
-        float trackLeft = seekLocation[0] - rootLocation[0] + seekBar.getPaddingLeft();
-        float trackRight = seekLocation[0] - rootLocation[0] + seekWidth - seekBar.getPaddingRight();
+        // 2026-11-28：进度条换成 Slider 后，轨道两端各内缩一个 thumb 半径，
+        // 标记必须按这个内缩算，否则会整体偏左。
+        float trackInset = seekBar.getThumbRadius();
+        float trackLeft = seekLocation[0] - rootLocation[0] + trackInset;
+        float trackRight = seekLocation[0] - rootLocation[0] + seekWidth - trackInset;
         float markerCenterX = trackLeft + (trackRight - trackLeft) * fraction;
         float markerCenterY = seekLocation[1] - rootLocation[1] + seekHeight / 2f;
         chorusMarkerDot.setX(markerCenterX - chorusMarkerDot.getWidth() / 2f);
@@ -2542,7 +2628,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     /** 当前是否停在播放页（pager 第 0 页）。pager 还没装好时按「是」处理。 */
     private boolean isPlayerPageVisible() {
-        return vpMainPages == null || vpMainPages.getCurrentItem() == 0;
+        // 2026-11-28：不能用 vpMainPages.getCurrentItem() —— 切页动画未结束时它仍是旧页，
+        // 会让刚恢复的标记又被设为 GONE；onMainPageSelected() 里的状态标志是即时的。
+        return !lyricsOverlayShowing;
     }
 
     private boolean hasChorusRange() {
@@ -2861,7 +2949,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             textView.setTextColor(0xFFFFFFFF);
             textView.setTextSize(12);
             textView.setPadding(dp(10), dp(8), dp(10), dp(8));
-            textView.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(textView.getContext(), 0xFF2D2D2D));
+            textView.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(textView.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_CARD));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             params.bottomMargin = dp(4);
@@ -3044,6 +3132,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 chorusMarkerDot.setVisibility(View.GONE);
             } else if (hasChorusRange()) {
                 updateChorusMarker(playerManager.getDuration());
+                // 切页动画期间 getCurrentItem / seekBar 布局都可能滞后，动画结束后再兜一次
+                seekBar.postDelayed(() -> {
+                    if (!lyricsOverlayShowing && hasChorusRange()) {
+                        positionChorusMarker(playerManager.getDuration());
+                    }
+                }, 350);
             }
         }
         updatePageIndicator(lyricsPage);
@@ -4350,7 +4444,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             itemLayout.setFocusable(true);
 
             if (realIndex == curReal) {
-                itemLayout.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(itemLayout.getContext(), 0xFF2D2D2D));
+                itemLayout.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(itemLayout.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_CARD));
             }
 
             ImageView ivCover = new ImageView(this);
@@ -4669,7 +4763,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), Math.abs(currentSpeed - speed) < 0.01f ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : 0xFF2D2D2D));
+            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), Math.abs(currentSpeed - speed) < 0.01f ? com.qinghe.music163pro.util.UiKit.COLOR_ACCENT : com.qinghe.music163pro.util.UiKit.COLOR_CARD));
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -4703,10 +4797,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         EditText etSpeed = new EditText(this);
         etSpeed.setHint("倍速");
         etSpeed.setTextColor(0xFFFFFFFF);
-        etSpeed.setHintTextColor(0xFF888888);
+        etSpeed.setHintTextColor(0xFFA49FB0);
         etSpeed.setTextSize(14);
         etSpeed.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        etSpeed.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etSpeed.getContext(), 0xFF2D2D2D));
+        etSpeed.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etSpeed.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_CARD));
         etSpeed.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -4885,7 +4979,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
             row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), isSelected
                     ? com.qinghe.music163pro.util.UiKit.withAlpha(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 0x33)
-                    : 0xFF2D2D2D));
+                    : com.qinghe.music163pro.util.UiKit.COLOR_CARD));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             rowParams.bottomMargin = dp(4);
@@ -4995,7 +5089,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             row.setPadding(dp(10), dp(9), dp(10), dp(9));
             int bgColor = disabledForSelection ? 0xFF222222 : (isSelected
                     ? com.qinghe.music163pro.util.UiKit.withAlpha(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT, 0x33)
-                    : 0xFF2D2D2D);
+                    : com.qinghe.music163pro.util.UiKit.COLOR_CARD);
             row.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(row.getContext(), bgColor));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -5611,6 +5705,154 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // ==================== Sleep Timer ====================
 
+    /**
+     * A/B 播放（2026-11-28 需求）：在浮层里设 A 点、B 点，循环播放这一段。
+     *
+     * <p>与音源无关 —— 在线 / 本地 / B 站都是同一个播放器实例，
+     * 所以三种歌曲的功能菜单里都挂了同一个入口。</p>
+     */
+    private void onFuncAbPlay() {
+        final int duration = playerManager.getDuration();
+        if (duration <= 0) {
+            com.qinghe.music163pro.util.UiKit.toast(this, "当前没有可播放的歌曲");
+            return;
+        }
+
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
+                .findViewById(android.R.id.content);
+        final FrameLayout overlay = new FrameLayout(this);
+        overlay.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC000000);
+        addSwipeToDismiss(overlay);
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER);
+        panel.setPadding(dp(20), dp(18), dp(20), dp(18));
+        FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        panelParams.gravity = Gravity.CENTER;
+        panelParams.leftMargin = dp(14);
+        panelParams.rightMargin = dp(14);
+        panel.setLayoutParams(panelParams);
+        panel.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xF2202024));
+
+        TextView title = new TextView(this);
+        title.setText("A/B 播放");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(15);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 0, 0, dp(10));
+        panel.addView(title);
+
+        final TextView info = new TextView(this);
+        info.setTextColor(0xFFB3B3B3);
+        info.setTextSize(11);
+        info.setGravity(Gravity.CENTER);
+        info.setPadding(0, 0, 0, dp(10));
+        panel.addView(info);
+
+        final Runnable refreshInfo = () -> {
+            String a = abStartMs < 0 ? "—" : clockOf(abStartMs);
+            String b = abEndMs < 0 ? "—" : clockOf(abEndMs);
+            info.setText("A：" + a + "   B：" + b
+                    + (abActive ? "\n正在循环 A→B" : "\n设好 A/B 后点「开始循环」"));
+        };
+        refreshInfo.run();
+
+        panel.addView(abButton("设 A 为当前位置", () -> {
+            abStartMs = playerManager.getCurrentPosition();
+            if (abEndMs >= 0 && abEndMs <= abStartMs) {
+                abEndMs = -1;
+            }
+            refreshInfo.run();
+        }));
+        panel.addView(abButton("设 B 为当前位置", () -> {
+            int pos = playerManager.getCurrentPosition();
+            if (abStartMs >= 0 && pos <= abStartMs) {
+                com.qinghe.music163pro.util.UiKit.toast(this, "B 点要在 A 点之后");
+                return;
+            }
+            abEndMs = pos;
+            refreshInfo.run();
+        }));
+        panel.addView(abButton("开始循环", () -> {
+            if (abStartMs < 0 || abEndMs <= abStartMs) {
+                com.qinghe.music163pro.util.UiKit.toast(this, "请先设好 A 点和 B 点");
+                return;
+            }
+            startAbLoop();
+            refreshInfo.run();
+            com.qinghe.music163pro.util.UiKit.toast(this, "A/B 循环已开启");
+        }));
+        panel.addView(abButton("停止并清除", () -> {
+            stopAbLoop();
+            abStartMs = -1;
+            abEndMs = -1;
+            refreshInfo.run();
+            com.qinghe.music163pro.util.UiKit.toast(this, "已停止 A/B 播放");
+        }));
+        panel.addView(abButton("关闭", () -> {
+            if (overlay.getParent() != null) {
+                ((ViewGroup) overlay.getParent()).removeView(overlay);
+            }
+            if (overlayContainer == overlay) {
+                overlayContainer = null;
+            }
+        }));
+
+        overlay.addView(panel);
+        rootView.addView(overlay);
+        overlayContainer = overlay;
+    }
+
+    private String clockOf(int ms) {
+        int total = Math.max(0, ms / 1000);
+        return String.format(java.util.Locale.US, "%d:%02d", total / 60, total % 60);
+    }
+
+    private TextView abButton(String label, Runnable action) {
+        // M3E：胶囊按钮（tonal）
+        com.google.android.material.button.MaterialButton btn =
+                com.qinghe.music163pro.util.UiKit.m3Button(this, label, false);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(6);
+        btn.setLayoutParams(lp);
+        btn.setOnClickListener(v -> action.run());
+        return btn;
+    }
+
+    /** 开循环：每 200ms 检查一次，越过 B 点就跳回 A（不依赖播放器事件，切歌也不受影响）。 */
+    private void startAbLoop() {
+        stopAbLoop();
+        abActive = true;
+        abHandler = new Handler(android.os.Looper.getMainLooper());
+        abLoopRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!abActive) {
+                    return;
+                }
+                if (abEndMs > abStartMs && playerManager.getCurrentPosition() >= abEndMs) {
+                    playerManager.seekTo(abStartMs);
+                }
+                abHandler.postDelayed(this, 200);
+            }
+        };
+        abHandler.post(abLoopRunnable);
+    }
+
+    private void stopAbLoop() {
+        abActive = false;
+        if (abHandler != null) {
+            abHandler.removeCallbacksAndMessages(null);
+            abHandler = null;
+        }
+        abLoopRunnable = null;
+    }
+
     private void onFuncSleepTimer() {
         dismissOverlay();
         if (playerManager.isSleepTimerActive()) {
@@ -5682,7 +5924,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         modeBtn.setTextSize(13);
         modeBtn.setGravity(Gravity.CENTER);
         modeBtn.setPadding(0, dp(10), 0, dp(10));
-        modeBtn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(modeBtn.getContext(), 0xFF2D2D2D));
+        modeBtn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(modeBtn.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_CARD));
         LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         modeParams.bottomMargin = dp(8);
@@ -5710,7 +5952,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), 0xFF2D2D2D));
+            btn.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(btn.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_CARD));
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -5748,10 +5990,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         EditText etSeconds = new EditText(this);
         etSeconds.setHint("秒数");
         etSeconds.setTextColor(0xFFFFFFFF);
-        etSeconds.setHintTextColor(0xFF888888);
+        etSeconds.setHintTextColor(0xFFA49FB0);
         etSeconds.setTextSize(14);
         etSeconds.setInputType(InputType.TYPE_CLASS_NUMBER);
-        etSeconds.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etSeconds.getContext(), 0xFF2D2D2D));
+        etSeconds.setBackground(com.qinghe.music163pro.util.UiKit.roundedFill(etSeconds.getContext(), com.qinghe.music163pro.util.UiKit.COLOR_CARD));
         etSeconds.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -6233,6 +6475,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     /** 刷新提示文本：目标位置相对「按下时位置」的秒数差（正负号显示）。 */
+    /** Slider 的值必须落在 [valueFrom, valueTo]，越界会抛 IllegalStateException。 */
+    /** 音量条取值同样要钳在 [0, max]，越界 Slider 会抛异常。 */
+    private float clampVolumeValue(int value, int max) {
+        if (value < 0) {
+            return 0f;
+        }
+        return Math.min(value, Math.max(max, 1));
+    }
+
+    private float clampSliderValue(float v) {
+        if (v < 0f) {
+            return 0f;
+        }
+        return Math.min(v, 1000f);
+    }
+
     private void updateSeekDeltaHint(int positionMs) {
         if (seekDeltaView == null || seekDeltaView.getVisibility() != android.view.View.VISIBLE) {
             return;
@@ -6309,8 +6567,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 int current = playerManager.getCurrentPosition();
                 int duration = playerManager.getDuration();
                 if (duration > 0) {
-                    seekBar.setMax(1000);
-                    seekBar.setProgress((int) (1000L * current / duration));
+                    seekBar.setValue(clampSliderValue(1000f * current / duration));
                     tvCurrentTime.setText(formatTime(current));
                     // 2026-11-21：时长没变就不重排标签宽度、不重建副歌标记（原来每 500ms 都做一遍）
                     if (duration != lastDuration) {

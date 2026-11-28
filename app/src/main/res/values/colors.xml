@@ -9,7 +9,7 @@
     <color name="colorErrorContainer">#8C1D18</color>
 
     <!-- Surface / Background -->
-    <color name="bg_dark">#121212</color>
+    <color name="bg_dark">#000000</color>   <!-- M3E(Wear)：纯黑底，OLED 省电、内容浮现 -->
     <color name="surface">#1E1E1E</color>
     <color name="surface_elevated">#252525</color>
     <color name="surface_overlay">#CC000000</color>
@@ -35,4 +35,9 @@
     <color name="gray_text">#B3FFFFFF</color>
     <color name="qr_background">#FFFFFFFF</color>
     <color name="favorite_red">#E53935</color>
+    <!-- M3 语义色（Wear M3E：surface container 层级） -->
+    <color name="m3_surface_container">#15151A</color>
+    <color name="m3_surface_container_high">#1E1F24</color>
+    <color name="m3_surface_container_highest">#26272D</color>
+    <color name="m3_outline">#3A3546</color>
 </resources>

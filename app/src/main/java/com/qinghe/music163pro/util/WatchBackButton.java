@@ -363,8 +363,24 @@ public final class WatchBackButton {
         // TextView 默认换行 —— 中文会被折成一列竖排（本项目已实测多例：我的歌单、本地音乐管理…）。
         // 统一单行 + END 截断后，超长文本退化为结尾「…」，不会再竖排。
         forceSingleLineTitles(titleBar);
-        // 标题居左（G5）：与「整行横向避让」同一个时机统一施加。
-        alignTitleStart(activity, titleBar);
+        // 2026-11-28：自绘标题（直接传 TextView）没有 id，走 looksLikeTitle 会漏掉，
+        // 这里显式居中，保证「一律居中」对自绘页面同样生效。
+        if (titleBar instanceof TextView) {
+            // 2026-11-28：自绘标题（自己就是标题栏）也要撑到返回按钮占位，
+            // 否则后面的内容（如字母网格第一行）会被按钮压住。
+            ViewGroup.LayoutParams lp = titleBar.getLayoutParams();
+            if (lp != null) {
+                int titleReserved = getReservedTopHeight(activity);
+                if (lp.height == ViewGroup.LayoutParams.WRAP_CONTENT
+                        || (lp.height > 0 && lp.height < titleReserved)) {
+                    lp.height = titleReserved;
+                    titleBar.setLayoutParams(lp);
+                }
+            }
+            applyTitleStart(activity, titleBar, (TextView) titleBar);
+        } else {
+            alignTitleStart(activity, titleBar);
+        }
     }
 
     // ==================== 标题居左（G5） ====================
@@ -451,27 +467,19 @@ public final class WatchBackButton {
         }
     }
 
+    /**
+     * 标题对齐（2026-11-28 需求方改版）：<b>一律居中，不再为返回按钮让位</b>。
+     *
+     * <p>以前是「居左 + 补足返回按钮占位」，导致同一个 App 里标题有的居中、有的偏右。
+     * 现在统一成：标题在<b>整屏宽度</b>上居中；为了真正做到「屏幕居中」，
+     * 这里把标题栏为返回按钮预留的 start 内边距压回到只有圆角内缩。</p>
+     */
     private static void applyTitleStart(Activity activity, View titleBar, TextView title) {
-        // 1) 居左（竖直仍居中，避免标题在撑高的标题栏里贴顶）
-        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-
-        // 2) 补足到「返回按钮占位」：累计 start 内缩 = 各级 padding + 各级 margin
-        int have = accumulatedStartInset(titleBar, title);
-        int needed = getReservedStartPadding(activity);
-        int fix = needed - have;
-        if (fix <= 0) {
-            return;
-        }
-        ViewGroup.LayoutParams raw = title.getLayoutParams();
-        if (raw instanceof ViewGroup.MarginLayoutParams) {
-            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
-            lp.setMarginStart(lp.getMarginStart() + fix);
-            title.setLayoutParams(lp);
-        } else if (raw != null) {
-            // 没有 margin 能力的 LayoutParams（例如 ListView 的 AbsListView.LayoutParams）：
-            // 退化为给标题自身加内边距，效果等价且不会破坏类型。
-            title.setPadding(title.getPaddingStart() + fix,
-                    title.getPaddingTop(), title.getPaddingEnd(), title.getPaddingBottom());
+        title.setGravity(Gravity.CENTER | Gravity.CENTER_VERTICAL);
+        if (titleBar != null) {
+            int inset = WatchUiUtils.cornerInset(activity);
+            titleBar.setPaddingRelative(inset, titleBar.getPaddingTop(),
+                    inset, titleBar.getPaddingBottom());
         }
     }
 

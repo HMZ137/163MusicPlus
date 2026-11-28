@@ -35,7 +35,7 @@ public class PersonalFMActivity extends BaseWatchActivity {
 
         // Wrap content in a ScrollView so small watch screens can scroll
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF121212);
+        scrollView.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scrollView.setFillViewport(true);
 
         LinearLayout root = new LinearLayout(this);

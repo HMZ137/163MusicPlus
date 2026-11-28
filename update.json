@@ -1,11 +1,10 @@
 {
-  "versionCode": 44,
-  "versionName": "20261122",
-  "apkUrl": "https://cdn.jsdelivr.net/gh/HMZ137/163MusicPlus@main/dist/163MusicPlus-20261122-v44.apk",
+  "versionCode": 45,
+  "versionName": "20261128",
+  "apkUrl": "https://github.com/HMZ137/163MusicPlus/releases/download/20261128/163MusicPlus-20261128-v45.apk",
   "mirrors": [
-    "https://gh-proxy.com/https://raw.githubusercontent.com/HMZ137/163MusicPlus/main/dist/163MusicPlus-20261122-v44.apk",
-    "https://raw.githubusercontent.com/HMZ137/163MusicPlus/main/dist/163MusicPlus-20261122-v44.apk"
+    "https://gh-proxy.com/https://github.com/HMZ137/163MusicPlus/releases/download/20261128/163MusicPlus-20261128-v45.apk"
   ],
-  "notes": "1. 表冠音量重写为连续增量模型：修复「向上转第一步却减音量」，转动更跟手；灵敏度改为自定义倍率（默认 x1，可输入 0.1~5.0）\n2. 设置页：开关选项页全部并入各分类页并移除原页；分类页新增引导简介、说明文字折叠可点开、标题自适应字号不再裁字\n3. 移除全屏歌词（页面、开关、入口一并下线）\n4. 收藏：修复歌曲封面永远显示占位图；修复收藏的专辑不加载；多选新增「收藏到歌单」；首次进入提示可长按的页面\n5. B 站：支持扫码/Cookie 登录并显示登录昵称；新增在线收藏入口；播放选项新增「复制链接」；修复搜索为空、听 bili 无返回入口\n6. 新增「网易云红」主题（#FC3D49）\n7. 性能：收藏 ID 改为内存缓存（主界面浮层更快）、设置页行背景复用、修复行背景涟漪只出现在最后一行\n8. 播放页上下两排控制按钮统一为全宽三等分，任意 dpi 下对齐；debug 版改为独立包名 .debug，可与发行版共存",
+  "notes": "1. 应用统一更名为 163MusicPlus\n2. 新增「表冠音量条」开关：默认横向音量条，可切到右侧竖向细条；两种都平滑过渡\n3. 新增网易云链接 / 歌曲 ID / 网络直链解析与播放，搜索支持 ID 置顶\n4. 收藏单曲页接入字母索引；西里尔与假名按读音并入 A-Z\n5. 多选菜单改为图标 + 小字说明，提高辨识度\n6. 进度条改用 Material Slider，修复播放闪退与副歌标记错位\n7. 版本号更新为 20261128",
   "force": false
 }

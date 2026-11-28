@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main_player_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -224,21 +225,26 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp" />
 
-            <SeekBar
+            <!-- 2026-11-28 M3E：进度条换 Material Slider（值域 0..1000，Java 侧按 /10 换算成百分比） -->
+            <com.google.android.material.slider.Slider
                 android:id="@+id/seek_bar"
                 android:layout_width="0dp"
                 android:layout_height="20dp"
                 android:layout_weight="1"
-                android:maxHeight="20dp"
-                android:minHeight="20dp"
-                android:max="100"
-                android:paddingStart="0dp"
-                android:paddingEnd="0dp"
-                android:paddingTop="0dp"
-                android:paddingBottom="0dp"
-                android:progress="0"
-                android:progressTint="?attr/colorPrimary"
-                android:thumbTint="?attr/colorPrimary" />
+                android:layout_marginStart="-7dp"
+                android:layout_marginEnd="-7dp"
+                android:valueFrom="0"
+                android:valueTo="1000"
+                android:value="0"
+                android:stepSize="0"
+                app:thumbRadius="7dp"
+                app:trackHeight="4dp"
+                app:trackColorActive="?attr/colorPrimary"
+                app:trackColorInactive="#3A3B44"
+                app:thumbColor="?attr/colorPrimary"
+                app:haloColor="#33333333"
+                app:labelBehavior="gone"
+                app:tickVisible="false" />
 
             <TextView
                 android:id="@+id/tv_total_time"

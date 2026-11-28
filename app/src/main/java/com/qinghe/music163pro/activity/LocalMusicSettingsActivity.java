@@ -266,8 +266,8 @@ public class LocalMusicSettingsActivity extends BaseWatchActivity {
                 final com.qinghe.music163pro.util.WatchPopup confirm =
                         com.qinghe.music163pro.util.WatchPopup.create(this)
                                 .title("发现 " + plan.groups.size() + " 组重复")
-                                .description("共 " + dupCount + " 个内容相同的副本（约 " + fmtSize(bytes)
-                                        + "）。移入 163Music/DuplicatesTrash 后可随时找回，确定清理？")
+                                .description("共 " + fmtSize(bytes) + "。可能误删，已保留在 "
+                                        + "DuplicatesTrash 文件夹，可随时恢复。")
                                 .cancelButton();
                 confirm.dangerButton("移入回收站", () -> doDedupe(plan, tvValue));
                 confirm.show();

@@ -57,11 +57,35 @@ public final class MultiSelectController {
         public final String id;
         public final String label;
         public final int textColor;
+        /** 图标资源；0 表示按 id 兜底（见 {@link #defaultIcon(String)}）。 */
+        public final int iconRes;
 
         public Action(String id, String label, int textColor) {
+            this(id, label, textColor, 0);
+        }
+
+        public Action(String id, String label, int textColor, int iconRes) {
             this.id = id;
             this.label = label;
             this.textColor = textColor;
+            this.iconRes = iconRes;
+        }
+
+        /** 没有显式给图标时，按动作 id 兜一个（2026-11-28：动作栏改为「图标 + 小字」）。 */
+        public int icon() {
+            if (iconRes != 0) {
+                return iconRes;
+            }
+            if (ID_DELETE.equals(id)) {
+                return R.drawable.ic_delete;
+            }
+            if (ID_FAVORITE.equals(id)) {
+                return R.drawable.ic_favorite_border;
+            }
+            if (ID_PLAY_NEXT.equals(id)) {
+                return R.drawable.ic_skip_next;
+            }
+            return R.drawable.ic_queue_music;
         }
 
         /** 默认的「删除」动作。 */
@@ -411,36 +435,59 @@ public final class MultiSelectController {
         return header;
     }
 
+    /**
+     * 动作按钮（2026-11-28 改版）：**上图标、下小字**，仿 Win11 右键菜单底部的图标条。
+     *
+     * <p>需求方明确要求「图标下方有小字说明提高辨识度」——图标单看太容易混淆，
+     * 所以文字必须留着且要够清楚（11sp，比原来 14sp 单行标签略小但仍有辨识度）。</p>
+     */
     private View buildActionButton(final Action action) {
-        TextView button = new TextView(activity);
-        button.setText(action.label);
-        button.setTextColor(action.textColor);
-        button.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(14));
-        button.setGravity(Gravity.CENTER);
-        button.setPadding(px(16), px(9), px(16), px(9));
-        // 单行 + 截断：保证所有动作按钮高度一致（标签字数不同也不会把某个按钮撑成两行）
-        button.setSingleLine(true);
-        button.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        button.setClickable(true);
-        button.setFocusable(true);
+        LinearLayout cell = new LinearLayout(activity);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER);
+        cell.setPadding(px(4), px(6), px(4), px(6));
+        cell.setClickable(true);
+        cell.setFocusable(true);
 
         GradientDrawable background = new GradientDrawable();
         background.setColor(ACTION_BUTTON_BG);
         background.setCornerRadius(UiKit.dp(activity, UiKit.DP_BUTTON_RADIUS));
-        button.setBackground(background);
+        cell.setBackground(background);
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         params.rightMargin = px(6);
-        button.setLayoutParams(params);
+        cell.setLayoutParams(params);
 
-        button.setOnClickListener(new View.OnClickListener() {
+        ImageView icon = new ImageView(activity);
+        LinearLayout.LayoutParams iconParams =
+                new LinearLayout.LayoutParams(px(20), px(20));
+        icon.setLayoutParams(iconParams);
+        icon.setImageResource(action.icon());
+        icon.setColorFilter(action.textColor);
+        cell.addView(icon);
+
+        TextView label = new TextView(activity);
+        label.setText(action.label);
+        label.setTextColor(0xFFE6E1F0);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        label.setGravity(Gravity.CENTER);
+        label.setPadding(0, px(3), 0, 0);
+        // 单行 + 截断：保证所有格子等高（标签字数不同也不会把某个格子撑成两行）
+        label.setSingleLine(true);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        label.setLayoutParams(labelParams);
+        cell.addView(label);
+
+        cell.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 performAction(action);
             }
         });
-        return button;
+        return cell;
     }
 
     private void performAction(Action action) {

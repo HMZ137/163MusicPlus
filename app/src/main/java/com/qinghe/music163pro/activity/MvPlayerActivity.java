@@ -64,6 +64,8 @@ public class MvPlayerActivity extends BaseWatchActivity {
         playerView.setKeepScreenOn(true);
         btnBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         tvTitle.setText(mvName != null && !mvName.isEmpty() ? mvName : "MV播放");
+        // 2026-11-28：MV 页标题也走统一标题栏（居中，不被返回按钮挤偏）
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, tvTitle);
 
         if (mvId <= 0) {
             com.qinghe.music163pro.util.UiKit.toast(this, "MV地址无效");

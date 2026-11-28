@@ -38,7 +38,8 @@ public class SettingsHomeActivity extends BaseWatchActivity {
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
         title.setGravity(android.view.Gravity.CENTER);
         title.setPadding(0, dpToPx(4), 0, dpToPx(10));
-        root.addView(title);
+        root.addView(title);        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
+
 
         root.addView(category("外观与显示", "主题、字号、缩放、防烧屏、歌名显示、背景",
                 v -> open("appearance")));

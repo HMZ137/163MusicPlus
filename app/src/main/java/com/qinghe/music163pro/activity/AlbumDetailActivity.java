@@ -67,7 +67,7 @@ public class AlbumDetailActivity extends BaseWatchActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF121212);
+        root.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         root.setPadding(px(6), px(6), px(6), px(6));
 
         // Title bar

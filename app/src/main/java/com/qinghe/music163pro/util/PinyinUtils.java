@@ -17,8 +17,13 @@ public final class PinyinUtils {
     /** 归不进 A–Z 的分组（数字、符号、生僻字等）。 */
     public static final char OTHER = '#';
 
-    /** A–Z 索引里用到的全部字母（不含 I / U / V —— 汉语拼音里没有这三个声母）。 */
-    public static final String INDEX_LETTERS = "ABCDEFGHJKLMNOPQRSTWXYZ";
+    /**
+     * A–Z 索引全集（2026-11-28 改）：**含 I / U / V**。
+     *
+     * <p>原来按汉语拼音声母裁掉了这三个，但西里尔（Иван→I）与假名（ヴァイオリン→V）
+     * 转写后会产生它们，裁掉就搜不到。实际展示时由页面按「当前列表存在的字母」再筛。</p>
+     */
+    public static final String INDEX_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     /** 每个声母起始汉字的 GBK 编码（升序）。 */
     private static final int[] GB_BOUNDARIES = {

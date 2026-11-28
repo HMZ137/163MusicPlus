@@ -48,7 +48,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
     private static final String PREFS_NAME = "music163_settings";
     private static final int PAGE_SIZE = 20;
 
-    private static final int COLOR_BG = 0xFF121212;
+    private static final int COLOR_BG = 0xFF000000;   // M3E：纯黑
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int COLOR_TEXT_SECONDARY = 0x80FFFFFF;
     // P1-10：强调色统一走 UiKit.COLOR_ACCENT（随主题刷新），不再本地定义
@@ -122,7 +122,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
     private View buildTopBar() {
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setBackgroundColor(0xFF1A1A1A);
+        topBar.setBackgroundColor(0xFF15151A);
         topBar.setPadding(px(8), px(6), px(8), px(6));
         topBar.setGravity(Gravity.CENTER_VERTICAL);
 
@@ -201,7 +201,7 @@ public class CommentFloorActivity extends BaseWatchActivity {
     private View buildBottomBar() {
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
-        bottomBar.setBackgroundColor(0xFF1A1A1A);
+        bottomBar.setBackgroundColor(0xFF15151A);
         bottomBar.setPadding(px(6), px(4), px(6), px(4));
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
 

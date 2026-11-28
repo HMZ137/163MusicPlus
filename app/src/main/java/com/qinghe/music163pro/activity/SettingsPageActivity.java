@@ -229,6 +229,10 @@ public class SettingsPageActivity extends BaseWatchActivity {
                 com.qinghe.music163pro.util.CrownVolumePrefs.isEnabled(this),
                 (btn, checked) ->
                         com.qinghe.music163pro.util.CrownVolumePrefs.setEnabled(this, checked));
+        addSwitchRow("表冠音量条", "关=横向音量条（与音量按钮一致），开=右侧竖向细条",
+                com.qinghe.music163pro.util.CrownVolumePrefs.useVerticalBar(this),
+                (btn, checked) ->
+                        com.qinghe.music163pro.util.CrownVolumePrefs.setUseVerticalBar(this, checked));
         final TextView sens = addValueRow("表冠灵敏度",
                 "×" + com.qinghe.music163pro.util.CrownVolumePrefs.getCustomSensitivity(this));
         ((LinearLayout) sens.getParent()).setOnClickListener(v ->
@@ -570,7 +574,7 @@ public class SettingsPageActivity extends BaseWatchActivity {
         TextView body = new TextView(this);
         body.setText("较长的说明会折叠成一行，点灰色小字本身即可展开完整说明；"
                 + "短说明（含数值）直接显示一行，不折叠。");
-        body.setTextColor(0xFFAAAAAA);
+        body.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED);
         body.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
         android.widget.LinearLayout.LayoutParams bodyLp = new android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -652,7 +656,9 @@ public class SettingsPageActivity extends BaseWatchActivity {
                     android.util.TypedValue.COMPLEX_UNIT_SP);
         }
         container.addView(t);
+        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, t);
     }
+
 
     /**
      * 2026-11-22：分类下的引导性简介（告诉用户这一页有哪些设置项）。

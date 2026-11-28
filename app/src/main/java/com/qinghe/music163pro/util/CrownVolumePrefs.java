@@ -22,6 +22,8 @@ public final class CrownVolumePrefs {
     public static final String KEY_MAX_PERCENT = "crown_volume_max_percent";
     /** 2026-11-22：自定义灵敏度倍率（默认 1.0，0.1~5.0）。 */
     public static final String KEY_CUSTOM_SENSITIVITY = "crown_volume_custom_sensitivity";
+    /** 2026-11-28：表冠音量条样式。false=横向浮层（默认），true=右侧竖向细条。 */
+    public static final String KEY_USE_VERTICAL_BAR = "crown_volume_vertical_bar";
 
     private CrownVolumePrefs() {
     }
@@ -38,6 +40,17 @@ public final class CrownVolumePrefs {
     public static void setEnabled(Context context, boolean enabled) {
         if (context == null) return;
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).commit();
+    }
+
+    /** 表冠旋转时用哪种音量条：默认横向（和主界面音量按钮一致）。 */
+    public static boolean useVerticalBar(Context context) {
+        if (context == null) return false;
+        return prefs(context).getBoolean(KEY_USE_VERTICAL_BAR, false);
+    }
+
+    public static void setUseVerticalBar(Context context, boolean useVertical) {
+        if (context == null) return;
+        prefs(context).edit().putBoolean(KEY_USE_VERTICAL_BAR, useVertical).commit();
     }
 
     /** 灵敏度 1~3，默认 2。 */

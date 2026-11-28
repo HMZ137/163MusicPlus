@@ -46,6 +46,11 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String KEY_SEARCH_HISTORY = "search_history";
+    /** 提示词轮播（2026-11-28）。 */
+    private boolean hintRotationStarted;
+    private Runnable hintRunnable;
+    /** 输入框初始提示（静态文案），轮播时用来还原。 */
+    private CharSequence originalHint;
     private static final int MAX_HISTORY = 20;
 
     private static final int TAB_SONGS = 0;
@@ -161,7 +166,7 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
      * {@link #defaultKeyword}，空输入时按搜索键会直接用它，而不是毫无反应。</p>
      */
     private void loadDefaultKeyword() {
-        final CharSequence originalHint = etSearch.getHint();
+        originalHint = etSearch.getHint();
         MusicApiHelper.getDefaultSearchKeyword(playerManager.getCookie(),
                 new MusicApiHelper.DefaultKeywordCallback() {
                     @Override
@@ -176,6 +181,9 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
                         if (etSearch.getText().length() == 0) {
                             etSearch.setHint(keyword);
                         }
+                        // 2026-11-28：提示词在两个文案间轮播，告诉用户可以粘贴链接/ID，
+                        // 用 hint 轮播而不是加控件 —— 完全不改变页面布局
+                        startHintRotation();
                     }
 
                     @Override
@@ -186,6 +194,33 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
                         }
                     }
                 });
+    }
+
+    /** 提示词轮播：默认搜索词 ↔ 「可粘贴链接/ID/直链」（2026-11-28）。 */
+    private void startHintRotation() {
+        if (hintRotationStarted) {
+            return;
+        }
+        hintRotationStarted = true;
+        hintRunnable = new Runnable() {
+            private boolean showTip;
+
+            @Override
+            public void run() {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                // 用户已经在输入就不打扰，等下一轮
+                if (etSearch.getText().length() == 0) {
+                    showTip = !showTip;
+                    etSearch.setHint(showTip
+                            ? getString(R.string.search_hint_tip)
+                            : (defaultKeyword != null ? defaultKeyword : originalHint));
+                }
+                etSearch.postDelayed(this, 4000);
+            }
+        };
+        etSearch.postDelayed(hintRunnable, 4000);
     }
 
     private void initListeners(TextView btnSearch) {
@@ -226,6 +261,14 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
             }
         }
 
+        // 2026-11-28：短链（163cn.tv/xxx）先联网跟跳转拿到真实 ID，再当关键词搜
+        com.qinghe.music163pro.util.NeteaseLinkParser.Result linkHit =
+                com.qinghe.music163pro.util.NeteaseLinkParser.parse(keyword);
+        if (linkHit.type == com.qinghe.music163pro.util.NeteaseLinkParser.Result.Type.SHORT_LINK) {
+            resolveShortLinkThenSearch(linkHit.url);
+            return;
+        }
+
         currentKeyword = keyword;
         addToSearchHistory(keyword);
 
@@ -235,6 +278,42 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
         vpSearchTabs.setCurrentItem(currentTab, false);
         // 已创建的页各自重搜；之后才创建的页会在 onViewCreated 里用当前关键词补搜
         searchCreatedFragments(keyword);
+    }
+
+    /**
+     * 短链解析：{@code 163cn.tv/xxx} → 真实 ID（2026-11-28 新增）。
+     *
+     * <p>解析成功后把 ID 填回搜索框再走正常搜索 —— 这样「结果第一位是该歌」的逻辑
+     * 与「直接输 ID」完全一致，不用在结果页里再写一套。</p>
+     */
+    private void resolveShortLinkThenSearch(final String shortUrl) {
+        tvSearchInfo.setVisibility(View.VISIBLE);
+        tvSearchInfo.setText("正在解析短链…");
+        new Thread(() -> {
+            String keyword = null;
+            try {
+                com.qinghe.music163pro.util.ShortLinkResolver.Target target =
+                        com.qinghe.music163pro.util.ShortLinkResolver.resolve(shortUrl);
+                if (target.id > 0) {
+                    keyword = String.valueOf(target.id);
+                }
+            } catch (Exception ignored) {
+                // 解析失败落到下面的提示
+            }
+            final String resolved = keyword;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                if (resolved == null) {
+                    tvSearchInfo.setText("短链解析失败，请检查网络或直接粘贴歌曲 ID");
+                    return;
+                }
+                etSearch.setText(resolved);
+                etSearch.setSelection(resolved.length());
+                doSearch();
+            });
+        }).start();
     }
 
     /** 把新关键词分发给当前已经创建的结果页（后面才创建的页由 Fragment 自己补）。 */

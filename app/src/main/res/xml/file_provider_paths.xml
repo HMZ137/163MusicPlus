@@ -9,6 +9,9 @@
 -->
 <paths>
     <external-path name="music163_files" path="163Music/" />
+    <!-- 2026-11-28：局域网传歌收到的「非音乐文件」都落在 /sdcard/TransFiles，
+         传过来的 APK 要在接收端直接点开安装，所以这个目录也要授权给 FileProvider。 -->
+    <external-path name="transfiles" path="TransFiles/" />
     <external-files-path name="app_external_files" path="." />
     <external-cache-path name="app_external_cache" path="." />
     <files-path name="app_files" path="." />

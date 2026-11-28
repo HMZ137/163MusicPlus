@@ -39,7 +39,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:lineSpacingExtra="2dp"
-                android:text="这款模块可以使您在手表上打开网易云音乐转发链接时改为打开163音乐Pro"
+                android:text="这款模块可以使您在手表上打开网易云音乐转发链接时改为打开163MusicPlus"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 

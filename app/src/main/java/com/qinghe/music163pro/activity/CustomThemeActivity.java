@@ -50,7 +50,8 @@ public class CustomThemeActivity extends BaseWatchActivity {
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, dpToPx(4), 0, dpToPx(10));
-        root.addView(title);
+        root.addView(title);        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
+
 
         // 输入框
         input = new EditText(this);

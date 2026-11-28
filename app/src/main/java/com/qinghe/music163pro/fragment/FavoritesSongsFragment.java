@@ -177,6 +177,72 @@ public class FavoritesSongsFragment extends FavoritesPageFragment<Song> {
         }
     }
 
+    // ==================== 字母跳转（2026-11-28，复用 LetterGroups + LetterPickerActivity） ====================
+
+    private static final int REQUEST_LETTER_PICKER = 0x51;
+    private com.qinghe.music163pro.util.LetterGroups letterGroups;
+
+    /**
+     * 打开字母选择页。
+     *
+     * <p>收藏默认是「收藏先后」顺序，字母跳转没有意义，所以**先把列表按名称排一次**
+     * （用户点这个动作本身就是要求按字母看），排完再算分组。</p>
+     */
+    public void openLetterPicker() {
+        if (!isViewReady() || items.isEmpty()) {
+            toast("还没有可跳转的字母");
+            return;
+        }
+        sortByDisplayName();
+        java.util.List<String> names = new java.util.ArrayList<>(items.size());
+        for (Song song : items) {
+            names.add(song == null ? "" : song.getDisplayName());
+        }
+        letterGroups = com.qinghe.music163pro.util.LetterGroups.fromNames(names);
+        if (letterGroups.letters.isEmpty()) {
+            toast("还没有可跳转的字母");
+            return;
+        }
+        StringBuilder letters = new StringBuilder(letterGroups.letters.size());
+        for (Character c : letterGroups.letters) {
+            letters.append(c.charValue());
+        }
+        android.content.Intent intent = new android.content.Intent(
+                requireContext(), com.qinghe.music163pro.activity.LetterPickerActivity.class);
+        intent.putExtra(com.qinghe.music163pro.activity.LetterPickerActivity.EXTRA_LETTERS,
+                letters.toString());
+        intent.putExtra(com.qinghe.music163pro.activity.LetterPickerActivity.EXTRA_STARTS,
+                letterGroups.starts);
+        intent.putExtra(com.qinghe.music163pro.activity.LetterPickerActivity.EXTRA_COUNTS,
+                letterGroups.counts);
+        intent.putExtra(com.qinghe.music163pro.activity.LetterPickerActivity.EXTRA_CURRENT,
+                listView() == null ? 0 : listView().getFirstVisiblePosition());
+        startActivityForResult(intent, REQUEST_LETTER_PICKER);
+    }
+
+    /** 按展示名排序（拉丁/西里尔/假名/汉字统一走 {@link ScriptSort#TEXT_ORDER}）。 */
+    private void sortByDisplayName() {
+        java.util.Collections.sort(items, (a, b) -> com.qinghe.music163pro.util.ScriptSort.TEXT_ORDER.compare(
+                a == null ? "" : a.getDisplayName(),
+                b == null ? "" : b.getDisplayName()));
+        notifyItemsChanged();
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_LETTER_PICKER
+                || resultCode != android.app.Activity.RESULT_OK
+                || data == null || listView() == null) {
+            return;
+        }
+        int target = data.getIntExtra(
+                com.qinghe.music163pro.activity.LetterPickerActivity.EXTRA_RESULT_INDEX, -1);
+        if (target >= 0 && !items.isEmpty()) {
+            listView().setSelection(Math.max(0, Math.min(target, items.size() - 1)));
+        }
+    }
+
     @Override
     protected void onItemClicked(int position, Song song) {
         // 播放队列 = 当前收藏列表（与改造前一致），然后回主界面（播放器页）。

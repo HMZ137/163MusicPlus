@@ -56,7 +56,7 @@ public class EditMoreActivity extends BaseWatchActivity {
         prefs = MoreMenuPreferences.getPrefs(this);
 
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF121212);
+        scroll.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scroll.setFillViewport(true);
 
         LinearLayout root = new LinearLayout(this);

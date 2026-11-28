@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0d1212">
-<title>163音乐Pro · 传歌到手表</title>
+<title>163MusicPlus · 传歌到手表</title>
 <style>
 /* ============================================================
    主题变量：#39c5bb（初音绿）占位，后续由主题系统覆盖。
@@ -219,6 +219,101 @@ body{
   .queue{border-radius:var(--r-lg);max-height:38vh}
   .grid{grid-template-columns:1fr 1fr}
 }
+
+/* ===== 原型 v0.8 ===== */
+[hidden]{display:none !important}
+:root{ --r-ctl:12px; }
+body{padding:0;align-items:stretch}
+.app{max-width:920px;min-height:100dvh;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+@media (max-width:560px){ .app{padding:10px 12px calc(12px + env(safe-area-inset-bottom))} }
+.topbtn,.modebtn,.icon-btn,.cbtn,.widebtn,.sheet h3 .close,.devchip{border-radius:var(--r-ctl)}
+.topbtn{height:36px;padding:0 14px;flex:none;cursor:pointer;font:inherit;font-size:12px;font-weight:750;
+  background:var(--accent);color:#04211f;border:1px solid var(--accent)}
+.modebtn{display:inline-flex;align-items:center;gap:6px;flex:none;cursor:pointer;padding:0 12px;height:36px;
+  font:inherit;font-size:12px;font-weight:700;background:var(--accent-dim);border:1px solid var(--accent-edge);color:var(--accent)}
+.modebtn .cnt{font-size:10.5px;opacity:.85}
+.modebtn.recv{background:rgba(255,207,107,.12);border-color:rgba(255,207,107,.34);color:#ffcf6b}
+.pane{flex:1;display:flex;flex-direction:column;gap:12px;min-height:0}
+.sendbar{display:flex;align-items:center;gap:9px;padding:10px 12px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--stroke);border-radius:var(--r-xl);font-size:12.5px}
+.sendbar .tl{color:var(--fg-dim);flex:none}
+.sendbar b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sendbar .chev{color:var(--fg-dim)}
+.filecard{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 12px 58px;
+  background:var(--panel);border:1px solid var(--stroke);border-radius:var(--r-xl)}
+.filecard .dropzone{flex:1;margin:0}
+.qbody{flex:1;min-height:0;overflow:auto}
+.qlist{width:100%;display:flex;flex-direction:column;gap:7px}
+.corners{position:absolute;right:14px;bottom:12px;display:flex;gap:8px;align-items:center}
+.cbtn{height:34px;padding:0 16px;cursor:pointer;font:inherit;font-size:12.5px;font-weight:750;
+  background:var(--accent);color:#04211f;border:1px solid var(--accent)}
+.cbtn.ghost{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-edge);font-weight:650}
+.cbtn.danger{background:rgba(255,123,114,.14);color:#ff7b72;border-color:rgba(255,123,114,.4);font-weight:700}
+.cbtn.pulse{animation:cbtnPulse 1.15s ease-in-out infinite}
+@keyframes cbtnPulse{0%,100%{box-shadow:0 0 0 0 rgba(57,197,187,0)}
+  50%{box-shadow:0 0 0 6px rgba(57,197,187,.26)}}
+.qlist .row .selcb{display:none;width:18px;height:18px;border-radius:6px;border:1.6px solid var(--stroke);
+  flex:none;place-items:center;color:#04211f;font-size:12px;font-weight:800;background:transparent}
+.qlist.multi .row .selcb{display:grid}
+.qlist .row.sel .selcb{background:var(--accent);border-color:var(--accent)}
+.qlist .row.sel{background:var(--accent-dim);border-color:var(--accent-edge)}
+.rxwrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px;
+  background:var(--panel);border:1px solid var(--stroke);border-radius:var(--r-xl)}
+.rxwrap .rh{display:flex;align-items:center;gap:8px}
+.rxwrap .rh b{font-size:13px}
+.rxwrap .rh .n{color:var(--fg-dim);font-size:11.5px}
+.rxwrap .rh .gap{flex:1}
+.rxlist{list-style:none;margin:0;padding:0;flex:1;display:flex;flex-direction:column;gap:7px;overflow:auto}
+.rxlist li{display:flex;align-items:center;gap:9px;font-size:12.5px;background:var(--panel-2);
+  border:1px solid var(--stroke);border-radius:var(--r-md);padding:8px 10px}
+.rxlist li .rn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rxlist li .rs{color:var(--fg-dim);font-size:11px;flex:none}
+.rxlist li.empty{justify-content:center;color:var(--fg-dim);border-style:dashed;background:none}
+.rxlist li .dl{margin-left:8px;color:var(--accent);font-size:11.5px;text-decoration:none;
+  border:1px solid var(--accent-edge);border-radius:8px;padding:2px 8px;flex:none}
+.tagapk{font-size:9.5px;padding:1px 5px;border-radius:5px;flex:none;
+  background:rgba(255,207,107,.14);color:#ffcf6b;border:1px solid rgba(255,207,107,.34)}
+.devlist{display:flex;flex-direction:column;gap:8px;margin:10px 0 4px}
+.devitem{display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--r-md);
+  background:var(--panel-2);border:1px solid var(--stroke);cursor:pointer}
+.devitem.sel{border-color:var(--accent-edge);background:var(--accent-dim)}
+.devitem .cb{width:18px;height:18px;border-radius:6px;border:1.6px solid var(--stroke);flex:none;
+  display:grid;place-items:center;color:#04211f;font-size:12px;font-weight:800}
+.devitem.sel .cb{background:var(--accent);border-color:var(--accent)}
+.devitem .dn{flex:1;min-width:0}
+.devitem .dn b{display:block;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.devitem .dn span{font-size:11px;color:var(--fg-dim)}
+.devitem .cap{font-size:10px;padding:1px 6px;border-radius:6px;border:1px solid var(--stroke);color:var(--fg-dim)}
+.devitem .cap.both{color:var(--accent);border-color:var(--accent-edge)}
+.sheetfoot{display:flex;gap:9px;margin-top:12px}
+.sheetfoot button{flex:1;height:38px}
+.devchips{display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap}
+.devchip{padding:6px 11px;border-radius:var(--r-ctl);cursor:pointer;font:inherit;font-size:11.5px;
+  background:var(--panel-2);border:1px solid var(--stroke);color:var(--fg-dim)}
+.devchip.on{background:var(--accent-dim);border-color:var(--accent-edge);color:var(--accent);font-weight:700}
+/* 轻提示（toast）：浮在底部中间，2.2 秒自动消失，不占布局 */
+.banner{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,10px);
+  padding:9px 16px;border-radius:var(--r-ctl);font-size:12.5px;
+  max-width:88vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:var(--panel-2);border:1px solid var(--accent-edge);color:var(--accent);
+  box-shadow:0 12px 30px rgba(0,0,0,.45);
+  opacity:0;pointer-events:none;transition:opacity .16s,transform .16s;z-index:70;
+}
+.banner.on{opacity:1;transform:translate(-50%,0)}
+/* 二次确认 */
+.cfmask{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);
+  opacity:0;pointer-events:none;transition:opacity .16s;z-index:60}
+.cfmask.on{opacity:1;pointer-events:auto}
+.cfbox{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%) scale(.98);z-index:61;
+  width:min(360px,86vw);padding:16px;border-radius:var(--r-xl);
+  background:var(--panel);border:1px solid var(--stroke);box-shadow:0 20px 50px rgba(0,0,0,.55);
+  opacity:0;pointer-events:none;transition:opacity .16s,transform .16s}
+.cfbox.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.cfbox h3{margin:0 0 6px;font-size:14.5px}
+.cfbox p{margin:0 0 14px;font-size:12.5px;color:var(--fg-dim)}
+.cfacts{display:flex;gap:9px}
+.cfacts button{flex:1}
 </style>
 </head>
 <body>
@@ -228,10 +323,12 @@ body{
   <div class="bar">
     <div class="mark">♪</div>
     <div class="who">
-      <b>传歌到手表</b>
-      <span id="subtitle">音乐进 Music · 歌词自动配对</span>
+      <b>传文件 · 手表互传</b>
+      <span id="subtitle">发给手表，也能接手表发来的文件</span>
     </div>
     <div class="dot" id="conn"><i></i><span id="connText">在线</span></div>
+    <button class="topbtn" id="btnPick">选择文件</button>
+    <button class="modebtn" id="btnMode">⇄ <span id="modeText">接收</span><span class="cnt" id="modeCnt"></span></button>
     <button class="icon-btn" id="btnMonitor" title="状态监控" aria-label="状态监控">
       <svg viewBox="0 0 24 24">
         <path d="M3 13h3l2.5-6 3.5 12 3-8 2 2h4"/>
@@ -239,43 +336,75 @@ body{
     </button>
   </div>
 
-  <div class="stage">
-    <!-- 拖放区 -->
-    <div class="dropzone" id="dropzone">
-      <div>
-        <div class="glyph">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 16V4"/><path d="M7 9l5-5 5 5"/>
-            <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
-          </svg>
-        </div>
-        <h3>拖进来，或点一下选文件</h3>
-        <p>音频 + 同名 .lrc 一起选，会自动配对</p>
-        <div class="cta">选择文件</div>
-      </div>
-    </div>
-    <input class="hidden-file" type="file" id="picker" multiple>
+  <div class="banner" id="banner"></div>
 
-    <!-- 上传队列 -->
-    <div class="queue">
-      <div class="qhead">
-        <b>待传</b>
-        <span class="n" id="qcount">0 个</span>
-        <span class="gap"></span>
-        <button class="icon-btn" id="btnSend" title="开始上传" aria-label="开始上传" style="width:30px;height:30px;border-radius:9px">
-          <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 12h13"/><path d="M12 5l7 7-7 7"/></svg>
-        </button>
-        <button class="icon-btn" id="btnClear" title="清空" aria-label="清空" style="width:30px;height:30px;border-radius:9px">
-          <svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 7h12"/><path d="M9 7V5h6v2"/><path d="M8 7l1 13h6l1-13"/></svg>
-        </button>
+  <div class="pane" id="paneSend">
+    <div class="sendbar" id="targetBar">
+      <span class="tl">发送到</span>
+      <b id="targetName">选择设备（可多选）</b>
+      <span class="chev">›</span>
+    </div>
+
+    <div class="filecard" id="fileCard">
+      <div class="dropzone" id="dropzone">
+        <div>
+          <div class="glyph">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 16V4"/><path d="M7 9l5-5 5 5"/>
+              <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+            </svg>
+          </div>
+          <h3>拖进来，或点右上角「选择文件」</h3>
+          <p>音频 + 同名 .lrc 一起选，会自动配对</p>
+        </div>
       </div>
-      <ul class="qlist" id="qlist"></ul>
+
+      <div class="qbody" id="qbody" hidden><ul class="qlist" id="qlist"></ul></div>
+
+      <div class="corners" id="corners">
+        <button class="cbtn danger" id="btnClearList">清空</button>
+        <button class="cbtn ghost" id="btnMulti">多选</button>
+        <button class="cbtn" id="btnSend">发送</button>
+        <button class="cbtn ghost" id="btnCancel" hidden>取消</button>
+        <button class="cbtn danger" id="btnDelete" hidden>删除</button>
+        <button class="cbtn" id="btnSendSel" hidden>发送已选定文件</button>
+      </div>
+
+      <input class="hidden-file" type="file" id="picker" multiple>
+      <span id="qcount" hidden></span>
+      <button id="btnClear" hidden></button>
+    </div>
+  </div>
+
+  <div class="pane" id="paneRecv" hidden>
+    <div class="rxwrap">
+      <div class="rh">
+        <b>已接收</b><span class="n" id="rxCount">0 个</span>
+        <span style="font-size:11px;color:var(--fg-dim)">其它设备发来的文件会出现在这里</span>
+        <span class="gap"></span>
+        <button class="icon-btn" id="btnSim" title="刷新列表" style="width:30px;height:30px;font-size:15px">＋</button>
+      </div>
+      <ul class="rxlist" id="rxList"><li class="empty">还没有设备发文件过来</li></ul>
     </div>
   </div>
 </div>
 
 <!-- 监控面板 -->
 <div class="sheet-mask" id="mask"></div>
+<div class="sheet-mask" id="devMask"></div>
+<div class="sheet" id="devSheet">
+  <div class="grab"></div>
+  <h3>发送到
+    <span style="margin-left:4px;font-size:11.5px;color:var(--fg-dim);font-weight:400">可多选</span>
+    <div class="close" id="devClose">×</div>
+  </h3>
+  <div class="devlist" id="devList"></div>
+  <div class="sheetfoot">
+    <button class="icon-btn" id="btnScan" style="width:auto;border-radius:var(--r-ctl);font-size:12.5px">扫描</button>
+    <button class="icon-btn" id="devOk" style="width:auto;border-radius:var(--r-ctl);font-size:12.5px;background:var(--accent);color:#04211f;border-color:var(--accent);font-weight:750">确定</button>
+  </div>
+</div>
+
 <div class="sheet" id="sheet">
   <div class="grab"></div>
   <h3>
@@ -285,6 +414,10 @@ body{
     手表状态
     <div class="close" id="btnClose">×</div>
   </h3>
+
+  <div class="devchips" id="monChips">
+    <button class="devchip on" data-i="0">本机</button>
+  </div>
 
   <div class="now">
     <div class="cover" id="monCover">♪</div>
@@ -340,6 +473,16 @@ body{
   </div>
 
   <p class="hint" id="monHint">每 1 秒刷新</p>
+</div>
+
+<div class="cfmask" id="cfMask"></div>
+<div class="cfbox" id="cfBox">
+  <h3 id="cfTitle">确认操作</h3>
+  <p id="cfText"></p>
+  <div class="cfacts">
+    <button class="cbtn ghost" id="cfCancel">取消</button>
+    <button class="cbtn danger" id="cfOk">确认</button>
+  </div>
 </div>
 
 <script>
@@ -474,10 +617,14 @@ function send(it){
     it.status = 'send'; it.progress = 0; it.bps = 0;
     paint(it); count();
 
-    let url = '/upload?name=' + encodeURIComponent(it.name);
+    let url = (it.__base || '') + '/upload?name=' + encodeURIComponent(it.name);
     if (it.kind === 'LRC'){
       const p = pairOf(it);
       if (p) url += '&pair=' + encodeURIComponent(p);
+    }
+    // 2026-11-28：APK 单独标一下，接收端据此弹「是否安装」并按队列连续安装
+    if (/\.apk$/i.test(it.name)) {
+      url += '&kind=apk';
     }
 
     const x = new XMLHttpRequest();
@@ -537,6 +684,9 @@ async function sendAll(){
 let sheetOpen = false;
 
 function openSheet(){
+  if (!S.pollTimer && typeof selectMonitor === 'function'){
+    selectMonitor(0);
+  }
   sheetOpen = true;
   ui.sheet.classList.add('on');
   ui.mask.classList.add('on');
@@ -613,7 +763,7 @@ function applyStatus(d){
 
 async function fetchStatus(){
   try {
-    const r = await fetch('/api/status', { cache: 'no-store' });
+    const r = await fetch((S.monBase || '') + '/api/status', { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     applyStatus(await r.json());
   } catch(e){
@@ -654,7 +804,7 @@ function stopMonitor(){
    绑定
    ============================================================ */
 ui.dropzone.addEventListener('click', () => ui.picker.click());
-ui.picker.addEventListener('change', e => { add(e.target.files); ui.picker.value = ''; });
+ui.picker.addEventListener('change', e => { addFiles(e.target.files); ui.picker.value = ''; });
 
 ['dragenter','dragover'].forEach(ev => ui.dropzone.addEventListener(ev, e => {
   e.preventDefault(); ui.dropzone.classList.add('over');
@@ -663,7 +813,8 @@ ui.picker.addEventListener('change', e => { add(e.target.files); ui.picker.value
   e.preventDefault(); ui.dropzone.classList.remove('over');
 }));
 ui.dropzone.addEventListener('drop', e => {
-  if (e.dataTransfer && e.dataTransfer.files) add(e.dataTransfer.files);
+  e.preventDefault();
+  addFiles(e.dataTransfer && e.dataTransfer.files);
 });
 
 ui.btnSend.addEventListener('click', sendAll);
@@ -692,6 +843,391 @@ fetch('/api/status', { cache: 'no-store' })
   .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   .then(() => setConn(true))
   .catch(() => setConn(false));
+
+
+/* ============================================================
+   组网互传（2026-11-28 正式实现）
+   设备：GET /api/devices（手表代做 UDP 扫描）
+   发送：POST {base}/upload（复用各设备的接收服务）
+   接收：GET /api/files + /api/file（从手表拉，不需要另开服务）
+   ============================================================ */
+const W = {
+  mode:'send', devices:[], self:null, chosen:new Set(),
+  scanned:false, multi:false, sel:new Set(), recvCount:0
+};
+const wq = id => document.getElementById(id);
+// 2026-11-28：右上角「选择文件」按钮绑定（之前漏绑，点了没反应）
+(function bindPicker(){
+  const btn = document.getElementById('btnPick');
+  const input = document.getElementById('picker');
+  if (btn && input){
+    btn.onclick = () => input.click();
+  }
+})();
+
+let _toastTimer = 0;
+function banner(t, ms){
+  const b = wq('banner');
+  if(!t){ b.classList.remove('on'); return; }
+  b.textContent = t; b.classList.add('on');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => b.classList.remove('on'), ms || 2200);
+}
+function pending(){ return S.items.filter(i => i.status !== 'ok'); }
+
+/* ---------- 发送 / 接收 切换 ---------- */
+function setMode(mode){
+  W.mode = mode;
+  const send = mode === 'send';
+  wq('paneSend').hidden = !send;
+  wq('paneRecv').hidden = send;
+  wq('modeText').textContent = send ? '接收' : '发送';
+  wq('btnMode').classList.toggle('recv', !send);
+  wq('modeCnt').textContent = send
+    ? (W.recvCount ? W.recvCount + ' 个' : '')
+    : (S.items.length ? S.items.length + ' 个' : '');
+  if (!send) loadReceiveFiles();
+}
+wq('btnMode').onclick = () => setMode(W.mode === 'send' ? 'recv' : 'send');
+
+/* ---------- 文件区状态 ---------- */
+function refresh(){
+  const n = S.items.length;
+  wq('dropzone').hidden = n > 0;
+  wq('qbody').hidden = n === 0;
+  if (n === 0 && W.multi) exitMulti();
+  syncCorners();
+  if (W.mode === 'recv') wq('modeCnt').textContent = n ? n + ' 个' : '';
+}
+function syncCorners(){
+  const m = W.multi, has = S.items.length > 0, n = W.sel.size;
+  wq('btnClearList').hidden = m;
+  wq('btnMulti').hidden = m;
+  wq('btnSend').hidden = m;
+  wq('btnCancel').hidden = !m;
+  wq('btnDelete').hidden = !m;
+  wq('btnSendSel').hidden = !m;
+  wq('corners').hidden = false;
+  wq('btnSend').disabled = S.busy;
+  wq('btnDelete').disabled = n === 0;
+  wq('btnSendSel').disabled = n === 0 || S.busy;
+  wq('btnSendSel').textContent = n ? '发送已选定文件（' + n + '）' : '发送已选定文件';
+  wq('btnSendSel').classList.toggle('pulse', m && n > 0 && !S.busy);
+}
+function enterMulti(){
+  if (!S.items.length){ banner('当前无可操作文件'); return; }
+  W.multi = true; W.sel.clear();
+  wq('qlist').classList.add('multi');
+  S.items.forEach(syncRow); syncCorners();
+}
+function exitMulti(){
+  W.multi = false; W.sel.clear();
+  wq('qlist').classList.remove('multi');
+  S.items.forEach(syncRow); syncCorners();
+}
+wq('btnMulti').onclick = enterMulti;
+wq('btnCancel').onclick = exitMulti;
+
+const _paint = paint;
+paint = function(it){ _paint(it); syncRow(it); };
+function syncRow(it){
+  const el = it.el;
+  if (!el) return;
+  let cb = el.querySelector('.selcb');
+  if (!cb){
+    cb = document.createElement('div');
+    cb.className = 'selcb';
+    el.insertBefore(cb, el.firstChild);
+  }
+  const on = W.sel.has(it);
+  cb.textContent = on ? '✓' : '';
+  el.classList.toggle('sel', on);
+  el.onclick = W.multi ? (e) => {
+    e.stopPropagation();
+    W.sel.has(it) ? W.sel.delete(it) : W.sel.add(it);
+    syncRow(it); syncCorners();
+  } : null;
+  syncCorners();
+}
+
+/* ---------- 二次确认 ---------- */
+function askConfirm(title, text, onOk){
+  wq('cfTitle').textContent = title;
+  wq('cfText').textContent = text;
+  wq('cfMask').classList.add('on');
+  wq('cfBox').classList.add('on');
+  const okBtn = wq('cfOk');
+  if (okBtn) okBtn.onclick = () => { closeConfirm(); onOk(); };
+}
+function closeConfirm(){
+  if (wq('cfMask')) wq('cfMask').classList.remove('on');
+  if (wq('cfBox')) wq('cfBox').classList.remove('on');
+}
+if (wq('cfCancel')) wq('cfCancel').onclick = closeConfirm;
+if (wq('cfMask')) wq('cfMask').onclick = closeConfirm;
+
+/* ---------- 清空 / 删除 ---------- */
+wq('btnClearList').onclick = () => {
+  const n = S.items.length;
+  if (!n){ banner('当前无可操作文件'); return; }
+  askConfirm('清空列表？', '将移除列表里的 ' + n + ' 个文件（不会删除本机文件）', () => {
+    S.items.forEach(it => { if (it.el) it.el.remove(); });
+    S.items = []; W.sel.clear(); W.multi = false;
+    wq('qlist').classList.remove('multi');
+    count(); refresh();
+  });
+};
+wq('btnDelete').onclick = () => {
+  if (!W.sel.size){ banner('还没有勾选文件'); return; }
+  const killed = new Set(W.sel);
+  askConfirm('删除选中的 ' + killed.size + ' 个文件？', '仅从待发列表移除，不会删除本机文件', () => {
+    S.items = S.items.filter(it => !killed.has(it));
+    Array.from(wq('qlist').children).forEach(li => {
+      if (!S.items.some(it => it.el === li)) li.remove();
+    });
+    W.sel.clear();
+    count(); refresh();
+  });
+};
+
+/* ---------- 设备扫描（真实） ---------- */
+function openDev(open){
+  wq('devSheet').classList.toggle('on', open);
+  wq('devMask').classList.toggle('on', open);
+  if (open) renderDevs();
+}
+wq('devMask').onclick = () => openDev(false);
+wq('devClose').onclick = () => openDev(false);
+wq('targetBar').onclick = () => openDev(true);
+
+function renderDevs(){
+  const box = wq('devList');
+  box.innerHTML = '';
+
+  const mkRow = (key, name, sub, cap) => {
+    const sel = W.chosen.has(key);
+    const el = document.createElement('div');
+    el.className = 'devitem' + (sel ? ' sel' : '');
+    el.innerHTML = '<span class="cb">' + (sel ? '✓' : '') + '</span>'
+      + '<div class="dn"><b>' + name + '</b><span>' + sub + '</span></div>'
+      + '<span class="cap both">' + cap + '</span>';
+    el.onclick = () => {
+      W.chosen.has(key) ? W.chosen.delete(key) : W.chosen.add(key);
+      renderDevs();
+    };
+    box.appendChild(el);
+  };
+  const mkHint = (text) => {
+    const el = document.createElement('div');
+    el.className = 'devitem';
+    el.style.cssText = 'justify-content:center;color:var(--fg-dim);border-style:dashed';
+    el.textContent = text;
+    box.appendChild(el);
+  };
+
+  // 固定项 1：本机手表 = 提供这个页面的那台（相对地址 /upload），默认就选中
+  const selfName = (W.self && W.self.name) ? W.self.name : '本机手表';
+  const selfSub = (W.self && W.self.ip) ? (W.self.ip + ':' + W.self.port) : '当前连接的手表';
+  mkRow('self', selfName + '（本机手表）', selfSub, '可接收');
+
+  // 固定项 2：网页端 = 当前浏览器（文件直接保存到本机）
+  mkRow('web', '网页端（当前浏览器）', '直接保存到这台电脑 / 手机', '保存');
+
+  if (!W.scanned){
+    mkHint('点「扫描」查找同一 Wi-Fi 下的其它设备');
+  } else if (!W.devices.length){
+    mkHint('没有发现其它设备（对方需开启局域网传歌）');
+  } else {
+    W.devices.forEach(d => mkRow(d.key, d.name, d.ip + ':' + d.port, '可收发'));
+  }
+
+  const names = [];
+  if (W.chosen.has('self')) names.push('本机手表');
+  if (W.chosen.has('web')) names.push('网页端');
+  W.devices.forEach(d => { if (W.chosen.has(d.key)) names.push(d.name); });
+  wq('targetName').textContent = names.length
+    ? names.length + ' 台：' + names.join('、')
+    : '选择设备（可多选）';
+}
+
+wq('btnScan').onclick = async () => {
+  wq('btnScan').disabled = true; wq('btnScan').textContent = '扫描中…';
+  try {
+    const resp = await fetch('/api/devices?t=' + Date.now(), {cache:'no-store'});
+    const json = await resp.json();
+    W.self = json.self || null;
+    W.devices = (json.devices || []).map(d => ({
+      key: d.ip + ':' + d.port, name: d.name, ip: d.ip, port: d.port,
+      base: 'http://' + d.ip + ':' + d.port
+    }));
+    W.scanned = true;
+    renderDevs();
+    banner(W.devices.length ? ('发现 ' + W.devices.length + ' 台设备') : '没发现其它设备');
+  } catch (e) {
+    banner('扫描失败：' + e.message);
+  } finally {
+    wq('btnScan').disabled = false; wq('btnScan').textContent = '扫描';
+  }
+};
+wq('devOk').onclick = () => {
+  openDev(false);
+  if (W.chosen.size) banner('将发送到 ' + W.chosen.size + ' 台设备');
+};
+
+/* ---------- 发送（真实：逐设备 × 逐文件 POST /upload） ---------- */
+document.addEventListener('click', ev => {
+  const btn = ev.target && ev.target.closest && ev.target.closest('#btnSend, #btnSendSel');
+  if (!btn) return;
+  ev.preventDefault(); ev.stopPropagation();
+  doSend(btn.id === 'btnSendSel');
+}, true);
+
+async function doSend(onlySelected){
+  const items = onlySelected ? Array.from(W.sel) : pending();
+  if (!items.length){ banner('当前无可操作文件'); return; }
+  if (!W.chosen.size){ banner('先点「发送到」勾选设备'); openDev(true); return; }
+  const targets = [];
+  if (W.chosen.has('self')) targets.push({key:'self', name:'本机手表', base:''});
+  if (W.chosen.has('web')) targets.push({key:'web', name:'网页端'});
+  W.devices.forEach(d => { if (W.chosen.has(d.key)) targets.push(d); });
+  if (!targets.length){ banner('没有可发送的设备'); return; }
+
+  const webOnly = targets.filter(d => d.key === 'web');
+  const lanTargets = targets.filter(d => d.key !== 'web');   // self + 局域网设备，都走 POST /upload
+  S.busy = true; count(); syncCorners();
+  let ok = 0, total = 0;
+
+  // 网页端：把选中的文件直接存到本机（浏览器下载）
+  if (webOnly.length){
+    for (const it of items){
+      total++;
+      try {
+        const url = URL.createObjectURL(it.file);
+        const a = document.createElement('a');
+        a.href = url; a.download = it.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        ok++;
+        banner('已保存到本机：' + it.name, 2000);
+      } catch (e) { /* 忽略单个失败 */ }
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
+
+  for (const dev of lanTargets){
+    for (const it of items){
+      total++;
+      it.__base = dev.base;
+      banner('→ ' + dev.name + ' · 《' + it.name + '》', 3000);
+      await send(it);
+      if (it.status === 'ok') ok++;
+    }
+  }
+  S.busy = false; count(); syncCorners();
+  banner('发送完成：' + ok + '/' + total + ' 个成功');
+  if (onlySelected) exitMulti();
+}
+
+/* ---------- 接收：从手表拉文件 ---------- */
+async function loadReceiveFiles(){
+  const list = wq('rxList');
+  list.innerHTML = '<li class="empty">正在读取…</li>';
+  try {
+    const resp = await fetch('/api/inbox?t=' + Date.now(), {cache:'no-store'});
+    const rows = await resp.json();           // [{id,name,size,from,time}]
+    if (!Array.isArray(rows) || !rows.length){
+      list.innerHTML = '<li class="empty">还没有设备发文件过来</li>';
+      W.recvCount = 0;
+    } else {
+      list.innerHTML = rows.map(f => {
+        const apk = /\.apk$/i.test(f.name);
+        const href = '/api/download/' + encodeURIComponent(f.id);
+        return '<li><span class="rn">' + f.name + '</span>'
+          + (apk ? '<span class="tagapk">APK</span>' : '')
+          + '<span class="rs">' + size(f.size) + (f.from ? ' · ' + f.from : '') + '</span>'
+          + '<a class="dl" href="' + href + '" download>下载</a></li>';
+      }).join('');
+      W.recvCount = rows.length;
+    }
+    wq('rxCount').textContent = W.recvCount + ' 个';
+    if (W.mode === 'send') wq('modeCnt').textContent = W.recvCount ? W.recvCount + ' 个' : '';
+  } catch (e) {
+    list.innerHTML = '<li class="empty">读取失败：' + e.message + '</li>';
+  }
+}
+wq('btnSim').onclick = loadReceiveFiles;
+
+/* ---------- 监控：可切换设备 ---------- */
+let monDevices = [];
+async function buildMonChips(){
+  const chips = wq('monChips');
+  monDevices = [{key:'self', name:'本机手表', base:''}];
+  try {
+    const resp = await fetch('/api/devices?t=' + Date.now(), {cache:'no-store'});
+    const json = await resp.json();
+    (json.devices || []).forEach(d => monDevices.push({
+      key: d.ip + ':' + d.port, name: d.name, base: 'http://' + d.ip + ':' + d.port
+    }));
+  } catch (e) { /* 离线时只显示本机 */ }
+  chips.innerHTML = monDevices.map((d, i) =>
+    '<button class="devchip' + (i === 0 ? ' on' : '') + '" data-i="' + i + '">' + d.name + '</button>'
+  ).join('');
+  chips.querySelectorAll('.devchip').forEach(chip => {
+    chip.onclick = () => {
+      chips.querySelectorAll('.devchip').forEach(c => c.classList.remove('on'));
+      chip.classList.add('on');
+      selectMonitor(+chip.dataset.i);
+    };
+  });
+  selectMonitor(0);
+}
+function selectMonitor(index){
+  const dev = monDevices[index];
+  if (!dev) return;
+  S.monBase = dev.base || '';
+  // 切设备时先停掉上一台的 SSE / 轮询
+  if (S.sse){ try { S.sse.close(); } catch (e) {} S.sse = null; }
+  if (S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer = null; }
+
+  // 本机也走 1 秒轮询：SSE 在部分手机浏览器会静默断流，靠它兜底不现实
+  fetchStatus();
+  S.pollTimer = setInterval(fetchStatus, 1000);
+  if (!S.monBase && window.EventSource){
+    try {
+      S.sse = new EventSource('/api/events');
+      S.sse.onmessage = ev => {
+        try { applyStatus(JSON.parse(ev.data)); } catch (e) {}
+      };
+      S.sse.onerror = () => { if (S.sse){ S.sse.close(); S.sse = null; } };
+    } catch (e) { /* 不支持就算了，轮询已覆盖 */ }
+  }
+}
+
+/* 2026-11-28：文件加入统一走这里 —— 原 add() 依赖包装链，实测偶发「选完没反应」 */
+function addFiles(fileList){
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  files.forEach(f => {
+    const it = {
+      file: f, name: f.name, size: f.size,
+      kind: kind(f.name), status: 'wait', progress: 0, bps: 0, note: '', err: ''
+    };
+    S.items.push(it);
+    it.el = row(it);
+    ui.qlist.appendChild(it.el);
+    paint(it);
+  });
+  refresh();
+  count();
+}
+
+/* 原页面的 count() 会改按钮状态，这里包一层同步右下角 */
+const _count = count;
+count = function(){ _count(); refresh(); };
+
+W.chosen.add('self');      // 默认发给本机手表，打开就能用
+refresh(); setMode('send');
+buildMonChips();
 </script>
 </body>
 </html>

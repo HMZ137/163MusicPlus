@@ -53,7 +53,7 @@ public class SongInfoActivity extends BaseWatchActivity {
     private static final int COLOR_TEXT_DESC = 0xB3FFFFFF;
     // P1-10：强调色统一走 UiKit.COLOR_ACCENT（随主题刷新），不再本地定义
     private static final int COLOR_DIVIDER = 0xFF1E1E1E;
-    private static final int COLOR_CARD_BG = 0xFF252525;
+    private static final int COLOR_CARD_BG = com.qinghe.music163pro.util.UiKit.COLOR_SURFACE_HIGH;
 
     private long songId;
     private String songName;

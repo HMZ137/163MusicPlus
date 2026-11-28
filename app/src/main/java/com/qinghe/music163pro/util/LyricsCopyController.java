@@ -267,7 +267,7 @@ public final class LyricsCopyController {
                 GradientDrawable bg = new GradientDrawable();
                 bg.setColor(SELECTED_FILL);
                 bg.setStroke(dp(1), SELECTED_STROKE);
-                bg.setCornerRadius(dp(8));
+                bg.setCornerRadius(dp(12));
                 row.setBackground(bg);
             } else {
                 row.setBackground(i < originalBackgrounds.size()
@@ -321,7 +321,7 @@ public final class LyricsCopyController {
         button.setPadding(dp(3), dp(6), dp(3), dp(6));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(BTN_BG);
-        bg.setCornerRadius(dp(8));
+        bg.setCornerRadius(dp(12));
         button.setBackground(bg);
         button.setClickable(true);
         button.setFocusable(true);

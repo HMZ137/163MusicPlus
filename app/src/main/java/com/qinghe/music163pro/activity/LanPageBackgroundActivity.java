@@ -41,7 +41,8 @@ public class LanPageBackgroundActivity extends BaseWatchActivity {
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
         title.setGravity(android.view.Gravity.CENTER);
         title.setPadding(0, dpToPx(4), 0, dpToPx(10));
-        root.addView(title);
+        root.addView(title);        com.qinghe.music163pro.util.WatchBackButton.applyTitleBarInset(this, title);
+
 
         root.addView(button("选择背景图片", v ->
                 startActivityForResult(new Intent(Intent.ACTION_GET_CONTENT)

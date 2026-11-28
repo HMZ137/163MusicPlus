@@ -84,12 +84,12 @@ public class UpdateActivity extends BaseWatchActivity {
 
         root.addView(makeSpacer(px(10)));
 
-        TextView tvMsg = makeText("请选择下载源进行更新", 0xFFCCCCCC, px(15), false, Gravity.CENTER);
+        TextView tvMsg = makeText("请选择下载源进行更新", com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(15), false, Gravity.CENTER);
         root.addView(tvMsg);
 
         root.addView(makeSpacer(px(6)));
 
-        tvVersionInfo = makeText("最新版本：获取中...", 0xFFAAAAAA, px(13), false, Gravity.CENTER);
+        tvVersionInfo = makeText("最新版本：获取中...", com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(13), false, Gravity.CENTER);
         root.addView(tvVersionInfo);
 
         // 2026-11-21：更新源已改为自有仓库，恢复下载安装能力
@@ -103,7 +103,7 @@ public class UpdateActivity extends BaseWatchActivity {
 
         root.addView(makeSpacer(px(4)));
 
-        tvUpdateLog = makeText("正在获取更新日志...", 0xFFAAAAAA, px(13), false, Gravity.START);
+        tvUpdateLog = makeText("正在获取更新日志...", com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(13), false, Gravity.START);
         root.addView(tvUpdateLog);
 
         root.addView(makeSpacer(px(10)));

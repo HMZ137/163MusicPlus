@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M3E 弹窗按钮底：胶囊 + tonal 底，两态都带圆角（不用 ripple mask，避免按整行矩形铺开）。
+  与 bg_btn_accent（主操作）配套：弹窗里「取消 / 次要动作」用这个。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#3A3B44" />
+            <corners android:radius="@dimen/m3_corner_full" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#26272D" />
+            <corners android:radius="@dimen/m3_corner_full" />
+        </shape>
+    </item>
+</selector>

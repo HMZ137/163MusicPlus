@@ -22,7 +22,7 @@ public class OpenSourceActivity extends BaseWatchActivity {
         }
 
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF121212);
+        scrollView.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scrollView.setFillViewport(true);
 
         LinearLayout content = new LinearLayout(this);
@@ -35,11 +35,11 @@ public class OpenSourceActivity extends BaseWatchActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeText(
                 "本仓库采用 MIT License 开源，以下为本项目和使用到的开源项目说明。",
-                0xFFAAAAAA, px(15), false, Gravity.START));
+                com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(15), false, Gravity.START));
         content.addView(makeSpacer(px(8)));
         content.addView(makeText(
                 "163MusicPlus 代码部分可在 MIT 协议下使用、修改和分发；网易云音乐相关 API 与内容版权仍归网易公司所有。",
-                0xFFAAAAAA, px(15), false, Gravity.START));
+                com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(15), false, Gravity.START));
         addProject(content,
                 "163MusicPlus",
                 "开发者：HMZ138",
@@ -67,7 +67,7 @@ public class OpenSourceActivity extends BaseWatchActivity {
         content.addView(makeSpacer(px(8)));
         content.addView(makeText(name, 0xFFFFFFFF, px(18), true, Gravity.START));
         content.addView(makeSpacer(px(4)));
-        content.addView(makeText(developer, 0xFFCCCCCC, px(15), false, Gravity.START));
+        content.addView(makeText(developer, com.qinghe.music163pro.util.UiKit.COLOR_TEXT_MUTED, px(15), false, Gravity.START));
         content.addView(makeSpacer(px(2)));
         TextView linkTv = makeText(githubUrl, 0xFF5599CC, px(15), false, Gravity.START);
         Linkify.addLinks(linkTv, Linkify.WEB_URLS);

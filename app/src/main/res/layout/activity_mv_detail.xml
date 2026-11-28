@@ -33,7 +33,7 @@
                 android:id="@+id/layout_mv_cover"
                 android:layout_width="match_parent"
                 android:layout_height="148dp"
-                android:background="@color/surface_elevated"
+                android:background="@drawable/bg_card_row"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="@drawable/bg_selectable_rounded">

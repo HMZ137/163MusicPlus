@@ -29,7 +29,7 @@ import java.util.Locale;
  */
 public class LanguageLearningActivity extends BaseWatchActivity {
 
-    private Switch switchEnabled;
+    private android.widget.CompoundButton switchEnabled;
     private TextView tvKeyValue;
     private TextView tvModelValue;
     private TextView tvStatsValue;
@@ -40,7 +40,7 @@ public class LanguageLearningActivity extends BaseWatchActivity {
         super.onCreate(savedInstanceState);
 
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF121212);
+        scroll.setBackgroundColor(com.qinghe.music163pro.util.UiKit.COLOR_BG_SURFACE);
         scroll.setFillViewport(true);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -56,7 +56,9 @@ public class LanguageLearningActivity extends BaseWatchActivity {
         TextView title = new TextView(this);
         title.setText("高级歌词翻译");
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
+        // 2026-11-28：标题字号与全站统一（@dimen/watch_title_text_size = 16sp）
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                getResources().getDimensionPixelSize(R.dimen.watch_title_text_size));
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         android.widget.RelativeLayout.LayoutParams titleParams =
@@ -67,8 +69,6 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         titleParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
         title.setLayoutParams(titleParams);
         titleBar.addView(title);
-        // G5：标题居左；避让由统一入口按返回按钮占位动态补齐（勿手写像素）
-        WatchBackButton.alignTitleStart(this, title);
         root.addView(titleBar);
 
         // ── 总开关 ──
@@ -77,7 +77,13 @@ titleParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_START);
         switchText.addView(label("高级歌词翻译"));
         switchText.addView(hint("歌词按词性着色；没有翻译的歌交给 AI 翻译"));
         switchRow.addView(switchText);
-        switchEnabled = new Switch(this);
+        // 2026-11-28 M3E：系统 Switch 换成 Material 3 的 MaterialSwitch
+        // （M3 主题下 textOn/textOff 必须显式给空串，否则 onMeasure 里 NPE）
+        com.google.android.material.materialswitch.MaterialSwitch m3Switch =
+                new com.google.android.material.materialswitch.MaterialSwitch(this);
+        m3Switch.setTextOn("");
+        m3Switch.setTextOff("");
+        switchEnabled = m3Switch;
         // 2026-11-21：系统 Switch 的尺寸由 density 决定，不吃 px() 里的 UiScale 系数，
         // 界面缩放调大后它不会跟着变，看着比旁边文字小一圈。这里按同一系数缩放补偿。
         float switchScale = com.qinghe.music163pro.util.UiScale.getScale(this);

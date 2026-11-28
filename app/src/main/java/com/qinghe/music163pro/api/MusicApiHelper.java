@@ -405,6 +405,55 @@ public class MusicApiHelper {
     }
 
     /**
+     * 按歌曲 ID 取详情（2026-11-28 新增）：搜索框里输入纯 ID / 网易云链接时，
+     * 用它把这首歌放到搜索结果第一位。
+     *
+     * <p>走 {@code /api/v3/song/detail}，字段与 {@link #searchDirect} 的 cloudsearch
+     * 结果同构（{@code ar}/{@code al}），便于直接混进「搜索」列表。</p>
+     */
+    public static void getSongById(long songId, String cookie, SearchCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "按ID取歌", "id=" + songId);
+                JSONObject data = new JSONObject();
+                data.put("c", "[{\"id\":" + songId + "}]");
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String response = weapiPost("/api/v3/song/detail", data.toString(), cookie);
+
+                List<Song> songs = new ArrayList<>();
+                JSONObject json = new JSONObject(response);
+                JSONArray arr = json.optJSONArray("songs");
+                if (arr != null && arr.length() > 0) {
+                    JSONObject s = arr.getJSONObject(0);
+                    String name = s.optString("name", "");
+                    String artist = "";
+                    JSONArray ar = s.optJSONArray("ar");
+                    if (ar != null && ar.length() > 0) {
+                        artist = ar.getJSONObject(0).optString("name", "");
+                    }
+                    String album = "";
+                    String coverUrl = "";
+                    JSONObject al = s.optJSONObject("al");
+                    if (al != null) {
+                        album = al.optString("name", "");
+                        coverUrl = al.optString("picUrl", "");
+                    }
+                    Song song = new Song(s.optLong("id", songId), name, artist, album);
+                    if (!coverUrl.isEmpty()) {
+                        song.setCoverUrl(coverUrl);
+                    }
+                    songs.add(song);
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "按ID取歌失败: " + songId, e);
+                mainHandler.post(() -> callback.onError(
+                        e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
      * Search via weapi/cloudsearch/pc (same as NeteaseCloudMusicApiBackup module/cloudsearch.js)
      */
     private static List<Song> searchDirect(String keyword, int offset, String cookie) throws Exception {

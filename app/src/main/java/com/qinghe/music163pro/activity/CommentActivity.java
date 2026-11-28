@@ -56,7 +56,7 @@ public class CommentActivity extends BaseWatchActivity {
     private static final String PREFS_NAME = "music163_settings";
     private static final int PAGE_SIZE = 20;
 
-    private static final int COLOR_BG = 0xFF121212;
+    private static final int COLOR_BG = 0xFF000000;   // M3E：纯黑
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int COLOR_TEXT_SECONDARY = 0x80FFFFFF;
     // P1-10：强调色统一走 UiKit.COLOR_ACCENT（随主题刷新），不再本地定义
@@ -134,7 +134,7 @@ public class CommentActivity extends BaseWatchActivity {
     private View buildTopBar() {
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.VERTICAL);
-        topBar.setBackgroundColor(0xFF1A1A1A);
+        topBar.setBackgroundColor(0xFF15151A);
         topBar.setPadding(px(8), px(6), px(8), px(4));
 
         // Song name row
@@ -224,12 +224,22 @@ public class CommentActivity extends BaseWatchActivity {
     }
 
     private void styleSortTab(TextView tab, boolean active) {
+        if (tab == null) {
+            return;
+        }
         if (active) {
             tab.setTextColor(com.qinghe.music163pro.util.UiKit.COLOR_ACCENT);
             tab.setTypeface(tab.getTypeface(), Typeface.BOLD);
+            // M3E：选中项给胶囊底，形成 segmented 观感
+            android.graphics.drawable.GradientDrawable pill =
+                    com.qinghe.music163pro.util.UiKit.roundedFill(this, 0xFF3B2F4D);
+            pill.setCornerRadius(com.qinghe.music163pro.util.UiKit.dp(this,
+                    com.qinghe.music163pro.util.UiKit.DP_BUTTON_RADIUS));
+            tab.setBackground(pill);
         } else {
             tab.setTextColor(COLOR_TEXT_SECONDARY);
             tab.setTypeface(Typeface.DEFAULT);
+            tab.setBackground(null);
         }
     }
 
@@ -265,7 +275,7 @@ public class CommentActivity extends BaseWatchActivity {
     private View buildBottomBar() {
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
-        bottomBar.setBackgroundColor(0xFF1A1A1A);
+        bottomBar.setBackgroundColor(0xFF15151A);
         bottomBar.setPadding(px(6), px(4), px(6), px(4));
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
 
@@ -404,9 +414,17 @@ public class CommentActivity extends BaseWatchActivity {
     // ──────────────────────────────────────────────────────
 
     private View buildCommentItem(JSONObject comment) {
+        // 2026-11-28 M3E：每条评论一张 Material 卡片（18dp 圆角 + surface container）
+        com.google.android.material.card.MaterialCardView card =
+                com.qinghe.music163pro.util.UiKit.m3Card(this);
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardLp.bottomMargin = px(6);
+        card.setLayoutParams(cardLp);
+
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
-        item.setPadding(px(4), px(6), px(4), px(6));
+        item.setPadding(px(10), px(8), px(10), px(8));
 
         long commentId = comment.optLong("commentId", 0);
         String content = comment.optString("content", "");
@@ -595,7 +613,8 @@ public class CommentActivity extends BaseWatchActivity {
             return true;
         });
 
-        return item;
+        card.addView(item);
+        return card;
     }
 
     private void loadCurrentUserId() {

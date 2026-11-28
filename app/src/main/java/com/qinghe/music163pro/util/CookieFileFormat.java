@@ -16,7 +16,9 @@ import java.util.List;
 public final class CookieFileFormat {
 
     /** 文件头的标记行前缀，用来在文件管理器里一眼认出这是什么。 */
-    public static final String HEADER_MARK = "# 163音乐Pro";
+    public static final String HEADER_MARK = "# 163MusicPlus";
+    /** 旧版本写出的凭证文件头：改名后仍要能读回来，否则用户备份会失效。 */
+    private static final String LEGACY_HEADER_MARK = "# 163音乐Pro";
     /** 注释行的起始字符。 */
     public static final char COMMENT_CHAR = '#';
 
@@ -92,7 +94,8 @@ public final class CookieFileFormat {
             if (trimmed.isEmpty()) {
                 continue;
             }
-            return trimmed.startsWith(HEADER_MARK);
+            return trimmed.startsWith(HEADER_MARK)
+                    || trimmed.startsWith(LEGACY_HEADER_MARK);
         }
         return false;
     }
