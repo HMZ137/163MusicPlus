@@ -125,6 +125,12 @@ public final class MultiSelectController {
     static int CHECK_ACTIVE_COLOR = 0xFFBB86FC;
     private static final int CHECK_INACTIVE_COLOR = 0x80FFFFFF;
     private static final int ACTION_BUTTON_BG = 0xFF2D2D2D;
+    /** 多选动作栏收起后，无操作 2s 自动弹出（与标题栏收缩一致，标题栏是 2.5s）。 */
+    private static final long AUTO_EXPAND_MS = 2000L;
+    private boolean actionsCollapsed;
+    private View collapsedHandle;
+    private final android.os.Handler collapseHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable autoExpandTask;
 
     private final Activity activity;
     private final ListView listView;
@@ -285,6 +291,10 @@ public final class MultiSelectController {
         selectedPositions.clear();
         selectedLookup.clear();
         if (actionBar != null) {
+            expandActions();
+            if (collapsedHandle != null) {
+                collapsedHandle.setVisibility(View.GONE);
+            }
             actionBar.setVisibility(View.GONE);
         }
         setActionsCollapsed(false);
@@ -354,13 +364,11 @@ public final class MultiSelectController {
 
         bar.addView(buildHeaderRow());
 
-        // 动作按钮**每行两个**。
-        // 三个动作挤在一行时，每个按钮只有约 1/3 屏宽：「加入歌单 / 移出列表」这四个字放不下会被
-        // 折成两行，而「收藏」只有一行 —— 三个按钮看起来大小不一（实机截图确认）。两两成行后按钮
-        // 宽度翻倍，四个字能单行放下，三个按钮也就自然等大了。
+        // 2026-11-28：动作按钮**只占底下一排**（需求方：原来两列三行占了半个屏幕）。
+        // 横向空间不够时靠 shortLabel() 把长标签压到 2~3 字，而不是折行堆高。
         actionsContainer = new LinearLayout(activity);
-        actionsContainer.setOrientation(LinearLayout.VERTICAL);
-        final int perRow = 2;
+        actionsContainer.setOrientation(LinearLayout.HORIZONTAL);
+        final int perRow = Integer.MAX_VALUE;
         for (int i = 0; i < actions.size(); i += perRow) {
             LinearLayout actionRow = new LinearLayout(activity);
             actionRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -403,7 +411,87 @@ public final class MultiSelectController {
 
         content.addView(bar, params);
         actionBar = bar;
+
+        // 2026-11-28：收起态只在底部留一条小手柄；上滑手柄 / 2s 无操作都会弹回完整动作栏
+        TextView handle = new TextView(activity);
+        handle.setText("操作 ▴");
+        handle.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        handle.setTextColor(activity.getResources().getColor(R.color.text_primary));
+        handle.setGravity(Gravity.CENTER);
+        handle.setPadding(px(10), px(4), px(10), px(4));
+        handle.setClickable(true);
+        handle.setVisibility(View.GONE);
+        GradientDrawable handleBg = new GradientDrawable();
+        handleBg.setColor(ACTION_BUTTON_BG);
+        handleBg.setCornerRadius(UiKit.dp(activity, UiKit.DP_BUTTON_RADIUS));
+        handle.setBackground(handleBg);
+        FrameLayout.LayoutParams handleParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        handleParams.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        handleParams.bottomMargin = px(4);
+        handle.setOnClickListener(v -> expandActions());
+        content.addView(handle, handleParams);
+        collapsedHandle = handle;
+
+        // 在完整动作栏上下滑 → 收起；上滑 → 展开（与标题栏手势方向一致）
+        final android.view.GestureDetector detector = new android.view.GestureDetector(activity,
+                new android.view.GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDown(android.view.MotionEvent e) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2,
+                                           float vx, float vy) {
+                        float dy = e2.getY() - e1.getY();
+                        int threshold = px(24);
+                        if (dy <= -threshold) {
+                            expandActions();
+                        } else if (dy >= threshold) {
+                            collapseActions();
+                        }
+                        return true;
+                    }
+                });
+        bar.setOnTouchListener((v, ev) -> detector.onTouchEvent(ev));
+
         updateHeaderText();
+    }
+
+    /** 收起：完整动作栏隐藏，底部只留一条手柄。 */
+    private void collapseActions() {
+        if (actionsCollapsed || actionBar == null) {
+            return;
+        }
+        actionsCollapsed = true;
+        actionBar.setVisibility(View.GONE);
+        if (collapsedHandle != null) {
+            collapsedHandle.setVisibility(View.VISIBLE);
+        }
+        if (autoExpandTask != null) {
+            collapseHandler.removeCallbacks(autoExpandTask);
+        }
+        autoExpandTask = () -> expandActions();
+        collapseHandler.postDelayed(autoExpandTask, AUTO_EXPAND_MS);
+    }
+
+    /** 展开：收起手柄隐藏，恢复完整动作栏。 */
+    private void expandActions() {
+        if (autoExpandTask != null) {
+            collapseHandler.removeCallbacks(autoExpandTask);
+            autoExpandTask = null;
+        }
+        if (!actionsCollapsed) {
+            return;
+        }
+        actionsCollapsed = false;
+        if (collapsedHandle != null) {
+            collapsedHandle.setVisibility(View.GONE);
+        }
+        if (actionBar != null) {
+            actionBar.setVisibility(View.VISIBLE);
+        }
     }
 
     private View buildHeaderRow() {
@@ -441,11 +529,26 @@ public final class MultiSelectController {
      * <p>需求方明确要求「图标下方有小字说明提高辨识度」——图标单看太容易混淆，
      * 所以文字必须留着且要够清楚（11sp，比原来 14sp 单行标签略小但仍有辨识度）。</p>
      */
+    /** 底下一排放得下 5 个格子，标签必须压短（图标+小字仍保留辨识度）。 */
+    private static String shortLabel(Action action) {
+        if (action == null) return "";
+        if (Action.ID_PLAY_NEXT.equals(action.id)) return "下一首";
+        if (Action.ID_FAVORITE.equals(action.id)) return "收藏";
+        if (Action.ID_DELETE.equals(action.id)) return "删除";
+        String label = action.label;
+        if (label == null) return "";
+        if (label.contains("本地歌单")) return "本地歌单";
+        if (label.contains("歌单")) return "收藏歌单";
+        if (label.contains("下载")) return "下载";
+        if (label.contains("移出")) return "移出";
+        return label.length() > 4 ? label.substring(0, 4) : label;
+    }
+
     private View buildActionButton(final Action action) {
         LinearLayout cell = new LinearLayout(activity);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
-        cell.setPadding(px(4), px(6), px(4), px(6));
+        cell.setPadding(px(2), px(3), px(2), px(3));
         cell.setClickable(true);
         cell.setFocusable(true);
 
@@ -461,18 +564,18 @@ public final class MultiSelectController {
 
         ImageView icon = new ImageView(activity);
         LinearLayout.LayoutParams iconParams =
-                new LinearLayout.LayoutParams(px(20), px(20));
+                new LinearLayout.LayoutParams(px(18), px(18));
         icon.setLayoutParams(iconParams);
         icon.setImageResource(action.icon());
         icon.setColorFilter(action.textColor);
         cell.addView(icon);
 
         TextView label = new TextView(activity);
-        label.setText(action.label);
+        label.setText(shortLabel(action));
         label.setTextColor(0xFFE6E1F0);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
+        label.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(10));
         label.setGravity(Gravity.CENTER);
-        label.setPadding(0, px(3), 0, 0);
+        label.setPadding(0, px(2), 0, 0);
         // 单行 + 截断：保证所有格子等高（标签字数不同也不会把某个格子撑成两行）
         label.setSingleLine(true);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
