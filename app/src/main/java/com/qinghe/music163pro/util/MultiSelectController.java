@@ -369,32 +369,22 @@ public final class MultiSelectController {
         actionsContainer = new LinearLayout(activity);
         actionsContainer.setOrientation(LinearLayout.HORIZONTAL);
         final int perRow = Integer.MAX_VALUE;
-        for (int i = 0; i < actions.size(); i += perRow) {
-            LinearLayout actionRow = new LinearLayout(activity);
-            actionRow.setOrientation(LinearLayout.HORIZONTAL);
-            actionRow.setPadding(0, px(2), 0, 0);
-            int count = 0;
-            for (int j = 0; j < perRow && i + j < actions.size(); j++) {
-                actionRow.addView(buildActionButton(actions.get(i + j)));
-                count++;
-            }
-            if (count == 1) {
-                // 最后一行只剩一个按钮时补等宽占位：与上一行左对齐，且宽度保持一致。
-                // 高度必须写死为 1px —— 裸 View 的高度若给 WRAP_CONTENT，在 AT_MOST 约束下会
-                // 「撑满可用高度」，把这一行、进而整条动作栏顶到全屏高，gravity=BOTTOM 随之失效、
-                // 动作条会跑到屏幕顶部（实机复现并定位）。
-                View spacer = new View(activity);
-                spacer.setLayoutParams(new LinearLayout.LayoutParams(0, px(1), 1f));
-                actionRow.addView(spacer);
-            }
-            // 最后一个动作按钮（或占位）不需要右边距，避免动作栏右侧留白。
-            View last = actionRow.getChildAt(actionRow.getChildCount() - 1);
+        // 2026-11-28：按钮**直接**挂在横向容器下。
+        // 之前外面还套了一层「行」，行在横向容器里是 WRAP_CONTENT，按钮的 weight=1 失效，
+        // 每个按钮只剩图标那点宽度（实测 19px），文字全被截断 —— 这一层必须去掉。
+        actionsContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        for (int i = 0; i < actions.size(); i++) {
+            actionsContainer.addView(buildActionButton(actions.get(i)));
+        }
+        // 最后一个动作按钮不需要右边距，避免动作栏右侧留白。
+        View last = actionsContainer.getChildAt(actionsContainer.getChildCount() - 1);
+        if (last != null) {
             ViewGroup.LayoutParams raw = last.getLayoutParams();
             if (raw instanceof LinearLayout.LayoutParams) {
                 ((LinearLayout.LayoutParams) raw).rightMargin = 0;
                 last.setLayoutParams(raw);
             }
-            actionsContainer.addView(actionRow);
         }
         bar.addView(actionsContainer);
 
@@ -455,6 +445,11 @@ public final class MultiSelectController {
                     }
                 });
         bar.setOnTouchListener((v, ev) -> detector.onTouchEvent(ev));
+        // 按钮格子是 clickable，会吃掉 MOVE/UP，父容器的 OnTouchListener 收不到 fling；
+        // 「已选 N 项」这行文字本身不可点，在它上面下滑同样能收起。
+        if (headerView != null) {
+            headerView.setOnTouchListener((v, ev) -> detector.onTouchEvent(ev));
+        }
 
         updateHeaderText();
     }
@@ -537,18 +532,18 @@ public final class MultiSelectController {
         if (Action.ID_DELETE.equals(action.id)) return "删除";
         String label = action.label;
         if (label == null) return "";
-        if (label.contains("本地歌单")) return "本地歌单";
-        if (label.contains("歌单")) return "收藏歌单";
+        if (label.contains("本地歌单")) return "本地";
+        if (label.contains("歌单")) return "收藏";
         if (label.contains("下载")) return "下载";
         if (label.contains("移出")) return "移出";
-        return label.length() > 4 ? label.substring(0, 4) : label;
+        return label.length() > 2 ? label.substring(0, 2) : label;
     }
 
     private View buildActionButton(final Action action) {
         LinearLayout cell = new LinearLayout(activity);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
-        cell.setPadding(px(2), px(3), px(2), px(3));
+        cell.setPadding(px(1), px(8), px(1), px(8));
         cell.setClickable(true);
         cell.setFocusable(true);
 
@@ -564,7 +559,7 @@ public final class MultiSelectController {
 
         ImageView icon = new ImageView(activity);
         LinearLayout.LayoutParams iconParams =
-                new LinearLayout.LayoutParams(px(18), px(18));
+                new LinearLayout.LayoutParams(px(20), px(20));
         icon.setLayoutParams(iconParams);
         icon.setImageResource(action.icon());
         icon.setColorFilter(action.textColor);
@@ -573,9 +568,9 @@ public final class MultiSelectController {
         TextView label = new TextView(activity);
         label.setText(shortLabel(action));
         label.setTextColor(0xFFE6E1F0);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(10));
+        label.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(11));
         label.setGravity(Gravity.CENTER);
-        label.setPadding(0, px(2), 0, 0);
+        label.setPadding(0, px(3), 0, 0);
         // 单行 + 截断：保证所有格子等高（标签字数不同也不会把某个格子撑成两行）
         label.setSingleLine(true);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
