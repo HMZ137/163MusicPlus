@@ -51,6 +51,8 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
 
     private static final String PREFS_NAME = "music163_settings";
     private static final String KEY_SEARCH_HISTORY = "search_history";
+    /** 「可以解析网易云链接」浮窗提示只弹一次（与主界面 pager_hint_shown 同一模式）。 */
+    private static final String KEY_LINK_HINT_SHOWN = "search_link_hint_shown";
     /** 提示词轮播（2026-11-28）。 */
     private boolean hintRotationStarted;
     private Runnable hintRunnable;
@@ -145,8 +147,18 @@ public class SearchActivity extends BaseWatchActivity implements SearchListFragm
      * <p>需求方明确要的是**提示气泡**，不是带输入框/按钮的卡片 —— 只显示一行文字 +
      * 一个关闭 X，浮在搜索框下方，不遮全屏、不拦截背景操作。X 在 5 秒后才可点，
      * 逼用户至少看一眼这个入口（与设置页首次提示同一套交互）。</p>
+     *
+     * <p>2026-11-28 追加：改成只弹一次 —— 用 {@link #KEY_LINK_HINT_SHOWN} 标记，
+     * 与主界面「左右滑动切换」首次提示（{@code pager_hint_shown}）同一套逻辑，
+     * 不再每次进搜索页都弹。</p>
      */
     private void showPasteLinkDialog() {
+        // 只弹一次：弹过就写标记，后续进搜索页直接返回
+        if (prefs.getBoolean(KEY_LINK_HINT_SHOWN, false)) {
+            return;
+        }
+        prefs.edit().putBoolean(KEY_LINK_HINT_SHOWN, true).apply();
+
         FrameLayout rootView = (FrameLayout) getWindow().getDecorView()
                 .findViewById(android.R.id.content);
 
